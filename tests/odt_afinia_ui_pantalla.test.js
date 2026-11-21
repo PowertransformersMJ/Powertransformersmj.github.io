@@ -135,6 +135,48 @@ describe('Constancia de firmas', () => {
   });
 });
 
+describe('decisiones del 2026-11-21 en la Constancia y la bandeja', () => {
+  const odtBase = {
+    nro: NRO, huella: 'a'.repeat(64), publicadoPor: { nombre: 'Admin De Prueba' }, publicadoEnMs: Date.UTC(2026, 10, 20, 14),
+    firmantes: { azt: { uid: 'u1', nombre: 'Azt De Prueba', correo: 'azt@prueba.test' }, responsable: { uid: 'u2', nombre: 'Resp De Prueba', correo: 'resp@prueba.test' } }
+  };
+  const actoResp = (compositor) => ({
+    nombre: 'Resp De Prueba', correo: 'resp@prueba.test', enMs: Date.UTC(2026, 10, 20, 16), authTime: Math.floor(Date.UTC(2026, 10, 20, 15, 59) / 1000),
+    nro: NRO, huellaImagen: 'b'.repeat(64), huellaBase: 'a'.repeat(64), huellaVista: 'd'.repeat(64), compositor,
+    cierre: { si: true, fecha: '15/11/2026' }, declaracionVersion: 'odt-resp-v1', declaracion: declaracionResponsable({ ...DATOS, fecha: '15/11/2026' })
+  });
+  const sello = (ms) => ({ toMillis: () => ms });
+  test('pestañas «Cerradas» y «Anuladas y reemplazadas»', () => {
+    const t = PESTANAS.map((p) => p.titulo);
+    assert.ok(t.includes('Cerradas'));
+    assert.ok(t.includes('Anuladas y reemplazadas'));
+    assert.ok(t.indexOf('Listas') < t.indexOf('Cerradas'), 'Cerradas va después de Listas');
+  });
+  test('CERRADA: «Cerrada en Afinia el … · soporte … · registró …» y el estado en llano', () => {
+    const odt = { ...odtBase, estado: 'CERRADA', cierreAfinia: { fecha: '18/11/2026', soporte: 'SOPORTE_ODT_PRUEBA_01', por: { uid: 'u9', nombre: 'Admin De Prueba' }, en: sello(Date.UTC(2026, 10, 18, 20)) } };
+    const t = constancia({ odt, actos: {} }).textContent;
+    assert.ok(t.includes('Cerrada en Afinia el 18/11/2026 · soporte SOPORTE_ODT_PRUEBA_01 · registró Admin De Prueba'));
+    assert.ok(t.includes('Estado') && t.includes('Cerrada en Afinia'));
+    assert.ok(!/null|undefined/.test(t));
+  });
+  test('REEMPLAZADA: quién, cuándo y el motivo', () => {
+    const odt = { ...odtBase, estado: 'REEMPLAZADA', reemplazo: { motivo: 'La consignación del PDF no era la correcta.', por: { uid: 'u9', nombre: 'Admin De Prueba' }, en: sello(Date.UTC(2026, 10, 19, 15)) } };
+    const t = constancia({ odt, actos: {} }).textContent;
+    assert.ok(t.includes('Reemplazada por Admin De Prueba, 19/11/2026'), t);
+    assert.ok(t.includes('Motivo: La consignación del PDF no era la correcta.'));
+    assert.ok(!/null|undefined/.test(t));
+  });
+  test('acto del Responsable @2: dice el N.º estampado en «ODT GENERADA N°»; uno @1, no', () => {
+    const odt = { ...odtBase, estado: 'LISTA' };
+    const t2 = constancia({ odt, actos: { responsable: actoResp('odt-afinia@2') } }).textContent;
+    assert.ok(t2.includes('ODT GENERADA N° (estampado)'));
+    assert.ok(t2.includes('Fecha de cierre declarada') && t2.includes('15/11/2026'));
+    const t1 = constancia({ odt, actos: { responsable: actoResp('odt-afinia@1') } }).textContent;
+    assert.ok(!t1.includes('ODT GENERADA N°'));
+    assert.ok(t1.includes('odt-afinia@1'), 'el compositor del acto se sigue mostrando');
+  });
+});
+
 const { TEXTOS_APROBADOS, ROTULO_BORRADOR } = await import('../assets/js/domain/odt_afinia_textos.js');
 const { mensajeEsDeLaVista } = await import('../assets/js/ui/odt-afinia/app.js');
 const { avisoSesionReciente, motivosEnLlano } = await import('../assets/js/ui/odt-afinia/publicar.js');

@@ -1,6 +1,8 @@
 // Firma de ODT Afinia · componer(v0, actos, {PDFLib, zonas}): determinista (misma SHA-256 en dos
 // corridas, en otro proceso y con el pdf-lib de node_modules), estampa DENTRO de la zona de su rol y
 // en ningún otro lado, y no toca el resto del documento. PDFs y PNG SINTÉTICOS armados en memoria.
+// Compositor (2026-11-21): pruebas de ORO de la composición @1 (huellas medidas ANTES del cambio: las ODT
+// ya firmadas con @1 deben seguir recomponiéndose igual) y @2 = @1 + el N.º en «ODT GENERADA N°».
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -22,6 +24,19 @@ const IMG_RESP = pngFirma(300, 80, 2);    // 3,75 : 1
 const FECHA = '20/11/2026';
 const actosAzt = () => ({ azt: { imagen: IMG_AZT } });
 const actosAmbos = () => ({ azt: { imagen: IMG_AZT }, responsable: { imagen: IMG_RESP, cierre: { si: true, fecha: FECHA } } });
+const actosCon = (compositor, extra = {}) => ({ azt: { imagen: IMG_AZT }, responsable: { imagen: IMG_RESP, cierre: { si: true, fecha: FECHA }, compositor, nro: NRO, ...extra } });
+
+/**
+ * ORO: SHA-256 de la composición de los fixtures, medidas con el compositor @1 ANTES de agregar @2 (2026-11-21).
+ * Si cambia una sola, las ODT reales firmadas con @1 dejarían de recomponerse con su huellaVista: NO se actualizan
+ * a mano; se arregla el compositor. La de @2 queda fijada desde hoy por la misma razón (actos firmados con @2).
+ */
+const ORO = Object.freeze({
+  v0: 'd2e5b8fba60fb5bb8e9c90ad1b6b4798c9bd54c9c3bc9a8565ae8f6ec43819f8',
+  azt: '0d17ea9e614ce6a7b525346935f0e011aed327c3f3aefa1b25666969299122b3',
+  ambosV1: 'b60fd6a6d5dae9bbf64de97bb7bece2e16e704652d0277f65fabd198c868591a',
+  ambosV2: '8c0ac5a4bf7ac4e30fe3acd606b40546fa3b3d31acb2f83ee635b741553c9402'
+});
 
 async function base() {
   const odt = await armarOdt();
@@ -166,6 +181,61 @@ describe('estampa dentro de la zona de su rol, y en ningún otro lado', () => {
     assert.equal(comp.getPageCount(), 2);
     const tamOrig = orig.getPage(1).getSize(); const tamComp = comp.getPage(1).getSize();
     assert.deepEqual(tamComp, tamOrig);
+  });
+});
+
+describe('compositor @1 (oro) y @2: la versión la decide el acto del Responsable', () => {
+  test('ORO @1: el v0, la etapa AZT y AZT + Responsable sin compositor dan las huellas de antes del cambio', async () => {
+    const { v0, zonas } = await base();
+    assert.equal(sha(v0), ORO.v0, 'el fixture no cambió');
+    assert.equal(sha(await componer(v0, actosAzt(), { PDFLib, zonas })), ORO.azt);
+    assert.equal(sha(await componer(v0, actosAmbos(), { PDFLib, zonas })), ORO.ambosV1);
+  });
+  test('ORO @1: con compositor «odt-afinia@1» explícito (como lo trae un acto ya firmado) sale lo MISMO, con o sin nro', async () => {
+    const { v0, zonas } = await base();
+    assert.equal(sha(await componer(v0, actosCon('odt-afinia@1'), { PDFLib, zonas })), ORO.ambosV1);
+    assert.equal(sha(await componer(v0, actosCon('odt-afinia@1', { nro: undefined }), { PDFLib, zonas })), ORO.ambosV1);
+    assert.equal(sha(await componer(v0, actosCon('odt-afinia@1'), { PDFLib: PDFLibNpm, zonas })), ORO.ambosV1, 'y con el pdf-lib de node_modules');
+  });
+  test('ORO @2: determinista (dos corridas, pdf-lib vendorizado y de node_modules) y distinto de @1', async () => {
+    const { v0, zonas } = await base();
+    const a = sha(await componer(v0, actosCon('odt-afinia@2'), { PDFLib, zonas }));
+    const b = sha(await componer(v0, actosCon('odt-afinia@2'), { PDFLib, zonas }));
+    const c = sha(await componer(v0, actosCon('odt-afinia@2'), { PDFLib: PDFLibNpm, zonas }));
+    assert.equal(a, ORO.ambosV2); assert.equal(b, a); assert.equal(c, a);
+    assert.notEqual(a, ORO.ambosV1);
+  });
+  test('@2 = @1 + el N.º en «ODT GENERADA N°» (zonas.fecha.x, zonas.fecha.y − 16), Helvetica 7; nada más cambia', async () => {
+    const { v0, zonas } = await base();
+    const d1 = dibujado(await PDFLib.PDFDocument.load(await componer(v0, actosCon('odt-afinia@1'), { PDFLib, zonas })), 1);
+    const d2Doc = await PDFLib.PDFDocument.load(await componer(v0, actosCon('odt-afinia@2'), { PDFLib, zonas }));
+    const d2 = dibujado(d2Doc, 1);
+    const sinNombre = (l) => l.map(({ nombre, ...r }) => r);
+    assert.deepEqual(sinNombre(d2.imagenes), sinNombre(d1.imagenes), 'las firmas, en el mismo sitio');
+    assert.equal(d2.textos.length, d1.textos.length + 1);
+    assert.deepEqual(d2.textos.slice(0, -1), d1.textos, 'X, FECHA CIERRE y el resto, igual que @1');
+    const nuevo = d2.textos.at(-1);
+    assert.equal(ESTAMPA.dyGenerada, 16);
+    assert.deepEqual(nuevo, { texto: NRO, x: zonas.fecha.x, y: Math.round((zonas.fecha.y - ESTAMPA.dyGenerada) * 100) / 100 });
+    assert.equal(nuevo.y, 140.2, 'la etiqueta «ODT GENERADA N°» mide y = 140,2 en las ODT reales');
+    const flujo = contenido(d2Doc, 1).join('\n');
+    assert.match(flujo, / 7 Tf\n24 TL\n1 0 0 1 316 140\.2 Tm\n<3030303030303031> Tj/, 'Helvetica de tamaño 7 (tamFecha), con el N.º');
+    assert.equal(contenido(d2Doc, 0).join(''), contenido(await PDFLib.PDFDocument.load(v0), 0).join(''), 'la página 1 no cambia');
+  });
+  test('la etapa AZT es idéntica en @1 y @2 (sin Responsable no hay pie de cierre)', async () => {
+    const { v0, zonas } = await base();
+    // El acto del AZT puede traer cualquier compositor: no cambia nada (solo manda el del Responsable).
+    assert.equal(sha(await componer(v0, { azt: { imagen: IMG_AZT, compositor: 'odt-afinia@2' } }, { PDFLib, zonas })), ORO.azt);
+    assert.equal(sha(await componer(v0, { azt: { imagen: IMG_AZT, compositor: 'odt-afinia@1' } }, { PDFLib, zonas })), ORO.azt);
+  });
+  test('@2 sin N.º de 8 dígitos, o un compositor desconocido → no compone', async () => {
+    const { v0, zonas } = await base();
+    for (const nro of [undefined, '1234567', 12345678, 'ABCDEFGH']) {
+      await assert.rejects(componer(v0, actosCon('odt-afinia@2', { nro }), { PDFLib, zonas }), /N\.º de la ODT/, String(nro));
+    }
+    for (const c of ['odt-afinia@3', '', 'odt-afinia@']) {
+      await assert.rejects(componer(v0, actosCon(c), { PDFLib, zonas }), /Compositor desconocido/, c);
+    }
   });
 });
 

@@ -2,6 +2,9 @@
 // Comprueba que lo que se ENVÍA tiene exactamente la forma del contrato de las reglas
 // (bloque odt_afinia de firestore.rules: size()==N + cada campo leído) y el flujo de punta
 // a punta: publicar → leer (huellas) → firmar AZT → firmar Responsable → descargar.
+// Desde el 2026-11-21: el Responsable cierra con la fecha PREVISTA y el compositor @2 (N.º en
+// «ODT GENERADA N°»; una ODT firmada con @1 se sigue recomponiendo igual); REEMPLAZAR una LISTA
+// (y volver a publicar su N.º con `reemplaza`) y registrar su CIERRE EN AFINIA (→ CERRADA).
 // Que las reglas acepten esa forma lo prueba tests-rules/odt_afinia.rules.test.js.
 // Datos inventados (repo público): uids uid-*-prueba, correos @prueba.test, N.º 00000001.
 import { test, describe } from 'node:test';
@@ -14,12 +17,13 @@ import {
 } from '../assets/js/data/odt_afinia.js';
 import { crearCuenta, claimsDe } from '../assets/js/data/odt_afinia_cuenta.js';
 import { miFirmaOdt, HUELLA_MI_FIRMA_DISTINTA } from '../assets/js/data/odt_afinia_mi_firma.js';
-import { ErrorOdt, planPublicacion, documentoHabilitacion } from '../assets/js/data/odt_afinia_lotes.js';
+import { ErrorOdt, planPublicacion, planFirma, documentoHabilitacion } from '../assets/js/data/odt_afinia_lotes.js';
 import { prepararFirma, verificarAntesDeFirmar, descargarOdt, prepararDescarga } from '../assets/js/ui/odt-afinia/preparar.js';
 import { validarOdt } from '../assets/js/domain/odt_afinia_formato.js';
 import { prepararPartes } from '../assets/js/domain/odt_afinia_partes.js';
 import { textoAcuerdo, declaracionAzt, declaracionResponsable, fechaBogota } from '../assets/js/domain/odt_afinia_textos.js';
 import { ZONAS_MEDIDAS } from '../assets/js/domain/odt_afinia_zonas.js';
+import { componerConHuella } from '../assets/js/domain/odt_afinia_componer.js';
 
 const sha = (b) => createHash('sha256').update(b).digest('hex');
 const ADMIN = { uid: 'uid-admin-prueba', nombre: 'Admin De Prueba', correoPerfil: 'admin@prueba.test', rol: 'admin', activo: true, esAdmin: true, legacy: false };
@@ -154,16 +158,21 @@ describe('publicar: un lote con la ODT (16 campos), sus partes y el candado del 
     await assert.rejects(e.repo({ ...ADMIN, legacy: true }).publicar({ form: FORM, preparado, zonas: e.zonas, firmantes: {} }), (x) => x.codigo === 'sin_permiso');
   });
 
-  test('N.º duplicado: si la vigente no está ANULADA se avisa antes; si está ANULADA se reasigna', async () => {
+  test('N.º duplicado: si la vigente no está ANULADA se avisa antes; si está ANULADA se reasigna y la nueva dice a cuál reemplaza', async () => {
     const e = await escenario();
     const { id } = await publicada(e);
     const antes = e.fs.lotes.length;
-    await assert.rejects(publicada(e), (x) => x.codigo === 'duplicado');
+    await assert.rejects(publicada(e), (x) => x.codigo === 'duplicado' && /anúlela/.test(x.message));
     assert.equal(e.fs.lotes.length, antes, 'no se envió el lote');
     await e.repo(ADMIN).anular(id, 'Se publicó con un error de prueba.');
     const otra = await publicada(e);
     assert.notEqual(otra.id, id);
     assert.deepEqual(e.fs.store.get('odt_afinia_nro/' + NRO), { odtId: otra.id });
+    // 2026-11-21: la republicación guarda `reemplaza` = la anterior (17 campos); la primera publicación no lo lleva.
+    const odtNueva = e.fs.lotes.at(-1).ops[0].datos;
+    assert.equal(odtNueva.reemplaza, id);
+    assert.equal(Object.keys(odtNueva).length, 17);
+    assert.equal(e.fs.lotes[0].ops.find((o) => o.ruta === 'odt_afinia/' + id).datos.reemplaza, undefined);
   });
 });
 
@@ -247,7 +256,8 @@ describe('firmar: lote de 2 (acto + estado) desde la copia congelada', () => {
     assert.equal(acto.datos.huellaBase, sha(e.bytes));
     assert.deepEqual([...acto.datos.imagen.toUint8Array()], [...e.pngs[AZT.uid]], 'imagen == firmas/{uid}.imagen byte a byte');
     assert.equal(acto.datos.huellaImagen, sha(e.pngs[AZT.uid]));
-    assert.equal(acto.datos.compositor, 'odt-afinia@1');
+    assert.equal(acto.datos.compositor, 'odt-afinia@2', 'el compositor vigente, el de la copia congelada');
+    assert.equal(c.compositor, 'odt-afinia@2');
     assert.equal(acto.datos.declaracionVersion, 'odt-azt-v1');
     assert.equal(acto.datos.en, TS);
     assert.deepEqual(upd, { tipo: 'update', ruta: 'odt_afinia/' + id, datos: { estado: 'PENDIENTE_RESPONSABLE', rev: 1 } });
@@ -258,13 +268,16 @@ describe('firmar: lote de 2 (acto + estado) desde la copia congelada', () => {
     const { id } = await publicada(e);
     const a = await prepararDe(e, AZT, id);
     await a.r.firmar(a.c, tokenFalso({ uid: AZT.uid, email: correoDe(AZT) }));
-    const hoy = fechaBogota();
-    const p = await prepararDe(e, RESP, id, { fechaCierre: hoy });
-    assert.equal(p.c.declaracion.texto, declaracionResponsable({ nombre: RESP.nombre, correo: correoDe(RESP), nro: NRO, fecha: hoy }));
+    // FECHA CIERRE = la fecha PREVISTA de la orden (2026-11-21): no se pasa, sale de la ODT.
+    const prevista = FORM.fechaTrabajo;
+    const p = await prepararDe(e, RESP, id);
+    assert.equal(p.c.declaracion.texto, declaracionResponsable({ nombre: RESP.nombre, correo: correoDe(RESP), nro: NRO, fecha: prevista }));
     await p.r.firmar(p.c, tokenFalso({ uid: RESP.uid, email: correoDe(RESP) }));
     const [acto, upd] = e.fs.lotes.at(-1).ops;
     assert.equal(Object.keys(acto.datos).length, 17);
-    assert.deepEqual(acto.datos.cierre, { si: true, fecha: hoy });
+    // El pie completo queda escrito: X en SI, la fecha prevista y el N.º de «ODT GENERADA N°» (la regla exige generada == N.º).
+    assert.deepEqual(acto.datos.cierre, { si: true, fecha: prevista, generada: NRO });
+    assert.equal(acto.datos.compositor, 'odt-afinia@2');
     assert.equal(acto.datos.declaracionVersion, 'odt-resp-v1');
     assert.deepEqual(upd.datos, { estado: 'LISTA', rev: 2 });
 
@@ -292,7 +305,7 @@ describe('firmar: lote de 2 (acto + estado) desde la copia congelada', () => {
     const { id } = await publicada(e);
     const a = await prepararDe(e, AZT, id);
     await a.r.firmar(a.c, tokenFalso({ uid: AZT.uid, email: correoDe(AZT) }));
-    const p = await prepararDe(e, RESP, id, { fechaCierre: fechaBogota() });
+    const p = await prepararDe(e, RESP, id);
     await p.r.firmar(p.c, tokenFalso({ uid: RESP.uid, email: correoDe(RESP) }));
     const { odt, bytesV0 } = await p.r.leerOdt(id);
     const actos = await p.r.leerActos(id);
@@ -308,7 +321,7 @@ describe('firmar: lote de 2 (acto + estado) desde la copia congelada', () => {
     await a.r.firmar(a.c, tokenFalso({ uid: AZT.uid, email: correoDe(AZT) }));
     const ruta = 'odt_afinia/' + id + '/actos/azt';
     e.fs.poner(ruta, { ...e.fs.store.get(ruta), huellaVista: '0'.repeat(64) });
-    await assert.rejects(prepararDe(e, RESP, id, { fechaCierre: fechaBogota() }), (x) => x.codigo === 'huella');
+    await assert.rejects(prepararDe(e, RESP, id), (x) => x.codigo === 'huella');
   });
 
   test('«Mi firma» anterior a la habilitación: no se prepara', async () => {
@@ -330,7 +343,7 @@ describe('firmar: lote de 2 (acto + estado) desde la copia congelada', () => {
   test('el Responsable no firma antes que el AZT, y nadie firma la casilla ajena', async () => {
     const e = await escenario();
     const { id } = await publicada(e);
-    await assert.rejects(prepararDe(e, RESP, id, { fechaCierre: fechaBogota() }), (x) => x.codigo === 'estado');
+    await assert.rejects(prepararDe(e, RESP, id), (x) => x.codigo === 'estado');
     const tercero = { ...AZT, uid: 'uid-tercero-prueba' };
     await assert.rejects(prepararDe(e, tercero, id), (x) => x.codigo === 'sin_permiso');
   });
@@ -517,7 +530,7 @@ describe('contrato nuevo: lista blanca, D5, D6 y causas de rechazo', () => {
     const { id } = await publicada(e);
     const a = await prepararDe(e, AZT, id);
     await a.r.firmar(a.c, tokenFalso({ uid: AZT.uid, email: correoDe(AZT) }));
-    const p = await prepararDe(e, RESP, id, { fechaCierre: fechaBogota() });
+    const p = await prepararDe(e, RESP, id);
     const actoAzt = await p.r.leerActo(id, 'azt');
     const odt = await p.r.leerOdtDoc(id);
     assert.ok(actoAzt.enMs > odt.publicadoEnMs);
@@ -583,5 +596,223 @@ describe('zonas guardadas fuera del formato (otro cliente): no se compone ni se 
     const antes = e.fs.lotes.length;
     await assert.rejects(prepararDe(e, AZT, id), (x) => x.codigo === 'huella' && /±3 pt/.test(x.message));
     assert.equal(e.fs.lotes.length, antes);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Decisiones del Ingeniero del 2026-11-21: pie de cierre (@2), REEMPLAZAR una LISTA y CERRADA en Afinia.
+// ═════════════════════════════════════════════════════════════════════════════
+/** Publica, firma el AZT y firma el Responsable (con la fecha prevista): la ODT queda LISTA. */
+async function lista(e) {
+  const { id } = await publicada(e);
+  const a = await prepararDe(e, AZT, id);
+  await a.r.firmar(a.c, tokenFalso({ uid: AZT.uid, email: correoDe(AZT) }));
+  const p = await prepararDe(e, RESP, id);
+  await p.r.firmar(p.c, tokenFalso({ uid: RESP.uid, email: correoDe(RESP) }));
+  assert.equal(e.fs.store.get('odt_afinia/' + id).estado, 'LISTA');
+  return { id, p };
+}
+
+describe('pie de cierre: FECHA CIERRE = la prevista y «ODT GENERADA N°» con el compositor @2', () => {
+  test('una fecha de cierre distinta de la prevista no se prepara (mensaje en llano); la prevista sí', async () => {
+    const e = await escenario();
+    const { id } = await publicada(e);
+    const a = await prepararDe(e, AZT, id);
+    await a.r.firmar(a.c, tokenFalso({ uid: AZT.uid, email: correoDe(AZT) }));
+    await assert.rejects(prepararDe(e, RESP, id, { fechaCierre: fechaBogota() }),
+      (x) => x.codigo === 'validacion' && /tiene que ser la fecha prevista de la orden \(01\/01\/2026\)/.test(x.message));
+    const ok = await prepararDe(e, RESP, id, { fechaCierre: FORM.fechaTrabajo });
+    assert.deepEqual({ ...ok.c.cierre }, { si: true, fecha: FORM.fechaTrabajo, generada: NRO });
+  });
+  test('con la fecha prevista todavía en el futuro, el Responsable no prepara (se dice desde cuándo)', async () => {
+    const e = await escenario();
+    const { id } = await publicada(e);
+    const a = await prepararDe(e, AZT, id);
+    await a.r.firmar(a.c, tokenFalso({ uid: AZT.uid, email: correoDe(AZT) }));
+    const ruta = 'odt_afinia/' + id;
+    e.fs.poner(ruta, { ...e.fs.store.get(ruta), fechaTrabajo: '31/12/2099' });
+    await assert.rejects(prepararDe(e, RESP, id), (x) => x.codigo === 'validacion' && /posterior a hoy: el Responsable firma y cierra la ODT desde ese día/.test(x.message));
+  });
+  test('lo que ve el Responsable lleva el N.º en «ODT GENERADA N°» (@2) y es lo que se descarga', async () => {
+    const e = await escenario();
+    const { id, p } = await lista(e);
+    const r = e.repo(ADMIN);
+    const { odt, bytesV0 } = await r.leerOdt(id);
+    const actos = await r.leerActos(id);
+    const con2 = await componerConHuella(bytesV0, { azt: { imagen: actos.azt.imagen }, responsable: { imagen: actos.responsable.imagen, cierre: actos.responsable.cierre, compositor: 'odt-afinia@2', nro: NRO } }, { PDFLib, zonas: odt.zonas });
+    const con1 = await componerConHuella(bytesV0, { azt: { imagen: actos.azt.imagen }, responsable: { imagen: actos.responsable.imagen, cierre: actos.responsable.cierre } }, { PDFLib, zonas: odt.zonas });
+    assert.equal(p.c.huellaVista, con2.huella, 'lo visto es la composición @2');
+    assert.notEqual(con1.huella, con2.huella);
+    const d = await prepararDescarga({ odt, bytesV0, actos, PDFLib });
+    assert.equal(d.huella, p.c.huellaVista);
+  });
+  test('una ODT firmada con @1 (antes del cambio) se sigue recomponiendo IGUAL: Ver y Descargar verifican su huella', async () => {
+    const e = await escenario();
+    const { id } = await lista(e);
+    // Se simula un acto del Responsable firmado con @1: su huellaVista es la de la composición SIN el N.º.
+    const r = e.repo(ADMIN);
+    const { odt, bytesV0 } = await r.leerOdt(id);
+    const actos = await r.leerActos(id);
+    const v1 = await componerConHuella(bytesV0, { azt: { imagen: actos.azt.imagen }, responsable: { imagen: actos.responsable.imagen, cierre: actos.responsable.cierre } }, { PDFLib, zonas: odt.zonas });
+    const ruta = 'odt_afinia/' + id + '/actos/responsable';
+    e.fs.poner(ruta, { ...e.fs.store.get(ruta), compositor: 'odt-afinia@1', huellaVista: v1.huella });
+    const actos1 = await r.leerActos(id);
+    const d = await prepararDescarga({ odt, bytesV0, actos: actos1, PDFLib });
+    assert.equal(d.huella, v1.huella, '@1 sale con los bytes de siempre');
+    // Y si alguien le cambia el compositor al acto, ya no cuadra (la versión la decide el acto).
+    e.fs.poner(ruta, { ...e.fs.store.get(ruta), compositor: 'odt-afinia@2' });
+    await assert.rejects(prepararDescarga({ odt, bytesV0, actos: await r.leerActos(id), PDFLib }), (x) => x.codigo === 'huella');
+  });
+  test('una copia congelada sin compositor (página vieja en la caché) no se firma: se pide recargar y no se envía nada', async () => {
+    const e = await escenario();
+    const { id } = await publicada(e);
+    const { r, c } = await prepararDe(e, AZT, id);
+    const vieja = { ...c }; delete vieja.compositor;
+    const antes = e.fs.lotes.length;
+    await assert.rejects(r.firmar(vieja, tokenFalso({ uid: AZT.uid, email: correoDe(AZT) })), (x) => x.codigo === 'validacion' && /Recargue/.test(x.message));
+    assert.throws(() => planFirma(vieja, tokenFalso({ uid: AZT.uid, email: correoDe(AZT) }), { ts: TS, aBytes: BytesFalso.fromUint8Array }), /versión anterior/);
+    assert.equal(e.fs.lotes.length, antes);
+  });
+  test('L-102 (Responsable): lo que deja un preparar.js viejo de la caché (compuesto en @1, sin compositor ni «ODT GENERADA» en el cierre) no se firma; lo nuevo sí', async () => {
+    const e = await escenario();
+    const { id } = await publicada(e);
+    const a = await prepararDe(e, AZT, id);
+    await a.r.firmar(a.c, tokenFalso({ uid: AZT.uid, email: correoDe(AZT) }));
+    const { r, c } = await prepararDe(e, RESP, id);
+    const tk = tokenFalso({ uid: RESP.uid, email: correoDe(RESP) });
+    const antes = e.fs.lotes.length;
+    // Como lo dejaba el preparar.js de antes de @2: sin compositor y con el cierre de 2 claves.
+    const vieja = { ...c, cierre: { si: true, fecha: c.cierre.fecha } }; delete vieja.compositor;
+    await assert.rejects(r.firmar(vieja, tk), (x) => x.codigo === 'validacion' && /Recargue/.test(x.message));
+    // Con el compositor pero sin el N.º de «ODT GENERADA» en el cierre (pieza a medias): tampoco.
+    const aMedias = { ...c, cierre: { si: true, fecha: c.cierre.fecha } };
+    await assert.rejects(r.firmar(aMedias, tk), (x) => x.codigo === 'validacion' && /ODT GENERADA/.test(x.message));
+    assert.throws(() => planFirma(aMedias, tk, { ts: TS, aBytes: BytesFalso.fromUint8Array }), /ODT GENERADA/);
+    // Con «ODT GENERADA» de OTRO N.º: tampoco.
+    await assert.rejects(r.firmar({ ...c, cierre: { ...c.cierre, generada: '00000002' } }, tk), (x) => x.codigo === 'validacion');
+    assert.equal(e.fs.lotes.length, antes, 'no se envió nada');
+    // Control: la copia nueva, tal cual, sí firma.
+    await r.firmar(c, tk);
+    assert.equal(e.fs.store.get('odt_afinia/' + id).estado, 'LISTA');
+  });
+  test('Ver/Descargar: un acto @2 cuyo cierre no trae «ODT GENERADA» (o trae otro N.º) no se da por bueno', async () => {
+    const e = await escenario();
+    const { id } = await lista(e);
+    const r = e.repo(ADMIN);
+    const { odt, bytesV0 } = await r.leerOdt(id);
+    const ruta = 'odt_afinia/' + id + '/actos/responsable';
+    const bueno = e.fs.store.get(ruta);
+    await prepararDescarga({ odt, bytesV0, actos: await r.leerActos(id), PDFLib });   // control
+    e.fs.poner(ruta, { ...bueno, cierre: { si: true, fecha: bueno.cierre.fecha } });
+    await assert.rejects(prepararDescarga({ odt, bytesV0, actos: await r.leerActos(id), PDFLib }), (x) => x.codigo === 'huella' && /otro N\.º/.test(x.message));
+    e.fs.poner(ruta, { ...bueno, cierre: { ...bueno.cierre, generada: '00000002' } });
+    await assert.rejects(prepararDescarga({ odt, bytesV0, actos: await r.leerActos(id), PDFLib }), (x) => x.codigo === 'huella');
+  });
+});
+
+describe('reemplazar una ODT LISTA (admin, con motivo) y volver a publicar su N.º', () => {
+  test('update de 3 claves {estado:REEMPLAZADA, rev, reemplazo{motivo, por, en}}; nada se borra', async () => {
+    const e = await escenario();
+    const { id } = await lista(e);
+    const actosAntes = [...e.fs.store.keys()].filter((k) => k.startsWith('odt_afinia/' + id + '/')).sort();
+    const r = await e.repo(ADMIN).reemplazar(id, '  La consignación del PDF publicado no era la correcta.  ');
+    assert.deepEqual(r, { estado: 'entro', rev: 3 });
+    const upd = e.fs.lotes.at(-1).ops;
+    assert.equal(upd.length, 1);
+    assert.equal(upd[0].tipo, 'update'); assert.equal(upd[0].ruta, 'odt_afinia/' + id);
+    assert.deepEqual(claves(upd[0].datos), ['estado', 'reemplazo', 'rev']);
+    assert.deepEqual({ ...upd[0].datos, reemplazo: { ...upd[0].datos.reemplazo, en: null } },
+      { estado: 'REEMPLAZADA', rev: 3, reemplazo: { motivo: 'La consignación del PDF publicado no era la correcta.', por: { uid: ADMIN.uid, nombre: ADMIN.nombre }, en: null } });
+    assert.equal(upd[0].datos.reemplazo.en, TS);
+    const actosDespues = [...e.fs.store.keys()].filter((k) => k.startsWith('odt_afinia/' + id + '/')).sort();
+    assert.deepEqual(actosDespues, actosAntes, 'actos y partes se conservan');
+    // Se sigue leyendo y verificando (Ver), pero ya no se descarga.
+    const { odt, bytesV0 } = await e.repo(AZT).leerOdt(id);
+    await assert.rejects(prepararDescarga({ odt, bytesV0, actos: await e.repo(AZT).leerActos(id), PDFLib }), (x) => x.codigo === 'estado');
+  });
+  test('no se reemplaza: un técnico, desde PENDIENTE_*, con motivo corto, ni una CERRADA (no se envía nada)', async () => {
+    const e = await escenario();
+    const { id } = await publicada(e);
+    const antes = e.fs.lotes.length;
+    await assert.rejects(e.repo(AZT).reemplazar(id, 'Motivo suficiente de prueba'), (x) => x.codigo === 'sin_permiso');
+    await assert.rejects(e.repo(ADMIN).reemplazar(id, 'Motivo suficiente de prueba'), (x) => x.codigo === 'estado' && /Solo una ODT LISTA/.test(x.message));
+    e.fs.poner('odt_afinia/' + id, { ...e.fs.store.get('odt_afinia/' + id), estado: 'LISTA', rev: 2 });
+    await assert.rejects(e.repo(ADMIN).reemplazar(id, 'corto'), (x) => x.codigo === 'validacion');
+    e.fs.poner('odt_afinia/' + id, { ...e.fs.store.get('odt_afinia/' + id), estado: 'CERRADA', rev: 3 });
+    await assert.rejects(e.repo(ADMIN).reemplazar(id, 'Motivo suficiente de prueba'), (x) => x.codigo === 'estado' && /cerrada en Afinia/.test(x.message));
+    assert.equal(e.fs.lotes.length, antes);
+  });
+  test('con la vigente LISTA no se republica (se dice «reemplácela»); REEMPLAZADA → se republica con reemplaza = la anterior', async () => {
+    const e = await escenario();
+    const { id } = await lista(e);
+    const antes = e.fs.lotes.length;
+    await assert.rejects(publicada(e), (x) => x.codigo === 'duplicado' && /reemplácela/.test(x.message));
+    assert.equal(e.fs.lotes.length, antes);
+    const prev = await e.repo(ADMIN).previaDelNro(NRO);
+    assert.deepEqual({ ...prev, publicadoEnMs: null }, { odtId: id, estado: 'LISTA', publicadoEnMs: null, libre: false, mensaje: prev.mensaje });
+    await e.repo(ADMIN).reemplazar(id, 'La consignación del PDF publicado no era la correcta.');
+    const libre = await e.repo(ADMIN).previaDelNro(NRO);
+    assert.equal(libre.libre, true); assert.equal(libre.estado, 'REEMPLAZADA'); assert.equal(libre.mensaje, null);
+    const otra = await publicada(e);
+    const lote = e.fs.lotes.at(-1).ops;
+    assert.equal(lote[0].datos.reemplaza, id);
+    assert.deepEqual(lote.at(-1), { tipo: 'set', ruta: 'odt_afinia_nro/' + NRO, datos: { odtId: otra.id } });
+    assert.equal(await e.repo(ADMIN).previaDelNro('00000099'), null, 'un N.º nuevo no tiene previa');
+    await assert.rejects(e.repo(AZT).previaDelNro(NRO), (x) => x.codigo === 'sin_permiso');
+  });
+  test('planPublicacion: `reemplaza` solo si es un id válido y distinto de la nueva', () => {
+    const preparado = { partes: [new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d])], huellasPartes: ['a'.repeat(64)], huella: 'a'.repeat(64), bytes: 5 };
+    const habs = { azt: { uid: AZT.uid, nombre: AZT.nombre, correo: correoDe(AZT) }, responsable: { uid: RESP.uid, nombre: RESP.nombre, correo: correoDe(RESP) } };
+    const base = { id: 'A'.repeat(20), form: FORM, preparado, zonas: ZONAS_MEDIDAS, firmantes: habs, quien: ADMIN, ts: TS, aBytes: BytesFalso.fromUint8Array };
+    assert.equal(planPublicacion(base).odt.reemplaza, undefined);
+    assert.equal(Object.keys(planPublicacion(base).odt).length, 16);
+    assert.equal(planPublicacion({ ...base, reemplaza: 'B'.repeat(20) }).odt.reemplaza, 'B'.repeat(20));
+    assert.throws(() => planPublicacion({ ...base, reemplaza: 'corto' }), /identificador/);
+    assert.throws(() => planPublicacion({ ...base, reemplaza: 'A'.repeat(20) }), /identificador/);
+  });
+});
+
+describe('registrar el cierre en Afinia (admin; solo una LISTA) → CERRADA, que se sigue descargando', () => {
+  const SOPORTE_PRUEBA = 'SOPORTE_ODT_PRUEBA_01';
+  test('update de 3 claves {estado:CERRADA, rev, cierreAfinia{fecha, soporte, por, en}}; se descarga igual', async () => {
+    const e = await escenario();
+    const { id, p } = await lista(e);
+    const hoy = fechaBogota();
+    const r = await e.repo(ADMIN).registrarCierreAfinia(id, { fecha: hoy, soporte: '  ' + SOPORTE_PRUEBA + ' ' });
+    assert.deepEqual(r, { estado: 'entro', rev: 3 });
+    const [upd] = e.fs.lotes.at(-1).ops;
+    assert.equal(upd.tipo, 'update');
+    assert.deepEqual(claves(upd.datos), ['cierreAfinia', 'estado', 'rev']);
+    assert.deepEqual(claves(upd.datos.cierreAfinia), ['en', 'fecha', 'por', 'soporte']);
+    assert.deepEqual({ ...upd.datos.cierreAfinia, en: null }, { fecha: hoy, soporte: SOPORTE_PRUEBA, por: { uid: ADMIN.uid, nombre: ADMIN.nombre }, en: null });
+    assert.equal(upd.datos.estado, 'CERRADA');
+    const rr = e.repo(RESP);
+    const { odt, bytesV0 } = await rr.leerOdt(id);
+    const d = await prepararDescarga({ odt, bytesV0, actos: await rr.leerActos(id), PDFLib });
+    assert.equal(d.huella, p.c.huellaVista, 'la CERRADA se descarga con la misma huella que vio el Responsable');
+  });
+  test('no se registra: un técnico, desde PENDIENTE_*, fecha futura o anterior a la prevista, soporte corto, ni dos veces', async () => {
+    const e = await escenario();
+    const { id } = await publicada(e);
+    const antes = e.fs.lotes.length;
+    const ok = { fecha: fechaBogota(), soporte: SOPORTE_PRUEBA };
+    await assert.rejects(e.repo(AZT).registrarCierreAfinia(id, ok), (x) => x.codigo === 'sin_permiso');
+    await assert.rejects(e.repo(ADMIN).registrarCierreAfinia(id, ok), (x) => x.codigo === 'estado');
+    e.fs.poner('odt_afinia/' + id, { ...e.fs.store.get('odt_afinia/' + id), estado: 'LISTA', rev: 2 });
+    await assert.rejects(e.repo(ADMIN).registrarCierreAfinia(id, { ...ok, fecha: '31/12/2099' }), (x) => x.codigo === 'validacion' && /posterior a hoy/.test(x.message));
+    await assert.rejects(e.repo(ADMIN).registrarCierreAfinia(id, { ...ok, fecha: '31/12/2025' }), (x) => x.codigo === 'validacion' && /anterior a la fecha prevista/.test(x.message));
+    await assert.rejects(e.repo(ADMIN).registrarCierreAfinia(id, { ...ok, soporte: 'ab' }), (x) => x.codigo === 'validacion');
+    assert.equal(e.fs.lotes.length, antes, 'nada se envió');
+    await e.repo(ADMIN).registrarCierreAfinia(id, ok);
+    await assert.rejects(e.repo(ADMIN).registrarCierreAfinia(id, ok), (x) => x.codigo === 'estado' && /cerrada en Afinia/.test(x.message));
+    await assert.rejects(e.repo(ADMIN).anular(id, 'Motivo suficiente de prueba'), (x) => x.codigo === 'estado');
+    await assert.rejects(publicada(e), (x) => x.codigo === 'duplicado' && /cerrada en Afinia/.test(x.message));
+  });
+  test('si la regla lo niega (la ODT cambió), se dice en llano', async () => {
+    const e = await escenario({ denegarLote: false });
+    const { id } = await lista(e);
+    e.fs.opciones.denegarLote = true;
+    await assert.rejects(e.repo(ADMIN).reemplazar(id, 'Motivo suficiente de prueba'), (x) => x.codigo === 'conflicto' && /cambió mientras tanto/.test(x.message));
+    await assert.rejects(e.repo(ADMIN).registrarCierreAfinia(id, { fecha: fechaBogota(), soporte: SOPORTE_PRUEBA }), (x) => x.codigo === 'conflicto');
   });
 });

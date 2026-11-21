@@ -3,7 +3,11 @@
 // ──────────────────────────────────────────────────────────────────────────────
 //   PENDIENTE_AZT ──(acto azt)──▶ PENDIENTE_RESPONSABLE ──(acto responsable)──▶ LISTA
 //         └──────────────┴──(admin, con motivo)──▶ ANULADA
-// Una ODT LISTA (ya firmada por los dos) NO se anula (D6 del Ingeniero, 20-11).
+//   LISTA ──(admin, con motivo)──▶ REEMPLAZADA   (su N.º se puede volver a publicar)
+//   LISTA ──(admin, fecha y soporte)──▶ CERRADA  (cerrada en Afinia: reposa en la página)
+// Una ODT LISTA (ya firmada por los dos) NO se anula (D6 del Ingeniero, 20-11): se REEMPLAZA
+// (decisión del 2026-11-21, que revierte D6 con su visto bueno). ANULADA, REEMPLAZADA y
+// CERRADA son finales. Lo nuevo (reemplazo y cierre) vive en odt_afinia_cierre.js (L-102).
 //
 // Las reglas exigen lo mismo (DISENO-FINAL §3); esto da el mensaje claro ANTES
 // de que la base lo niegue. Identidad SIEMPRE por uid, nunca por nombre (P2).
@@ -11,6 +15,9 @@
 // ══════════════════════════════════════════════════════════════════════════════
 
 import { ESTADOS, ROLES, TOPES, esEstado, esRol } from './odt_afinia_rutas.js';
+import { ESTADOS_CIERRE, ETIQUETA_ESTADO_CIERRE } from './odt_afinia_cierre.js';
+
+const { CERRADA, REEMPLAZADA } = ESTADOS_CIERRE;
 
 /** Cada firma mueve UN paso: de → a. */
 export const TRANSICIONES = Object.freeze({
@@ -23,12 +30,13 @@ export const ETIQUETA_ESTADO = Object.freeze({
   [ESTADOS.PENDIENTE_AZT]: 'Pendiente: firma del AZT',
   [ESTADOS.PENDIENTE_RESPONSABLE]: 'Pendiente: firma del Responsable',
   [ESTADOS.LISTA]: 'Lista para descargar',
-  [ESTADOS.ANULADA]: 'Anulada'
+  [ESTADOS.ANULADA]: 'Anulada',
+  ...ETIQUETA_ESTADO_CIERRE           // CERRADA: «Cerrada en Afinia» · REEMPLAZADA: «Reemplazada»
 });
 
 const uidDe = (odt, rol) => (odt && odt.firmantes && odt.firmantes[rol] && odt.firmantes[rol].uid) || null;
 
-/** El rol al que le toca firmar en ese estado, o null (LISTA, ANULADA, desconocido). */
+/** El rol al que le toca firmar en ese estado, o null (LISTA, ANULADA, CERRADA, REEMPLAZADA, desconocido). */
 export function rolEnTurno(estado) {
   for (const rol of ROLES) if (TRANSICIONES[rol].de === estado) return rol;
   return null;
@@ -47,11 +55,15 @@ export function esMiTurno(odt, uid) {
   return !!rol && rolEnTurno(odt && odt.estado) === rol;
 }
 
-/** ¿El acto de ese rol ya existe según el estado? (deducido de la máquina, sin leer actos). */
+/**
+ * ¿El acto de ese rol ya existe según el estado? (deducido de la máquina, sin leer actos).
+ * CERRADA y REEMPLAZADA solo salen de LISTA: las dos firmas están.
+ */
 export function yaFirmo(odt, rol) {
   const e = odt && odt.estado;
-  if (rol === 'azt') return e === ESTADOS.PENDIENTE_RESPONSABLE || e === ESTADOS.LISTA;
-  if (rol === 'responsable') return e === ESTADOS.LISTA;
+  const conLasDos = e === ESTADOS.LISTA || e === CERRADA || e === REEMPLAZADA;
+  if (rol === 'azt') return e === ESTADOS.PENDIENTE_RESPONSABLE || conLasDos;
+  if (rol === 'responsable') return conLasDos;
   return false;
 }
 
@@ -69,6 +81,8 @@ export function cambioFirma(odt, rol, uid) {
   if (rol === 'responsable' && uidDe(odt, 'azt') === uid) return no('sin_permiso', 'La misma cuenta no puede firmar las dos casillas.');
   if (odt.estado === ESTADOS.ANULADA) return no('estado', 'La ODT fue anulada: ya no se firma.');
   if (odt.estado === ESTADOS.LISTA) return no('estado', 'La ODT ya tiene las dos firmas.');
+  if (odt.estado === CERRADA) return no('estado', 'La ODT ya está cerrada en Afinia: ya no se firma.');
+  if (odt.estado === REEMPLAZADA) return no('estado', 'La ODT fue reemplazada por otra versión: ya no se firma.');
   const t = TRANSICIONES[rol];
   if (odt.estado !== t.de) {
     return rol === 'responsable'
@@ -79,7 +93,7 @@ export function cambioFirma(odt, rol, uid) {
   return { ok: true, cambios: { estado: t.a, rev: rev + 1 } };
 }
 
-/** Estados desde los que se anula (D6: nunca desde LISTA ni desde ANULADA). La regla exige lo mismo. */
+/** Estados desde los que se anula (D6: nunca desde LISTA, ANULADA, CERRADA ni REEMPLAZADA). La regla exige lo mismo. */
 export const ESTADOS_ANULABLES = Object.freeze([ESTADOS.PENDIENTE_AZT, ESTADOS.PENDIENTE_RESPONSABLE]);
 
 /** ¿Se puede anular? (solo PENDIENTE_AZT o PENDIENTE_RESPONSABLE). */
@@ -90,7 +104,9 @@ export const puedeAnular = (odt) => !!odt && ESTADOS_ANULABLES.includes(odt.esta
  * datos con la hora del servidor. Devuelve {ok, cambios:{estado, rev, anulacion:{motivo, por}}}.
  */
 export function cambioAnular(odt, { motivo, por } = {}) {
-  if (odt && odt.estado === ESTADOS.LISTA) return no('estado', 'La ODT ya tiene las dos firmas: una ODT lista no se anula.');
+  if (odt && odt.estado === ESTADOS.LISTA) return no('estado', 'La ODT ya tiene las dos firmas: una ODT lista no se anula (si hay que corregirla, se reemplaza).');
+  if (odt && odt.estado === CERRADA) return no('estado', 'La ODT ya está cerrada en Afinia: no se anula.');
+  if (odt && odt.estado === REEMPLAZADA) return no('estado', 'La ODT ya fue reemplazada: no se anula.');
   if (!puedeAnular(odt)) return no('estado', 'La ODT ya está anulada o no existe.');
   const m = typeof motivo === 'string' ? motivo.trim() : '';
   if (m.length < TOPES.motivoMin || m.length > TOPES.motivoMax) {
@@ -156,20 +172,24 @@ export function firmantesElegibles(habilitados, config, perfiles = {}, publicado
 
 /**
  * Pestaña de la bandeja para `uid`:
- * 'mi_turno' | 'en_curso' | 'listas' | 'anuladas'.
+ * 'mi_turno' | 'en_curso' | 'listas' | 'cerradas' | 'anuladas' (anuladas Y reemplazadas).
  */
 export function grupoBandeja(odt, uid) {
   const e = odt && odt.estado;
-  if (e === ESTADOS.ANULADA) return 'anuladas';
+  if (e === ESTADOS.ANULADA || e === REEMPLAZADA) return 'anuladas';
+  if (e === CERRADA) return 'cerradas';
   if (e === ESTADOS.LISTA) return 'listas';
   if (esMiTurno(odt, uid)) return 'mi_turno';
   return 'en_curso';
 }
 
-/** Reparte una lista de ODT en la bandeja; «firmadasPorMi» se cruza con las demás. */
+/**
+ * Reparte una lista de ODT en la bandeja; «firmadasPorMi» se cruza con las demás.
+ * `cerradas` es una clave NUEVA (2026-11-21): la bandeja la lee con «|| []» por si este archivo quedó viejo.
+ */
 export function bandeja(odts, uid) {
-  const out = { miTurno: [], enCurso: [], listas: [], anuladas: [], firmadasPorMi: [] };
-  const clave = { mi_turno: 'miTurno', en_curso: 'enCurso', listas: 'listas', anuladas: 'anuladas' };
+  const out = { miTurno: [], enCurso: [], listas: [], cerradas: [], anuladas: [], firmadasPorMi: [] };
+  const clave = { mi_turno: 'miTurno', en_curso: 'enCurso', listas: 'listas', cerradas: 'cerradas', anuladas: 'anuladas' };
   for (const o of odts || []) {
     out[clave[grupoBandeja(o, uid)]].push(o);
     const rol = rolDe(o, uid);

@@ -12,6 +12,11 @@
 //     se abrió después de publicar; la del Responsable, además, después del acto del AZT), nombre/correo del acto =
 //     los publicados, huella de «Mi firma» = la de sus bytes, días inexistentes, devolución «rol_rev», D6 (una LISTA
 //     no se anula) y las negativas con su control que pidió la lente de seguridad.
+//   · Decisiones del 2026-11-21: actos nuevos con compositor 'odt-afinia@2'; el Responsable cierra con la FECHA
+//     PREVISTA (cierre.fecha == o.fechaTrabajo, real y no posterior a hoy en Bogotá) y escribe su pie completo
+//     (cierre.generada == N.º: el acto de un armador viejo de la caché no lo trae y se niega, L-102); REEMPLAZAR una LISTA (solo admin,
+//     con motivo) y registrar su CIERRE EN AFINIA (solo admin, fecha y soporte); los dos son finales; candado
+//     reasignable tras ANULADA o REEMPLAZADA, con `reemplaza` = la anterior; descarga en LISTA y CERRADA.
 // Cada caso en las DOS direcciones (L-73/L-78): lo que se niega tiene su control que pasa. Un lote = una
 // conexión. Carga máxima (L-110): 5 partes de 900 KB y una firma de 900 KB. Prefijo `oa_`; nunca
 // clearFirestore(). Datos INVENTADOS: ningún uid, correo, nombre ni N.º de ODT real; los PDF se arman en memoria.
@@ -145,9 +150,9 @@ function metaOdt(pub, nro, partes, { azt = 'oa_azt', resp = 'oa_resp', ...extra 
  * Lo que escribe la página al publicar: odt + sus partes + el candado del N.º, en UN lote.
  * `escribir`: pares [n, bytes] que se escriben como partes (por defecto, todas las de `partes`).
  */
-function publicar(pub, id, nro, { partes = [parte(0)], m, escribir, candado, azt, resp, mas } = {}) {
+function publicar(pub, id, nro, { partes = [parte(0)], m, escribir, candado, azt, resp, mas, reemplaza } = {}) {
   const d = plano(pub); const b = writeBatch(d);
-  b.set(doc(d, 'odt_afinia', id), m || metaOdt(pub, nro, partes, { azt, resp }));
+  b.set(doc(d, 'odt_afinia', id), m || metaOdt(pub, nro, partes, { azt, resp, ...(reemplaza ? { reemplaza } : {}) }));
   for (const [n, u] of (escribir || partes.map((u, i) => [i, u]))) b.set(doc(d, 'odt_afinia', id, 'partes', String(n)), { datos: by(u) });
   if (candado !== null) b.set(doc(d, 'odt_afinia_nro', nro), candado || { odtId: id });
   if (mas) mas(b, d);
@@ -160,10 +165,12 @@ function actoDe(uid, rol, o, at, extra = {}) {
   const base = {
     rol, uid, correo: c, correoVerificado: true, proveedor: 'password', authTime: at, nombre: n, nro: o.nro,
     imagen: by(FIRMA[uid] || png(99)), huellaImagen: sha(FIRMA[uid] || png(99)), huellaBase: o.huella, huellaVista: 'e'.repeat(64),
-    compositor: 'odt-afinia@1', en: serverTimestamp()
+    compositor: 'odt-afinia@2', en: serverTimestamp()
   };
+  // El Responsable cierra con la FECHA PREVISTA de la orden (2026-11-21) y su pie completo lleva el N.º de
+  // «ODT GENERADA N°» (cierre.generada == o.nro; un armador viejo de la caché no lo escribe, L-102).
   if (rol === 'azt') Object.assign(base, { declaracionVersion: 'odt-azt-v1', declaracion: DECL_AZT(n, c, o.nro) });
-  else Object.assign(base, { declaracionVersion: 'odt-resp-v1', cierre: { si: true, fecha: HOY }, declaracion: DECL_RESP(n, c, o.nro, HOY) });
+  else Object.assign(base, { declaracionVersion: 'odt-resp-v1', cierre: { si: true, fecha: o.fechaTrabajo, generada: o.nro }, declaracion: DECL_RESP(n, c, o.nro, o.fechaTrabajo) });
   return { ...base, ...extra };
 }
 async function firmar(uid, id, rol, { claims = {}, acto = {}, quitar = [], cambio, sinActo = false, sinCambio = false } = {}) {
@@ -196,6 +203,15 @@ function habilitar(uid, { claims = {}, h = {}, como = uid } = {}) {
 }
 const anular = (uid, id, rev, extra = {}) => updateDoc(doc(plano(uid), 'odt_afinia', id), {
   estado: 'ANULADA', rev, anulacion: { motivo: 'Publicada con un error de prueba', por: { uid, nombre: NOMBRE(uid) }, en: serverTimestamp() }, ...extra
+});
+/** Reemplazar una LISTA (2026-11-21): {estado, rev, reemplazo{motivo, por, en}}. */
+const reemplazar = (uid, id, rev, extra = {}) => updateDoc(doc(plano(uid), 'odt_afinia', id), {
+  estado: 'REEMPLAZADA', rev, reemplazo: { motivo: 'La consignación del PDF de prueba no era la correcta', por: { uid, nombre: NOMBRE(uid) }, en: serverTimestamp() }, ...extra
+});
+const SOPORTE = 'SOPORTE_ODT_PRUEBA_01';
+/** Registrar el cierre en Afinia de una LISTA (2026-11-21): {estado, rev, cierreAfinia{fecha, soporte, por, en}}. */
+const cerrar = (uid, id, rev, { fecha = HOY, soporte = SOPORTE, ...extra } = {}) => updateDoc(doc(plano(uid), 'odt_afinia', id), {
+  estado: 'CERRADA', rev, cierreAfinia: { fecha, soporte, por: { uid, nombre: NOMBRE(uid) }, en: serverTimestamp() }, ...extra
 });
 
 before(async () => {
@@ -462,7 +478,8 @@ describe('firmar como AZT — su imagen, su credencial reciente, su turno, atado
       () => ({ declaracionVersion: 'odt-resp-v1' }),
       () => ({ nro: NRO(2), declaracion: DECL_AZT(NOMBRE('oa_azt'), CORREO('oa_azt'), NRO(2)) }),
       (o) => ({ nombre: 'Otro Nombre', declaracion: DECL_AZT('Otro Nombre', CORREO('oa_azt'), o.nro) }),
-      () => ({ huellaBase: 'd'.repeat(64) }), () => ({ huellaVista: 'no-hex' }), () => ({ compositor: 'odt-afinia@2' }),
+      () => ({ huellaBase: 'd'.repeat(64) }), () => ({ huellaVista: 'no-hex' }),
+      () => ({ compositor: 'odt-afinia@1' }), () => ({ compositor: 'odt-afinia@3' }),          // 2026-11-21: solo @2
       () => ({ rol: 'responsable' }), () => ({ correoVerificado: false }), () => ({ proveedor: 'custom' }),
       () => ({ cierre: { si: true, fecha: HOY } }), () => ({ en: Timestamp.now() }), () => ({ uid: 'oa_aztB' })
     ]) {
@@ -506,16 +523,47 @@ describe('firmar como AZT — su imagen, su credencial reciente, su turno, atado
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
-describe('firmar como Responsable — después del AZT, otra persona, con fecha de cierre válida', () => {
-  test('fecha de cierre futura, anterior al trabajo, sin cierre, «SI» falso o declaración con otra fecha → no', async () => {
-    const r = (fecha, extra = {}) => (o) => ({ cierre: { si: true, fecha }, declaracion: DECL_RESP(NOMBRE('oa_resp'), CORREO('oa_resp'), o.nro, fecha), ...extra });
+describe('firmar como Responsable — después del AZT, otra persona, cerrando con la FECHA PREVISTA de la orden', () => {
+  test('fecha de cierre distinta de la prevista (hoy, antes o después), mal escrita, sin cierre, «SI» falso o declaración con otra fecha → no', async () => {
+    const r = (fecha, extra = {}) => (o) => ({ cierre: { si: true, fecha, generada: o.nro }, declaracion: DECL_RESP(NOMBRE('oa_resp'), CORREO('oa_resp'), o.nro, fecha), ...extra });
+    // 2026-11-21: la de HOY ya no sirve (antes pasaba): la FECHA CIERRE es la prevista (TRABAJO).
+    await assertFails(firmar('oa_resp', ID(1), 'responsable', { acto: r(HOY) }));
+    await assertFails(firmar('oa_resp', ID(1), 'responsable', { acto: r(fechaBogota(-9)) }));
     await assertFails(firmar('oa_resp', ID(1), 'responsable', { acto: r(fechaBogota(2)) }));
     await assertFails(firmar('oa_resp', ID(1), 'responsable', { acto: r(fechaBogota(-11)) }));
     await assertFails(firmar('oa_resp', ID(1), 'responsable', { acto: r('31-12-2026') }));
+    await assertFails(firmar('oa_resp', ID(1), 'responsable', { acto: r(TRABAJO.replace(/\//g, '-')) }));
     await assertFails(firmar('oa_resp', ID(1), 'responsable', { quitar: ['cierre'] }));
-    await assertFails(firmar('oa_resp', ID(1), 'responsable', { acto: (o) => ({ ...r(HOY)(o), cierre: { si: false, fecha: HOY } }) }));
-    await assertFails(firmar('oa_resp', ID(1), 'responsable', { acto: (o) => ({ ...r(HOY)(o), declaracion: DECL_RESP(NOMBRE('oa_resp'), CORREO('oa_resp'), o.nro, TRABAJO) }) }));
+    await assertFails(firmar('oa_resp', ID(1), 'responsable', { acto: (o) => ({ ...r(TRABAJO)(o), cierre: { si: false, fecha: TRABAJO, generada: o.nro } }) }));
+    await assertFails(firmar('oa_resp', ID(1), 'responsable', { acto: (o) => ({ ...r(TRABAJO)(o), declaracion: DECL_RESP(NOMBRE('oa_resp'), CORREO('oa_resp'), o.nro, HOY) }) }));
     await assertFails(firmar('oa_resp', ID(1), 'responsable', { acto: () => ({ declaracionVersion: 'odt-azt-v1' }) }));
+    // Compositor: solo @2 (el @1 queda para los actos ya firmados, que no se vuelven a escribir).
+    await assertFails(firmar('oa_resp', ID(1), 'responsable', { acto: () => ({ compositor: 'odt-afinia@1' }) }));
+  });
+
+  test('L-102 (caché mezclada): el acto que arma un odt_afinia_lotes.js VIEJO con el odt_afinia_rutas.js nuevo (@2, cierre sin «ODT GENERADA») → no', async () => {
+    // Era el agujero: compositor @2 (del rutas nuevo), los mismos 17 campos y la fecha prevista, pero lo compuesto
+    // por el preparar.js viejo era @1 (sin el N.º): la ODT quedaba LISTA y ya no se podía ver ni descargar.
+    await assertFails(firmar('oa_resp', ID(1), 'responsable', { acto: (o) => ({ cierre: { si: true, fecha: o.fechaTrabajo } }) }));
+    // «ODT GENERADA» con otro N.º, como número o vacío → no.
+    await assertFails(firmar('oa_resp', ID(1), 'responsable', { acto: (o) => ({ cierre: { si: true, fecha: o.fechaTrabajo, generada: NRO(2) } }) }));
+    await assertFails(firmar('oa_resp', ID(1), 'responsable', { acto: (o) => ({ cierre: { si: true, fecha: o.fechaTrabajo, generada: Number(o.nro) } }) }));
+    await assertFails(firmar('oa_resp', ID(1), 'responsable', { acto: (o) => ({ cierre: { si: true, fecha: o.fechaTrabajo, generada: '' } }) }));
+    // Control (la prueba «con todo exacto» de abajo): el mismo acto con cierre.generada == N.º de la ODT → sí.
+  });
+
+  test('la fecha prevista todavía no llega (es posterior a hoy en Bogotá) → no firma, aunque sea la prevista; llegada → sí', async () => {
+    const manana = fechaBogota(1);
+    await sembrar(async (d) => {
+      await setDoc(doc(d, 'odt_afinia', ID(45)), {
+        ...metaOdt('oa_admin', NRO(45), [parte(0)], { azt: 'oa_azt', resp: 'oa_resp' }),
+        fechaTrabajo: manana, estado: 'PENDIENTE_RESPONSABLE', rev: 1, publicadoEn: haceMs(120e3)
+      });
+      await setDoc(doc(d, 'odt_afinia', ID(45), 'actos', 'azt'), { uid: 'oa_azt', en: haceMs(60e3) });
+    });
+    await assertFails(firmar('oa_resp', ID(45), 'responsable'));                        // cierre = la prevista (mañana)
+    await sembrar(async (d) => { await updateDoc(doc(d, 'odt_afinia', ID(45)), { fechaTrabajo: HOY }); });
+    await assertSucceeds(firmar('oa_resp', ID(45), 'responsable'));                     // control: la prevista es hoy
   });
 
   test('el AZT no firma como Responsable; sin reautenticación reciente → no', async () => {
@@ -523,15 +571,18 @@ describe('firmar como Responsable — después del AZT, otra persona, con fecha 
     await assertFails(firmar('oa_resp', ID(1), 'responsable', { claims: { auth_time: ahoraS() - 400 } }));
   });
 
-  test('con todo exacto el Responsable cierra (fecha de hoy y fecha del trabajo, los dos bordes) → LISTA; después nadie firma', async () => {
+  test('con todo exacto (compositor @2, cierre con la fecha prevista y «ODT GENERADA» = el N.º) el Responsable cierra → LISTA; después nadie firma', async () => {
     await assertSucceeds(firmar('oa_resp', ID(1), 'responsable'));
     const o = await leer('odt_afinia/' + ID(1));
     assert.equal(o.estado, 'LISTA'); assert.equal(o.rev, 2);
+    const a = await leer('odt_afinia/' + ID(1) + '/actos/responsable');
+    assert.deepEqual(a.cierre, { si: true, fecha: o.fechaTrabajo, generada: o.nro });
+    assert.equal(a.compositor, 'odt-afinia@2');
     await assertFails(firmar('oa_resp', ID(1), 'responsable'));
     await assertFails(firmar('oa_azt', ID(1), 'azt'));
-    // Borde inferior: cierre con la misma fecha del trabajo (ODT 5, ya firmada por el AZT).
+    // ODT 5 (ya firmada por el AZT): la prevista escrita a mano en el acto también pasa (mismo texto).
     await assertSucceeds(firmar('oa_resp', ID(5), 'responsable', {
-      acto: (x) => ({ cierre: { si: true, fecha: TRABAJO }, declaracion: DECL_RESP(NOMBRE('oa_resp'), CORREO('oa_resp'), x.nro, TRABAJO) })
+      acto: (x) => ({ cierre: { si: true, fecha: TRABAJO, generada: x.nro }, declaracion: DECL_RESP(NOMBRE('oa_resp'), CORREO('oa_resp'), x.nro, TRABAJO) })
     }));
   });
 
@@ -601,16 +652,29 @@ describe('anular, inmutables y carrera — solo el admin, con motivo; ANULADA ci
     await assertSucceeds(anular('oa_resp', ID(13), 1));
   });
 
-  test('republicar el N.º de una ODT ANULADA reasigna el candado; con la nueva vigente, otra vez no', async () => {
-    await assertSucceeds(publicar('oa_admin', ID(9), NRO(7), { azt: 'oa_azt', resp: 'oa_resp' }));
+  test('republicar el N.º de una ODT ANULADA reasigna el candado (con `reemplaza` = la anulada); con la nueva vigente, otra vez no', async () => {
+    // 2026-11-21: la republicación dice a cuál reemplaza, y tiene que ser la del candado.
+    await assertFails(publicar('oa_admin', ID(9), NRO(7), { azt: 'oa_azt', resp: 'oa_resp' }));                         // sin reemplaza
+    await assertFails(publicar('oa_admin', ID(9), NRO(7), { azt: 'oa_azt', resp: 'oa_resp', reemplaza: ID(8) }));       // otra ODT
+    await assertFails(publicar('oa_admin', ID(9), NRO(7), { azt: 'oa_azt', resp: 'oa_resp', reemplaza: 'corto' }));     // id inválido
+    await assertSucceeds(publicar('oa_admin', ID(9), NRO(7), { azt: 'oa_azt', resp: 'oa_resp', reemplaza: ID(7) }));
     assert.deepEqual(await leer('odt_afinia_nro/' + NRO(7)), { odtId: ID(9) });
+    assert.equal((await leer('odt_afinia/' + ID(9))).reemplaza, ID(7));
     await assertFails(publicar('oa_admin', ID(10), NRO(7), { azt: 'oa_azt', resp: 'oa_resp' }));
+    await assertFails(publicar('oa_admin', ID(10), NRO(7), { azt: 'oa_azt', resp: 'oa_resp', reemplaza: ID(9) }));    // vigente PENDIENTE_AZT
+  });
+
+  test('un N.º nuevo no lleva `reemplaza` (el candado es nuevo); sin él, sí', async () => {
+    await assertFails(publicar('oa_admin', ID(46), NRO(46), { azt: 'oa_azt', resp: 'oa_resp', reemplaza: ID(7) }));
+    await assertSucceeds(publicar('oa_admin', ID(46), NRO(46), { azt: 'oa_azt', resp: 'oa_resp' }));
+    assert.equal((await leer('odt_afinia/' + ID(46))).reemplaza, undefined);
   });
 
   test('candado: con la vigente LISTA no se reasigna; reasignarlo al mismo odtId tampoco; con la vigente ANULADA, sí', async () => {
-    await assertFails(publicar('oa_admin', ID(14), NRO(4), { azt: 'oa_azt', resp: 'oa_resp' }));          // ID 4 está LISTA
-    await assertFails(setDoc(doc(plano('oa_admin'), 'odt_afinia_nro', NRO(13)), { odtId: ID(13) }));       // mismo odtId (ANULADA)
-    await assertSucceeds(publicar('oa_admin', ID(14), NRO(13), { azt: 'oa_azt', resp: 'oa_resp' }));      // control: ID 13 ANULADA
+    await assertFails(publicar('oa_admin', ID(14), NRO(4), { azt: 'oa_azt', resp: 'oa_resp' }));                    // ID 4 está LISTA
+    await assertFails(publicar('oa_admin', ID(14), NRO(4), { azt: 'oa_azt', resp: 'oa_resp', reemplaza: ID(4) }));  // ni diciendo a cuál
+    await assertFails(setDoc(doc(plano('oa_admin'), 'odt_afinia_nro', NRO(13)), { odtId: ID(13) }));                 // mismo odtId (ANULADA)
+    await assertSucceeds(publicar('oa_admin', ID(14), NRO(13), { azt: 'oa_azt', resp: 'oa_resp', reemplaza: ID(13) }));   // control: ID 13 ANULADA
     assert.deepEqual(await leer('odt_afinia_nro/' + NRO(13)), { odtId: ID(14) });
   });
 });
@@ -777,7 +841,7 @@ describe('paliativo D5 — la sesión que firma se abrió DESPUÉS de publicar (
     const azt = await leer('odt_afinia/' + ID(32) + '/actos/azt');
     const entre = Math.floor(msDe(azt.en) / 1000);
     assert.ok(entre * 1000 > msDe(o.publicadoEn), 'la sesión «entre» debe ser posterior a publicar');
-    await assertFails(firmar('oa_resp', ID(32), 'responsable', { acto: { cierre: { si: true, fecha: HOY, hora: '10:00' } } }));
+    await assertFails(firmar('oa_resp', ID(32), 'responsable', { acto: (x) => ({ cierre: { si: true, fecha: x.fechaTrabajo, generada: x.nro, hora: '10:00' } }) }));
     await assertFails(firmar('oa_resp', ID(32), 'responsable', { claims: { auth_time: entre } }));
     await assertSucceeds(firmar('oa_resp', ID(32), 'responsable'));
   });
@@ -852,20 +916,23 @@ describe('fechas: días que no existen en el mes', () => {
     await assertSucceeds(publicar('oa_admin', ID(39), NRO(39), { m: metaOdt('oa_admin', NRO(39), pt, { fechaTrabajo: '31/12/2026' }) }));
   });
 
-  test('cierre del Responsable en un día inexistente (entre el trabajo y hoy) → no; un día real → sí', async () => {
-    const y = Number(HOY.slice(6)) - 1;   // el año pasado: todo su febrero y abril quedan entre el trabajo y hoy
-    await sembrar(async (d) => {
+  test('cierre del Responsable en un día inexistente → no, aunque sea la «prevista» (sembrada sin pasar por publicar); un día real → sí', async () => {
+    const y = Number(HOY.slice(6)) - 1;   // el año pasado: todo su febrero y abril quedan antes de hoy
+    // La fecha prevista se siembra con las reglas apagadas (publicar ya la niega): así la regla del acto sigue
+    // exigiendo una fecha REAL (odtFecha) además de que sea la prevista.
+    const sembrarCon = (fechaTrabajo) => sembrar(async (d) => {
       await setDoc(doc(d, 'odt_afinia', ID(40)), {
         ...metaOdt('oa_admin', NRO(40), [parte(0)], { azt: 'oa_azt', resp: 'oa_resp' }),
-        fechaTrabajo: `01/01/${y}`, estado: 'PENDIENTE_RESPONSABLE', rev: 1, publicadoEn: haceMs(120e3)
+        fechaTrabajo, estado: 'PENDIENTE_RESPONSABLE', rev: 1, publicadoEn: haceMs(120e3)
       });
       await setDoc(doc(d, 'odt_afinia', ID(40), 'actos', 'azt'), { uid: 'oa_azt', en: haceMs(60e3) });
     });
-    const cierre = (fecha) => (o) => ({ cierre: { si: true, fecha }, declaracion: DECL_RESP(NOMBRE('oa_resp'), CORREO('oa_resp'), o.nro, fecha) });
     for (const f of [`31/02/${y}`, `30/02/${y}`, `31/04/${y}`]) {
-      await assertFails(firmar('oa_resp', ID(40), 'responsable', { acto: cierre(f) }), f);
+      await sembrarCon(f);
+      await assertFails(firmar('oa_resp', ID(40), 'responsable'), f);
     }
-    await assertSucceeds(firmar('oa_resp', ID(40), 'responsable', { acto: cierre(`28/02/${y}`) }));
+    await sembrarCon(`28/02/${y}`);
+    await assertSucceeds(firmar('oa_resp', ID(40), 'responsable'));
   });
 });
 
@@ -926,6 +993,157 @@ describe('anular, devolución y descarga: bordes con su control', () => {
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
+// Decisiones del Ingeniero del 2026-11-21: REEMPLAZAR una LISTA y registrar su CIERRE EN AFINIA. Cada negativa con
+// su control que pasa (L-73/L-78).
+// ═════════════════════════════════════════════════════════════════════════════
+describe('reemplazar una ODT LISTA — solo el admin con perfil, con motivo; nada se borra; el N.º queda libre', () => {
+  const por = (u) => ({ uid: u, nombre: NOMBRE(u) });
+  const reemplazo = (u, extra = {}) => ({ motivo: 'La consignación del PDF de prueba no era la correcta', por: por(u), en: serverTimestamp(), ...extra });
+
+  test('desde PENDIENTE_AZT o PENDIENTE_RESPONSABLE → no (eso se anula); técnico, tercero, admin sin perfil, inactivo o visitante → no', async () => {
+    await assertSucceeds(publicar('oa_admin', ID(50), NRO(50), { azt: 'oa_azt', resp: 'oa_resp' }));
+    await assertFails(reemplazar('oa_admin', ID(50), 1));                       // PENDIENTE_AZT
+    await assertSucceeds(firmar('oa_azt', ID(50), 'azt'));
+    await assertFails(reemplazar('oa_admin', ID(50), 2));                       // PENDIENTE_RESPONSABLE
+    await assertSucceeds(firmar('oa_resp', ID(50), 'responsable'));             // → LISTA, rev 2
+    assert.equal((await leer('odt_afinia/' + ID(50))).estado, 'LISTA');
+    for (const u of ['oa_azt', 'oa_tercero', 'oa_arranque', 'oa_adminInact', 'oa_visit']) {
+      await assertFails(reemplazar(u, ID(50), 3), u);
+    }
+    await assertFails(updateDoc(doc(anon(), 'odt_afinia', ID(50)), { estado: 'REEMPLAZADA', rev: 3, reemplazo: reemplazo('oa_admin') }));
+  });
+
+  test('forma: sin reemplazo, motivo corto o largo, «por» ajeno, sello del cliente, clave de más, otro campo, rev o estado equivocados → no', async () => {
+    const d = plano('oa_admin');
+    await assertFails(updateDoc(doc(d, 'odt_afinia', ID(50)), { estado: 'REEMPLAZADA', rev: 3 }));
+    for (const extra of [
+      { reemplazo: reemplazo('oa_admin', { motivo: 'muy corto' }) },
+      { reemplazo: reemplazo('oa_admin', { motivo: 'M'.repeat(501) }) },
+      { reemplazo: reemplazo('oa_admin', { por: por('oa_resp') }) },
+      { reemplazo: reemplazo('oa_admin', { en: Timestamp.now() }) },
+      { reemplazo: reemplazo('oa_admin', { nota: 'x' }) },
+      { reemplazo: 'texto suelto' },
+      { lectores: ['oa_azt', 'oa_resp', 'oa_admin'] }, { fechaTrabajo: HOY },
+      { rev: 4 }, { rev: 2 },
+      { estado: 'ANULADA' }, { estado: 'CERRADA' }, { estado: 'LISTA' }
+    ]) {
+      await assertFails(reemplazar('oa_admin', ID(50), 3, extra), JSON.stringify(extra).slice(0, 60));
+    }
+    assert.equal((await leer('odt_afinia/' + ID(50))).estado, 'LISTA');
+    // Control: todo exacto (motivo de 500 caracteres justos) → REEMPLAZADA, rev 3.
+    await assertSucceeds(reemplazar('oa_admin', ID(50), 3, { reemplazo: reemplazo('oa_admin', { motivo: 'M'.repeat(500) }) }));
+    const o = await leer('odt_afinia/' + ID(50));
+    assert.equal(o.estado, 'REEMPLAZADA'); assert.equal(o.rev, 3);
+    assert.deepEqual(o.reemplazo.por, por('oa_admin'));
+  });
+
+  test('REEMPLAZADA es final: no se reemplaza otra vez, no se cierra, no se anula, no vuelve a LISTA ni recibe devoluciones', async () => {
+    await assertFails(reemplazar('oa_admin', ID(50), 4));
+    await assertFails(cerrar('oa_admin', ID(50), 4));
+    await assertFails(anular('oa_admin', ID(50), 4));
+    await assertFails(updateDoc(doc(plano('oa_admin'), 'odt_afinia', ID(50)), { estado: 'LISTA', rev: 4 }));
+    await assertFails(firmar('oa_resp', ID(50), 'responsable'));
+    await assertFails(setDoc(doc(collection(plano('oa_resp'), 'odt_afinia', ID(50), 'devoluciones'), 'responsable_3'),
+      { uid: 'oa_resp', rol: 'responsable', motivo: 'La ODT trae un dato de prueba que no corresponde', en: serverTimestamp() }));
+  });
+
+  test('nada se borra: sus firmantes y el admin siguen leyendo la ODT, sus partes y sus actos; nadie los borra ni los cambia', async () => {
+    for (const u of ['oa_azt', 'oa_resp', 'oa_admin']) {
+      const d = plano(u);
+      await assertSucceeds(getDoc(doc(d, 'odt_afinia', ID(50))), u);
+      await assertSucceeds(getDoc(doc(d, 'odt_afinia', ID(50), 'partes', '0')));
+      await assertSucceeds(getDoc(doc(d, 'odt_afinia', ID(50), 'actos', 'azt')));
+      await assertSucceeds(getDoc(doc(d, 'odt_afinia', ID(50), 'actos', 'responsable')));
+    }
+    await assertFails(getDoc(doc(plano('oa_tercero'), 'odt_afinia', ID(50))));
+    await assertFails(deleteDoc(doc(plano('oa_admin'), 'odt_afinia', ID(50))));
+    await assertFails(deleteDoc(doc(plano('oa_admin'), 'odt_afinia', ID(50), 'actos', 'responsable')));
+    await assertFails(deleteDoc(doc(plano('oa_admin'), 'odt_afinia', ID(50), 'partes', '0')));
+    await assertFails(updateDoc(doc(plano('oa_admin'), 'odt_afinia', ID(50)), { reemplazo: reemplazo('oa_admin', { motivo: 'Otro motivo cambiado después' }) }));
+  });
+
+  test('candado reasignable tras REEMPLAZADA (con `reemplaza` = la reemplazada); la REEMPLAZADA no se descarga', async () => {
+    await assertFails(publicar('oa_admin', ID(52), NRO(50), { azt: 'oa_azt', resp: 'oa_resp' }));                       // sin reemplaza
+    await assertFails(publicar('oa_admin', ID(52), NRO(50), { azt: 'oa_azt', resp: 'oa_resp', reemplaza: ID(1) }));     // otra ODT
+    await assertSucceeds(publicar('oa_admin', ID(52), NRO(50), { azt: 'oa_azt', resp: 'oa_resp', reemplaza: ID(50) }));
+    assert.deepEqual(await leer('odt_afinia_nro/' + NRO(50)), { odtId: ID(52) });
+    assert.equal((await leer('odt_afinia/' + ID(52))).reemplaza, ID(50));
+    const C = (u) => collection(plano(u), 'odt_afinia_descargas');
+    const desc = (u, odtId) => ({ odtId, uid: u, huella: 'a'.repeat(64), en: serverTimestamp() });
+    await assertFails(setDoc(doc(C('oa_azt'), 'oaDescarga0000000020'), desc('oa_azt', ID(50))));
+    await assertFails(setDoc(doc(C('oa_admin'), 'oaDescarga0000000021'), desc('oa_admin', ID(50))));
+  });
+});
+
+describe('registrar el cierre en Afinia — solo el admin, solo desde LISTA; CERRADA es final y se sigue descargando', () => {
+  const por = (u) => ({ uid: u, nombre: NOMBRE(u) });
+  const cierreAfinia = (u, extra = {}) => ({ fecha: HOY, soporte: SOPORTE, por: por(u), en: serverTimestamp(), ...extra });
+
+  test('desde PENDIENTE_* → no; técnico, tercero, admin sin perfil, inactivo o visitante → no', async () => {
+    await assertSucceeds(publicar('oa_admin', ID(51), NRO(51), { azt: 'oa_azt', resp: 'oa_resp' }));
+    await assertFails(cerrar('oa_admin', ID(51), 1));                            // PENDIENTE_AZT
+    await assertSucceeds(firmar('oa_azt', ID(51), 'azt'));
+    await assertFails(cerrar('oa_admin', ID(51), 2));                            // PENDIENTE_RESPONSABLE
+    await assertSucceeds(firmar('oa_resp', ID(51), 'responsable'));              // → LISTA, rev 2
+    for (const u of ['oa_azt', 'oa_tercero', 'oa_arranque', 'oa_adminInact', 'oa_visit']) {
+      await assertFails(cerrar(u, ID(51), 3), u);
+    }
+  });
+
+  test('fecha futura, anterior a la prevista, inexistente o mal escrita; soporte corto, largo o no texto; «por» ajeno; sello; claves → no', async () => {
+    for (const extra of [
+      { fecha: fechaBogota(1) }, { fecha: fechaBogota(-11) }, { fecha: '31/11/2026' }, { fecha: '31/02/2026' }, { fecha: '2026-11-15' },
+      { soporte: 'ab' }, { soporte: 'S'.repeat(121) }, { soporte: 12345 }
+    ]) {
+      await assertFails(cerrar('oa_admin', ID(51), 3, extra), JSON.stringify(extra).slice(0, 60));
+    }
+    const d = plano('oa_admin');
+    const u = (cambio) => updateDoc(doc(d, 'odt_afinia', ID(51)), { estado: 'CERRADA', rev: 3, cierreAfinia: cierreAfinia('oa_admin'), ...cambio });
+    for (const cambio of [
+      { cierreAfinia: cierreAfinia('oa_admin', { por: por('oa_resp') }) },
+      { cierreAfinia: cierreAfinia('oa_admin', { en: Timestamp.now() }) },
+      { cierreAfinia: cierreAfinia('oa_admin', { nota: 'x' }) },
+      { cierreAfinia: { fecha: HOY, por: por('oa_admin'), en: serverTimestamp() } },   // sin soporte
+      { lectores: ['oa_azt'] }, { rev: 4 }, { rev: 2 }, { estado: 'LISTA' }, { estado: 'REEMPLAZADA' }
+    ]) {
+      await assertFails(u(cambio), JSON.stringify(cambio).slice(0, 60));
+    }
+    await assertFails(updateDoc(doc(d, 'odt_afinia', ID(51)), { estado: 'CERRADA', rev: 3 }));
+    assert.equal((await leer('odt_afinia/' + ID(51))).estado, 'LISTA');
+  });
+
+  test('con todo exacto (fecha de hoy) → CERRADA; es final: no se reemplaza, ni se anula, ni se cierra otra vez, ni se edita; su N.º no se republica', async () => {
+    await assertSucceeds(cerrar('oa_admin', ID(51), 3));
+    const o = await leer('odt_afinia/' + ID(51));
+    assert.equal(o.estado, 'CERRADA'); assert.equal(o.rev, 3);
+    assert.deepEqual({ fecha: o.cierreAfinia.fecha, soporte: o.cierreAfinia.soporte, por: o.cierreAfinia.por }, { fecha: HOY, soporte: SOPORTE, por: por('oa_admin') });
+    await assertFails(reemplazar('oa_admin', ID(51), 4));
+    await assertFails(anular('oa_admin', ID(51), 4));
+    await assertFails(cerrar('oa_admin', ID(51), 4));
+    await assertFails(updateDoc(doc(plano('oa_admin'), 'odt_afinia', ID(51)), { estado: 'LISTA', rev: 4 }));
+    await assertFails(updateDoc(doc(plano('oa_admin'), 'odt_afinia', ID(51)), { cierreAfinia: cierreAfinia('oa_admin', { soporte: 'OTRO_SOPORTE' }) }));
+    await assertFails(publicar('oa_admin', ID(53), NRO(51), { azt: 'oa_azt', resp: 'oa_resp', reemplaza: ID(51) }));
+    await assertFails(publicar('oa_admin', ID(53), NRO(51), { azt: 'oa_azt', resp: 'oa_resp' }));
+  });
+
+  test('descarga: de una CERRADA, sus firmantes y el admin sí; un tercero no', async () => {
+    const C = (u) => collection(plano(u), 'odt_afinia_descargas');
+    const desc = (u, odtId) => ({ odtId, uid: u, huella: 'a'.repeat(64), en: serverTimestamp() });
+    await assertSucceeds(setDoc(doc(C('oa_azt'), 'oaDescarga0000000022'), desc('oa_azt', ID(51))));
+    await assertSucceeds(setDoc(doc(C('oa_resp'), 'oaDescarga0000000023'), desc('oa_resp', ID(51))));
+    await assertSucceeds(setDoc(doc(C('oa_admin'), 'oaDescarga0000000024'), desc('oa_admin', ID(51))));
+    await assertFails(setDoc(doc(C('oa_tercero'), 'oaDescarga0000000025'), desc('oa_tercero', ID(51))));
+  });
+
+  test('borde: cierre con la fecha prevista exacta y un soporte de 120 caracteres → sí (ODT 4, LISTA)', async () => {
+    const o = await leer('odt_afinia/' + ID(4));
+    assert.equal(o.estado, 'LISTA');
+    await assertFails(cerrar('oa_admin', ID(4), o.rev + 1, { fecha: fechaBogota(-11) }));        // un día antes de la prevista
+    await assertSucceeds(cerrar('oa_admin', ID(4), o.rev + 1, { fecha: o.fechaTrabajo, soporte: 'S'.repeat(120) }));
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
 describe('carga máxima (L-110) — 5 partes de 900 KB y una firma de 900 KB', () => {
   test('publicar 5 × 900 KB, firmar el AZT con su imagen de 900 KB y cerrar el Responsable: pasa', async () => {
     const partes = [0, 1, 2, 3, 4].map((i) => parte(i, 900 * 1024));
@@ -941,5 +1159,18 @@ describe('carga máxima (L-110) — 5 partes de 900 KB y una firma de 900 KB', (
     const otra = parte(4, 900 * 1024); otra[0] ^= 1;
     await assertFails(publicar('oa_admin', ID(12), NRO(12), { partes, escribir: [[0, partes[0]], [1, partes[1]], [2, partes[2]], [3, partes[3]], [4, otra]], azt: 'oa_aztMax' }));
     await assertFails(publicar('oa_admin', ID(12), NRO(12), { partes, escribir: [[0, partes[0]], [1, partes[1]], [2, partes[2]], [4, partes[4]]], azt: 'oa_aztMax' }));
+  });
+
+  test('2026-11-21: reemplazar la LISTA de carga máxima y volver a publicar su N.º con 5 × 900 KB y `reemplaza` (candado reasignado): pasa', async () => {
+    assert.equal((await leer('odt_afinia/' + ID(11))).estado, 'LISTA');
+    await assertSucceeds(reemplazar('oa_admin', ID(11), 3));
+    const partes = [0, 1, 2, 3, 4].map((i) => parte(i, 900 * 1024));
+    // La regla más cara (17 campos + candado reasignado que compara `reemplaza`) cabe en el tope de expresiones.
+    await assertSucceeds(publicar('oa_admin', ID(55), NRO(11), { partes, azt: 'oa_aztMax', resp: 'oa_resp', reemplaza: ID(11) }));
+    assert.deepEqual(await leer('odt_afinia_nro/' + NRO(11)), { odtId: ID(55) });
+    // Y se firma de punta a punta con la firma de 900 KB (compositor @2, cierre con la fecha prevista).
+    await assertSucceeds(firmar('oa_aztMax', ID(55), 'azt'));
+    await assertSucceeds(firmar('oa_resp', ID(55), 'responsable'));
+    assert.equal((await leer('odt_afinia/' + ID(55))).estado, 'LISTA');
   });
 });

@@ -17,16 +17,28 @@
 //   · componerParaVer → lo que se muestra en «Ver la ODT»: verificado contra la
 //                      huellaVista de los actos, con su huella a la vista.
 //   · prepararDescarga → compone v0 + las dos firmas, huella, y exige que sea la
-//                      que vio el Responsable; se registra y se entrega ESE Blob.
+//                      que vio el Responsable; se registra y se entrega ESE Blob
+//                      (ODT LISTA o CERRADA en Afinia).
 // Antes de componer, las zonas guardadas en la ODT se comparan con las del formato
 // (±3 pt): la regla solo mira su forma.
+// Pie de cierre (2026-11-21): la FECHA CIERRE es la fecha PREVISTA de la orden
+// (odt.fechaTrabajo; no se edita) y el compositor vigente ('odt-afinia@2') estampa además
+// el N.º en «ODT GENERADA N°». Al Preparar se compone con el COMPOSITOR vigente y la copia
+// lo guarda, con el pie completo en su cierre {si, fecha, generada} (cierreDelResponsable);
+// al recomponer (Ver, verificar, Descargar) manda el compositor del acto del Responsable:
+// un acto @1 se recompone igual que siempre; uno @2 debe traer generada == N.º de la ODT.
+// Si el módulo que compone quedó viejo en la caché (no sabe @2), no se prepara ni se
+// verifica una firma @2: se pide recargar.
 // pdf-lib llega INYECTADO. Archivo NUEVO a propósito (L-102).
 // ══════════════════════════════════════════════════════════════════════════════
 
-import { ESTADOS, TOPES, PROVEEDOR, esHuella } from '../../domain/odt_afinia_rutas.js';
+import { TOPES, PROVEEDOR, COMPOSITOR, esHuella } from '../../domain/odt_afinia_rutas.js';
 import { cambioFirma, rolDe } from '../../domain/odt_afinia_estados.js';
 import { declaracion, errorFechaCierre, nombreArchivo } from '../../domain/odt_afinia_textos.js';
-import { componerConHuella } from '../../domain/odt_afinia_componer.js';
+import { componerConHuella, ESTAMPA } from '../../domain/odt_afinia_componer.js';
+import {
+  COMPOSITOR_V2, COMPOSITOR_VIGENTE, MSG_RECARGAR, MSG_RECARGAR_FIRMA, fechaCierreDe, cierreDelResponsable, puedeDescargar
+} from '../../domain/odt_afinia_cierre.js';
 import { errorZonasGuardadas } from '../../domain/odt_afinia_zonas.js';
 import { huella } from '../../domain/odt_afinia_partes.js';
 import { ErrorOdt } from '../../data/odt_afinia_lotes.js';
@@ -34,6 +46,13 @@ import { MSG_IDENTIDAD_CAMBIO, MSG_SESION_ANTES_DE_PUBLICAR, MSG_SESION_ANTES_DE
 import { HUELLA_MI_FIRMA_DISTINTA } from '../../data/odt_afinia_mi_firma.js';
 
 const falla = (codigo, mensaje) => { throw new ErrorOdt(codigo, mensaje); };
+
+/** ¿El módulo que compone ya sabe @2? (ESTAMPA.dyGenerada llegó con @2; L-102: caché de 10 min). */
+const componerSabeV2 = () => !!ESTAMPA && Number.isFinite(ESTAMPA.dyGenerada);
+/** Al preparar una firma NUEVA: el compositor vigente y el módulo que compone, de la MISMA entrega. */
+function exigirCompositorAlDia() {
+  if (COMPOSITOR !== COMPOSITOR_VIGENTE || !componerSabeV2()) falla('estado', MSG_RECARGAR_FIRMA);
+}
 
 /** Las zonas guardadas en la ODT deben ser las del formato (±3 pt); si no, no se compone. */
 export function exigirZonas(odt) {
@@ -67,7 +86,8 @@ export async function verificarActoAzt({ odt, bytesV0, actoAzt, PDFLib }) {
  * @param {string} p.correo       correo de la cuenta (el del token)
  * @param {{hay:boolean, imagen?:Uint8Array, huella?:string, huellaDeclarada?:string, enMs?:number}} p.miFirma  de miFirmaOdt
  * @param {{enMs?:number}|null} p.habilitacion
- * @param {string} [p.fechaCierre] solo el Responsable, 'dd/mm/aaaa'
+ * @param {string} [p.fechaCierre] solo el Responsable: la fecha PREVISTA de la orden (odt.fechaTrabajo);
+ *                                 si falta, se usa esa; si llega otra, no se prepara
  * @param {object} p.PDFLib
  * @param {Date} [p.ahora]
  */
@@ -92,18 +112,24 @@ export async function prepararFirma({ odt, bytesV0, actos = {}, sesion, correo, 
   const pub = odt.firmantes && odt.firmantes[rol];
   if (!pub || pub.nombre !== sesion.nombre || pub.correo !== correo) falla('sin_permiso', MSG_IDENTIDAD_CAMBIO);
 
+  exigirCompositorAlDia();
   let cierre = null;
   let actosComponer;
   const imagen = miFirma.imagen.slice();
   if (rol === 'azt') {
     actosComponer = { azt: { imagen } };
   } else {
-    const err = errorFechaCierre(fechaCierre, { fechaTrabajo: odt.fechaTrabajo, ahora });
+    // FECHA CIERRE = la fecha PREVISTA de la orden (no se edita). Si llega otra, se dice en llano.
+    const prevista = fechaCierreDe(odt);
+    const fecha = fechaCierre == null || fechaCierre === '' ? prevista : fechaCierre;
+    const err = errorFechaCierre(fecha, { fechaTrabajo: prevista, ahora });
     if (err) falla('validacion', err);
     await verificarActoAzt({ odt, bytesV0, actoAzt: actos.azt, PDFLib });
     if (actos.azt.uid === sesion.uid) falla('sin_permiso', 'La misma cuenta no puede firmar las dos casillas.');
-    cierre = { si: true, fecha: fechaCierre };
-    actosComponer = { azt: { imagen: actos.azt.imagen }, responsable: { imagen, cierre } };
+    // El pie completo queda en la copia y en el acto: {si, fecha (la prevista), generada (el N.º)}.
+    cierre = cierreDelResponsable(odt, fecha);
+    // Con el compositor vigente (@2): además de la X y la fecha, el N.º en «ODT GENERADA N°».
+    actosComponer = { azt: { imagen: actos.azt.imagen }, responsable: { imagen, cierre, compositor: COMPOSITOR_VIGENTE, nro: cierre.generada } };
   }
   const compuesto = await componerConHuella(bytesV0, actosComponer, { PDFLib, zonas: odt.zonas });
   const decl = declaracion(rol, { nombre: sesion.nombre, correo, nro: odt.nro, fecha: cierre && cierre.fecha });
@@ -122,6 +148,7 @@ export async function prepararFirma({ odt, bytesV0, actos = {}, sesion, correo, 
     imagen,
     huellaImagen: await huella(imagen),
     cierre: cierre && Object.freeze(cierre),
+    compositor: COMPOSITOR_VIGENTE,         // con el que se armó lo que ve (y lo que firma el acto)
     bytes: compuesto.bytes,
     huellaVista: compuesto.huella,
     declaracion: Object.freeze(decl),
@@ -175,7 +202,14 @@ export async function componerVerificado({ odt, bytesV0, actos = {}, PDFLib } = 
   const conAzt = await verificarActoAzt({ odt, bytesV0, actoAzt: a, PDFLib });
   if (!r) return { ...conAzt, firmas: 1 };
   if (!odt.firmantes || r.uid !== odt.firmantes.responsable.uid) falla('huella', 'La firma del Responsable no es de la persona asignada.');
-  const c = await componerConHuella(bytesV0, { azt: { imagen: a.imagen }, responsable: { imagen: r.imagen, cierre: r.cierre } }, { PDFLib, zonas: odt.zonas });
+  // La versión la decide el acto del Responsable: @1 se recompone como siempre; @2 lleva su N.º.
+  if (r.compositor === COMPOSITOR_V2 && !componerSabeV2()) falla('estado', MSG_RECARGAR);
+  // @2: el N.º estampado es el que dice su cierre (`generada`), y es el de ESTA ODT.
+  if (r.compositor === COMPOSITOR_V2 && (r.nro !== odt.nro || !r.cierre || r.cierre.generada !== odt.nro)) {
+    falla('huella', 'La firma del Responsable es de otro N.º de ODT. Avise al administrador.');
+  }
+  const resp = { imagen: r.imagen, cierre: r.cierre, compositor: r.compositor, nro: r.nro };
+  const c = await componerConHuella(bytesV0, { azt: { imagen: a.imagen }, responsable: resp }, { PDFLib, zonas: odt.zonas });
   if (c.huella !== r.huellaVista) falla('huella', 'La ODT recompuesta no coincide con la que firmó el Responsable. Avise al administrador.');
   return { ...c, firmas: 2 };
 }
@@ -185,10 +219,11 @@ export const componerParaVer = componerVerificado;
 
 /**
  * La ODT firmada para DESCARGAR: se compone UNA vez, se hulla y se exige que sea
- * lo que vio el Responsable. Devuelve {bytes, huella, nombre}.
+ * lo que vio el Responsable. Devuelve {bytes, huella, nombre}. Se descarga una ODT LISTA
+ * o CERRADA en Afinia (la regla del registro de descargas exige lo mismo).
  */
 export async function prepararDescarga({ odt, bytesV0, actos = {}, PDFLib } = {}) {
-  if (!odt || odt.estado !== ESTADOS.LISTA) falla('estado', 'Solo se descarga una ODT con las dos firmas (estado «Lista»).');
+  if (!puedeDescargar(odt)) falla('estado', 'Solo se descarga una ODT con las dos firmas (estado «Lista» o «Cerrada en Afinia»).');
   if (!actos.azt || !actos.responsable) falla('estado', 'Faltan firmas en la ODT.');
   const c = await componerVerificado({ odt, bytesV0, actos, PDFLib });
   return { bytes: c.bytes, huella: c.huella, nombre: nombreArchivo(odt.nro) };

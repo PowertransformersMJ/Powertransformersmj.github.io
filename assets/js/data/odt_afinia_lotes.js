@@ -6,9 +6,14 @@
 // espera (allí la forma se valida con `size() == N` y la lectura de cada campo,
 // así que aquí van exactamente esos campos, ni uno más).
 //   · documentoHabilitacion → odt_afinia_firmantes/{uid}            (9 campos)
-//   · planPublicacion       → odt_afinia/{id} (16) + partes/{i} + odt_afinia_nro/{nro}
-//   · documentoActo         → odt_afinia/{id}/actos/{rol}           (16; Responsable 17)
+//   · planPublicacion       → odt_afinia/{id} (16; 17 con `reemplaza` al volver a publicar un
+//                             N.º cuya vigente está ANULADA o REEMPLAZADA) + partes/{i} + odt_afinia_nro/{nro}
+//   · planFirma             → odt_afinia/{id}/actos/{rol}           (16; Responsable 17), con el
+//                             compositor de la copia congelada (el vigente: 'odt-afinia@2', que se
+//                             lee de odt_afinia_cierre.js y no de rutas, por la caché, L-102) y, el
+//                             Responsable, su pie completo: cierre {si, fecha (la prevista), generada (el N.º)}
 //   · cambiosAnulacion      → update {estado, rev, anulacion}
+//   (Reemplazar y registrar el cierre en Afinia los arma odt_afinia_cierre.js del dominio, L-102.)
 //   · documentoDevolucion   → odt_afinia/{id}/devoluciones/{rol_rev} (4; id determinista: una por turno)
 //   · documentoDescarga     → odt_afinia_descargas/{auto}           (4)
 // La marca de hora del servidor (`serverTimestamp()`) y el envoltorio de bytes
@@ -20,11 +25,13 @@
 // ══════════════════════════════════════════════════════════════════════════════
 
 import {
-  COL, ESTADOS, VERSIONES, COMPOSITOR, PROVEEDOR, TOPES, esNro, esHuella, esRol
+  COL, ESTADOS, VERSIONES, PROVEEDOR, TOPES, esNro, esHuella, esRol
 } from '../domain/odt_afinia_rutas.js';
 import { cambioFirma, cambioAnular, errorFirmantes } from '../domain/odt_afinia_estados.js';
 import { textoAcuerdo, esFechaDMA } from '../domain/odt_afinia_textos.js';
 import { esZonas } from '../domain/odt_afinia_zonas.js';
+// Archivo NUEVO (L-102): el compositor vigente sale de aquí, no de un odt_afinia_rutas.js que pudo quedar viejo.
+import { COMPOSITOR_VIGENTE } from '../domain/odt_afinia_cierre.js';
 
 // ── Errores con código (la pantalla decide el mensaje por el código) ───────────
 export class ErrorOdt extends Error {
@@ -46,7 +53,7 @@ export const MENSAJES = Object.freeze({
   validacion: 'Hay datos que no cumplen el formato.',
   estado: 'La ODT ya no está en el paso que se esperaba. Recargue para ver su estado actual.',
   conflicto: 'La ODT cambió mientras usted trabajaba. Recargue y vuelva a empezar.',
-  duplicado: 'Ya hay una ODT vigente con ese N.º. Para volver a publicarla, primero anule la vigente.',
+  duplicado: 'Ya hay una ODT vigente con ese N.º. Para volver a publicarla, primero anule la vigente (si le falta una firma) o reemplácela (si ya está lista).',
   red: 'No hay conexión con la plataforma. Revise su red e inténtelo de nuevo.',
   tiempo: 'La plataforma no respondió a tiempo.',
   indice: 'La bandeja se está preparando en la plataforma (índice en construcción). Inténtelo en unos minutos.',
@@ -150,11 +157,15 @@ export function documentoHabilitacion({ uid, nombre, token, ts } = {}) {
 // ── Publicación ────────────────────────────────────────────────────────────────
 /**
  * Lote de publicación: la ODT, sus partes 0..n-1 y el candado del N.º.
+ * `reemplaza` (opcional, 2026-11-21): el id de la ODT anterior con ese N.º, cuando el candado ya
+ * existía y su vigente está ANULADA o REEMPLAZADA. La regla del candado exige que coincida con el
+ * candado anterior (y que no venga si el candado es nuevo): queda la traza «reemplaza a…».
  * @param {{id:string, form:{nro,consignacion,subestacion,equipo,fechaTrabajo}, preparado:{partes:Uint8Array[], huellasPartes:string[], huella:string, bytes:number},
- *          zonas:object, firmantes:{azt:object, responsable:object}, quien:{uid:string, nombre:string}, ts:any, aBytes:(u:Uint8Array)=>any}} p
+ *          zonas:object, firmantes:{azt:object, responsable:object}, quien:{uid:string, nombre:string}, ts:any, aBytes:(u:Uint8Array)=>any,
+ *          reemplaza?:string|null}} p
  * @returns {{id:string, odt:object, operaciones:Array<{ruta:string[], datos:object}>}}
  */
-export function planPublicacion({ id, form = {}, preparado = {}, zonas, firmantes = {}, quien = {}, ts, aBytes } = {}) {
+export function planPublicacion({ id, form = {}, preparado = {}, zonas, firmantes = {}, quien = {}, ts, aBytes, reemplaza = null } = {}) {
   exige(esIdOdt(id), 'Identificador de ODT inválido.');
   exige(typeof aBytes === 'function', 'Falta el envoltorio de bytes.');
   const nro = texto(form.nro).trim();
@@ -166,7 +177,8 @@ export function planPublicacion({ id, form = {}, preparado = {}, zonas, firmante
   exige(consignacion.length <= 60, 'La consignación admite hasta 60 caracteres.');
   exige(subestacion.length >= 1 && subestacion.length <= 120, 'Escriba la subestación (hasta 120 caracteres).');
   exige(equipo.length >= 1 && equipo.length <= 120, 'Escriba el equipo (hasta 120 caracteres).');
-  exige(esFechaDMA(fechaTrabajo), 'La fecha del trabajo debe ser una fecha real dd/mm/aaaa.');
+  exige(esFechaDMA(fechaTrabajo), 'La fecha prevista de la orden debe ser una fecha real dd/mm/aaaa.');
+  exige(reemplaza == null || (esIdOdt(reemplaza) && reemplaza !== id), 'La ODT que se reemplaza no tiene un identificador válido.');
 
   const azt = firmanteDesdeHabilitacion(firmantes.azt);
   const responsable = firmanteDesdeHabilitacion(firmantes.responsable);
@@ -200,6 +212,7 @@ export function planPublicacion({ id, form = {}, preparado = {}, zonas, firmante
     publicadoPor: { uid: quien.uid, nombre: texto(quien.nombre) },
     publicadoEn: ts
   };
+  if (reemplaza != null) odt.reemplaza = reemplaza;
   const operaciones = [{ ruta: [COL.odt, id], datos: odt }];
   partes.forEach((p, i) => operaciones.push({ ruta: [COL.odt, id, COL.partes, String(i)], datos: { datos: aBytes(p) } }));
   operaciones.push({ ruta: [COL.nro, nro], datos: { odtId: id } });
@@ -226,6 +239,9 @@ export function planFirma(congelado, token, { ts, aBytes } = {}) {
   exige(esHuella(c.huellaImagen) && esHuella(c.huellaBase) && esHuella(c.huellaVista), 'Faltan huellas de la firma preparada.');
   const t = cambioFirma({ estado: c.estadoPrevio, rev: c.revPrevio, firmantes: c.firmantes }, c.rol, c.uid);
   exige(t.ok, t.mensaje);
+  // El compositor es el de la COPIA congelada (con el que se armó lo que vio): debe ser el vigente.
+  // Una copia de una página vieja en la caché (sin compositor) no se firma: se recarga y se prepara de nuevo.
+  exige(c.compositor === COMPOSITOR_VIGENTE, 'La firma se preparó con una versión anterior de la página. Recargue con Cmd + Shift + R (o Ctrl + Shift + R) y prepare de nuevo.');
   const datos = {
     rol: c.rol,
     uid: c.uid,
@@ -239,14 +255,16 @@ export function planFirma(congelado, token, { ts, aBytes } = {}) {
     huellaImagen: c.huellaImagen,
     huellaBase: c.huellaBase,
     huellaVista: c.huellaVista,
-    compositor: COMPOSITOR,
+    compositor: c.compositor,
     declaracionVersion: c.declaracion.version,
     declaracion: c.declaracion.texto,
     en: ts
   };
   if (c.rol === 'responsable') {
     exige(c.cierre && c.cierre.si === true && esFechaDMA(c.cierre.fecha), 'Falta la fecha de cierre.');
-    datos.cierre = { si: true, fecha: c.cierre.fecha };
+    // El pie completo: el N.º de «ODT GENERADA N°» va escrito (la regla exige generada == N.º; L-102).
+    exige(c.cierre.generada === c.nro && esNro(c.nro), 'La firma se preparó con una versión anterior de la página (falta el N.º de «ODT GENERADA»). Recargue con Cmd + Shift + R (o Ctrl + Shift + R) y prepare de nuevo.');
+    datos.cierre = { si: true, fecha: c.cierre.fecha, generada: c.cierre.generada };
   }
   return {
     acto: { ruta: [COL.odt, c.odtId, COL.actos, c.rol], datos },

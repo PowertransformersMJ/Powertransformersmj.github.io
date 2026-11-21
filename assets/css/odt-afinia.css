@@ -111,6 +111,9 @@
 .odt-chip--pendiente_azt, .odt-chip--pendiente_responsable { background: var(--odt-aviso-fondo, #fff4e0); color: var(--odt-aviso, #7a4200); }
 .odt-chip--lista { background: var(--odt-ok-fondo, #e6f7ee); color: var(--odt-ok, #00733b); }
 .odt-chip--anulada { background: var(--odt-mal-fondo, #fdecea); color: var(--odt-mal, #b3140e); }
+/* 2026-11-21: cerrada en Afinia (reposa en la página) y reemplazada (va con las anuladas). */
+.odt-chip--cerrada { background: var(--odt-info-fondo, #eaf2ff); color: var(--odt-info, #0b3d91); }
+.odt-chip--reemplazada { background: var(--odt-sup-suave, #f6f8fc); color: var(--odt-tenue, #4d6485); border-style: dashed; }
 
 .odt-tabla-caja { overflow-x: auto; }
 .odt-tabla { width: 100%; border-collapse: collapse; font-size: 13.5px; }
@@ -158,6 +161,12 @@ textarea.odt-campo { resize: vertical; }
 .odt-acto--pendiente { border-style: dashed; }
 .odt-acto .odt-datos { grid-template-columns: 1fr; gap: 6px; }
 .odt-anulada { margin: 10px 0 0; padding: 10px 12px; background: var(--odt-mal-fondo, #fdecea); color: var(--odt-mal, #b3140e); border-radius: 8px; }
+.odt-reemplazada { margin: 10px 0 0; padding: 10px 12px; background: var(--odt-aviso-fondo, #fff4e0); color: var(--odt-aviso, #7a4200); border-radius: 8px; }
+.odt-cerrada { margin: 10px 0 0; padding: 10px 12px; background: var(--odt-info-fondo, #eaf2ff); color: var(--odt-info, #0b3d91); border-radius: 8px; font-weight: 600; }
+.odt-reemplaza { margin: 4px 0 8px; }
+/* Pie de cierre que estampa el Responsable (fijo, no se edita). */
+.odt-pie-cierre { margin: 8px 0 12px; padding: 10px 12px; border-radius: 8px; background: var(--odt-sup-suave, #f6f8fc); border: 1px solid var(--odt-linea, rgba(0, 40, 90, .12)); }
+.odt-generada { font-weight: 700; color: var(--odt-tinta, #0d1f38); }
 .odt-devoluciones { margin: 10px 0 0; }
 .odt-devoluciones h4 { margin: 0 0 4px; font-size: 14px; }
 .odt-detalles summary { cursor: pointer; font-weight: 600; min-height: 32px; }

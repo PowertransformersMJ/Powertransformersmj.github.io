@@ -31,11 +31,16 @@ export const COL = Object.freeze({
 export const CONFIG_FIRMANTES = Object.freeze({ col: 'odt_afinia_config', doc: 'firmantes' });
 
 // ── Estados y roles ────────────────────────────────────────────────────────────
+// CERRADA y REEMPLAZADA (decisiones del 2026-11-21) se AGREGAN al final: cambio compatible
+// (un consumidor viejo no las nombra). Los consumidores nuevos las leen de
+// odt_afinia_cierre.js (archivo nuevo, L-102), por si este archivo quedó viejo en la caché.
 export const ESTADOS = Object.freeze({
   PENDIENTE_AZT: 'PENDIENTE_AZT',
   PENDIENTE_RESPONSABLE: 'PENDIENTE_RESPONSABLE',
   LISTA: 'LISTA',
-  ANULADA: 'ANULADA'
+  ANULADA: 'ANULADA',
+  CERRADA: 'CERRADA',            // el admin registró el cierre en Afinia (final)
+  REEMPLAZADA: 'REEMPLAZADA'     // el admin la reemplazó desde LISTA; su N.º se puede volver a publicar (final)
 });
 export const LISTA_ESTADOS = Object.freeze(Object.values(ESTADOS));
 
@@ -51,8 +56,15 @@ export const VERSIONES = Object.freeze({
   azt: 'odt-azt-v1',
   responsable: 'odt-resp-v1'
 });
-/** Identidad del compositor: si cambia cómo se arma el PDF, cambia esta cadena. */
-export const COMPOSITOR = 'odt-afinia@1';
+/**
+ * Identidad del compositor de los actos NUEVOS: si cambia cómo se arma el PDF, cambia esta cadena.
+ * 'odt-afinia@2' (2026-11-21): además estampa el N.º en «ODT GENERADA N°». Los actos firmados con
+ * 'odt-afinia@1' se siguen recomponiendo igual (odt_afinia_cierre.versionDeComposicion).
+ * L-102: lo que se ESCRIBE en un acto nuevo sale de odt_afinia_cierre.COMPOSITOR_VIGENTE (archivo nuevo); aquí
+ * solo lo compara preparar.js (control de que llegó la misma entrega). Un armador viejo de la caché que lea
+ * esta cadena escribe '@2' sin `generada` en el cierre del Responsable, y la regla lo niega.
+ */
+export const COMPOSITOR = 'odt-afinia@2';
 export const PROVEEDOR = 'password';
 
 // ── Topes (mismos números que las reglas) ──────────────────────────────────────

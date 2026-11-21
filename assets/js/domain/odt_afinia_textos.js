@@ -133,15 +133,22 @@ export function ordenDMA(f) {
 }
 
 /**
- * Error de la fecha de cierre, o null si sirve: fecha real, no posterior a hoy
- * (Bogotá) y no anterior a la fecha del trabajo.
+ * Error de la fecha de cierre, o null si sirve. Desde el 2026-11-21 (decisión del Ingeniero) la
+ * FECHA CIERRE es la fecha PREVISTA de la orden (`fechaTrabajo`), no la de hoy: tiene que ser
+ * EXACTAMENTE esa, real y no posterior a hoy (Bogotá). La regla del acto exige lo mismo
+ * (cierre.fecha == o.fechaTrabajo). Sin `fechaTrabajo` solo se miran la forma y el «hoy».
+ * La declaración v1 no cambia: «la cierro con fecha {fecha}», con {fecha} = la prevista.
  */
 export function errorFechaCierre(fecha, { fechaTrabajo, ahora = new Date() } = {}) {
   if (!esFechaDMA(fecha)) return 'La fecha de cierre debe ser una fecha real en formato dd/mm/aaaa.';
-  if (ordenDMA(fecha) > ordenDMA(fechaBogota(ahora))) return 'La fecha de cierre no puede ser posterior a hoy.';
-  if (fechaTrabajo != null && !esFechaDMA(fechaTrabajo)) return 'La fecha del trabajo de la ODT no es una fecha válida.';
-  if (fechaTrabajo != null && ordenDMA(fecha) < ordenDMA(fechaTrabajo)) {
-    return 'La fecha de cierre no puede ser anterior a la fecha del trabajo (' + fechaTrabajo + ').';
+  if (fechaTrabajo != null && !esFechaDMA(fechaTrabajo)) return 'La fecha prevista de la orden no es una fecha válida: avise al administrador.';
+  if (fechaTrabajo != null && fecha !== fechaTrabajo) {
+    return 'La fecha de cierre tiene que ser la fecha prevista de la orden (' + fechaTrabajo + '), no otra.';
+  }
+  if (ordenDMA(fecha) > ordenDMA(fechaBogota(ahora))) {
+    return fechaTrabajo != null
+      ? 'La fecha prevista de la orden (' + fecha + ') es posterior a hoy: el Responsable firma y cierra la ODT desde ese día.'
+      : 'La fecha de cierre no puede ser posterior a hoy.';
   }
   return null;
 }

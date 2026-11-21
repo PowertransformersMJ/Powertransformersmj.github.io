@@ -2037,21 +2037,28 @@ service cloud.firestore {
     //   · odt_afinia/{id}: la ODT; publica un admin con perfil; AZT y Responsable distintos entre sí, el AZT
     //     distinto de quien publica, los dos habilitados, activos y en la LISTA BLANCA de su rol; estados
     //     PENDIENTE_AZT → PENDIENTE_RESPONSABLE → LISTA, o ANULADA (admin, solo desde PENDIENTE_*: una LISTA no se
-    //     anula, D6 del 20-11). Lo leen sus dos firmantes y el admin.
+    //     anula, D6 del 20-11). Desde LISTA, solo el admin con perfil (decisiones del 2026-11-21): REEMPLAZADA (con
+    //     motivo; revierte D6 con su visto bueno; libera el N.º) o CERRADA (registró el cierre en Afinia: fecha y
+    //     soporte). ANULADA, REEMPLAZADA y CERRADA son finales; nada se borra (actos, partes y constancia se leen
+    //     igual). Lo leen sus dos firmantes y el admin. Al volver a publicar un N.º liberado, la nueva guarda
+    //     `reemplaza` = la anterior (lo comprueba el candado).
     //       /partes/{0..4}: solo en el lote de publicación; sha256 == huellasPartes[n]; la 0 empieza por %PDF-.
     //       /actos/{azt|responsable}: el acto de firmar, en un lote atado (en las DOS direcciones) al cambio de estado.
+    //         Actos nuevos con compositor 'odt-afinia@2' (estampa además el N.º en «ODT GENERADA N°»; los ya firmados
+    //         con @1 no se tocan). El del Responsable cierra con la FECHA PREVISTA de la orden (o.fechaTrabajo) y
+    //         escribe su pie completo: cierre {si, fecha, generada == N.º} (un armador viejo de la caché no lo trae).
     //       /devoluciones/{rol_rev}: «no firmo» del firmante en su turno; id determinista ⇒ una por turno (create-only).
     //   · odt_afinia_config/firmantes: LISTA BLANCA {azt: [uid], responsable: [uid]}; solo la consola de Firebase la
     //     escribe (aquí write false); la lee el admin para ofrecer firmantes. Sin ella, nadie publica.
-    //   · odt_afinia_nro/{nro}: candado de unicidad del N.º; se reasigna solo si la ODT vigente está ANULADA.
-    //   · odt_afinia_descargas/{auto}: registro de cada descarga de una ODT LISTA (lo leen solo los admin).
+    //   · odt_afinia_nro/{nro}: candado de unicidad del N.º; se reasigna solo si la ODT vigente está ANULADA o REEMPLAZADA.
+    //   · odt_afinia_descargas/{auto}: registro de cada descarga de una ODT LISTA o CERRADA (lo leen solo los admin).
     // Firmar (y habilitarse) exige reautenticación con contraseña en los últimos 5 minutos (auth_time del token)
     // y correo verificado: publicar NO la exige (D4 cubre publicar, nunca firmar). Paliativo D5 (20-11: el
     // Responsable firma con su MISMA cuenta admin): el inicio de sesión del token que firma es POSTERIOR a la
     // publicación, y el del Responsable además posterior al acto del AZT. Este bloque no nombra ninguna
     // colección de firmas custodiadas ni delegadas (prueba estática: tests/odt_afinia_reglas_estatico.test.js,
     // que también cuenta sus llamadas get/exists por operación y por lote). Los textos de acuerdo y declaración
-    // son la plantilla v1 (BORRADOR del Ingeniero) y se comparan aquí carácter a carácter.
+    // son la plantilla v1 (aprobada por el Ingeniero el 20-11) y se comparan aquí carácter a carácter.
     // Forma de los documentos: `size() == N` y CADA uno de esos N campos se lee sin condición más abajo ⇒ están
     // exactamente esos campos (uno que falta da error y la regla niega; uno de más cambia el tamaño). Más barato que
     // listas de claves: el tope es de 1000 expresiones por petición (L-110) y publicar a carga máxima va cerca.
@@ -2092,7 +2099,8 @@ service cloud.firestore {
     function odtCorreoDelPerfil() {
       return request.auth.token.email.lower() == profile().get('email', '').lower();
     }
-    // Textos v1 (BORRADOR del Ingeniero). El dominio los replica; una prueba de texto los amarra.
+    // Textos v1 (aprobados tal cual por el Ingeniero el 20-11). El dominio los replica; una prueba de texto los amarra.
+    // En la del Responsable, {fecha} es la fecha PREVISTA de la orden (2026-11-21): el texto no cambia.
     function odtAcuerdo(nombre, correo) {
       return 'Yo, ' + nombre + ', con mi cuenta personal ' + correo + ', acepto firmar electrónicamente las ODT de Afinia en SGM. Mi firma solo se estampa desde mi propia cuenta y con mi contraseña personal, que no comparto.';
     }
@@ -2156,8 +2164,10 @@ service cloud.firestore {
       let cfg = get(odtRutaConfig()).data;
       return hasProfile() && isAdmin() && odtIdValido(id)
         // nro, consignacion, subestacion, equipo, fechaTrabajo, firmantes, lectores, estado, rev, huella, bytes, partes,
-        // huellasPartes, zonas, publicadoPor, publicadoEn: todos se leen abajo (sin `anulacion` al publicar).
-        && d.size() == 16
+        // huellasPartes, zonas, publicadoPor, publicadoEn: todos se leen abajo (sin `anulacion` al publicar). Al volver
+        // a publicar un N.º liberado va además `reemplaza` (17): la ODT anterior; odtCandado exige que sea la del
+        // candado previo (y que no venga si el candado es nuevo), sin lecturas de más.
+        && (d.size() == 16 || (d.size() == 17 && odtIdValido(d.reemplaza)))
         && d.nro is string && d.nro.matches('^[0-9]{8}$')
         && odtTexto(d.consignacion, 0, 60) && odtTexto(d.subestacion, 1, 120) && odtTexto(d.equipo, 1, 120)
         && odtFecha(d.fechaTrabajo)
@@ -2228,16 +2238,23 @@ service cloud.firestore {
         && firma.huella == d.huellaImagen   // la huella guardada por «Mi firma» es la de sus bytes
         && firma.en > hab.en
         && d.huellaBase == o.huella && odtHex(d.huellaVista)
-        && d.compositor == 'odt-afinia@1'
+        // Compositor vigente (2026-11-21): @2 estampa además el N.º en «ODT GENERADA N°». Ningún acto nuevo con @1.
+        && d.compositor == 'odt-afinia@2'
         && d.en == request.time
         && (rol == 'azt'
             ? (d.declaracionVersion == 'odt-azt-v1'
                && d.declaracion == odtDeclaracionAzt(d.nombre, d.correo, o.nro))
             : (d.declaracionVersion == 'odt-resp-v1'
-               && d.cierre is map && d.cierre.size() == 2
+               // El pie de cierre completo {si, fecha, generada}: los 3 se leen abajo.
+               && d.cierre is map && d.cierre.size() == 3
+               // FECHA CIERRE = la fecha PREVISTA de la orden (2026-11-21), real y no posterior a hoy (Bogotá).
                && d.cierre.si == true && odtFecha(d.cierre.fecha)
+               && d.cierre.fecha == o.fechaTrabajo
                && odtFechaNum(d.cierre.fecha) <= odtHoyBogota()
-               && odtFechaNum(d.cierre.fecha) >= odtFechaNum(o.fechaTrabajo)
+               // «ODT GENERADA N°» = el N.º de la ODT, escrito en el acto. L-102: un armador viejo de la caché
+               // (odt_afinia_lotes.js de antes de @2) con un odt_afinia_rutas.js nuevo escribía compositor @2 con
+               // lo compuesto en @1 (sin el N.º); su cierre no trae `generada` y aquí se niega.
+               && d.cierre.generada == o.nro
                && d.declaracion == odtDeclaracionResp(d.nombre, d.correo, o.nro, d.cierre.fecha)
                && get(odtRutaActo(id, 'azt')).data.uid != request.auth.uid
                // Paliativo D5: el Responsable inició sesión DESPUÉS de la firma del AZT (misma lectura, sin costo).
@@ -2269,6 +2286,37 @@ service cloud.firestore {
         && n.anulacion.por == odtQuien()
         && n.anulacion.en == request.time;
     }
+    // ── Reemplazar: admin con perfil, solo desde LISTA, con motivo (2026-11-21; revierte D6). Libera el N.º ──
+    function odtReemplazo() {
+      let o = resource.data;
+      let n = request.resource.data;
+      return hasProfile() && isAdmin()
+        && o.estado == 'LISTA'
+        && n.diff(o).affectedKeys().hasOnly(['estado', 'rev', 'reemplazo'])
+        && n.estado == 'REEMPLAZADA' && n.rev == o.rev + 1
+        && n.reemplazo is map
+        && n.reemplazo.size() == 3
+        && odtTexto(n.reemplazo.motivo, 10, 500)
+        && n.reemplazo.por == odtQuien()
+        && n.reemplazo.en == request.time;
+    }
+    // ── Cierre en Afinia: admin con perfil, solo desde LISTA; fecha entre la prevista y hoy (Bogotá) y soporte ──
+    function odtCierreAfinia() {
+      let o = resource.data;
+      let n = request.resource.data;
+      return hasProfile() && isAdmin()
+        && o.estado == 'LISTA'
+        && n.diff(o).affectedKeys().hasOnly(['estado', 'rev', 'cierreAfinia'])
+        && n.estado == 'CERRADA' && n.rev == o.rev + 1
+        && n.cierreAfinia is map
+        && n.cierreAfinia.size() == 4   // fecha, soporte, por, en
+        && odtFecha(n.cierreAfinia.fecha)
+        && odtFechaNum(n.cierreAfinia.fecha) <= odtHoyBogota()
+        && odtFechaNum(n.cierreAfinia.fecha) >= odtFechaNum(o.fechaTrabajo)
+        && odtTexto(n.cierreAfinia.soporte, 3, 120)
+        && n.cierreAfinia.por == odtQuien()
+        && n.cierreAfinia.en == request.time;
+    }
     // Lector de una ODT (y de sus partes, actos y devoluciones): sus dos firmantes o un admin con perfil.
     function odtLector(id) {
       return isTeamMember() && hasProfile()
@@ -2293,7 +2341,7 @@ service cloud.firestore {
       allow list: if request.query.limit <= 50 && isTeamMember() && hasProfile()
                   && (isAdmin() || request.auth.uid in resource.data.lectores);
       allow create: if odtPublicacion(id);
-      allow update: if odtTransicion(id) || odtAnulacion();
+      allow update: if odtTransicion(id) || odtAnulacion() || odtReemplazo() || odtCierreAfinia();
       allow delete: if false;
 
       match /partes/{n} {
@@ -2316,35 +2364,38 @@ service cloud.firestore {
       }
     }
 
-    // ── Candado del N.º: {odtId}; nace con la ODT y solo se reasigna si la vigente está ANULADA ──
-    function odtCandado(nro) {
+    // ── Candado del N.º: {odtId}; nace con la ODT y solo se reasigna si la vigente está ANULADA o REEMPLAZADA ──
+    // `previa`: null al crear el candado; al reasignarlo, la ODT anterior (resource.data.odtId). La ODT nueva dice a
+    // cuál reemplaza (`reemplaza`) y tiene que ser esa: traza «reemplaza a…» sin lecturas de más (misma getAfter).
+    function odtCandado(nro, previa) {
       let d = request.resource.data;
       return hasProfile() && isAdmin() && nro.matches('^[0-9]{8}$')
         && d.size() == 1
         && odtIdValido(d.odtId)
         && !exists(odtRuta(d.odtId))
-        && getAfter(odtRuta(d.odtId)).data.nro == nro;
+        && getAfter(odtRuta(d.odtId)).data.nro == nro
+        && getAfter(odtRuta(d.odtId)).data.get('reemplaza', null) == previa;
     }
     function odtCandadoLibre() {
       return request.resource.data.odtId != resource.data.odtId
-        && get(odtRuta(resource.data.odtId)).data.estado == 'ANULADA';
+        && get(odtRuta(resource.data.odtId)).data.estado in ['ANULADA', 'REEMPLAZADA'];
     }
     match /odt_afinia_nro/{nro} {
       allow get: if hasProfile() && isAdmin();
       allow list: if false;
-      allow create: if odtCandado(nro);
-      allow update: if odtCandado(nro) && odtCandadoLibre();
+      allow create: if odtCandado(nro, null);
+      allow update: if odtCandado(nro, resource.data.odtId) && odtCandadoLibre();
       allow delete: if false;
     }
 
-    // ── Registro de descargas: lo crea un lector de una ODT LISTA; lo leen solo los admin ──
+    // ── Registro de descargas: lo crea un lector de una ODT LISTA o CERRADA (no REEMPLAZADA); lo leen solo los admin ──
     function odtDescarga() {
       let d = request.resource.data;
       return isTeamMember() && hasProfile()
         && d.size() == 4   // odtId, uid, huella, en
         && odtIdValido(d.odtId)
         && d.uid == request.auth.uid && odtHex(d.huella) && d.en == request.time
-        && get(odtRuta(d.odtId)).data.estado == 'LISTA'
+        && get(odtRuta(d.odtId)).data.estado in ['LISTA', 'CERRADA']
         && (isAdmin() || request.auth.uid in get(odtRuta(d.odtId)).data.lectores);
     }
     match /odt_afinia_descargas/{dId} {

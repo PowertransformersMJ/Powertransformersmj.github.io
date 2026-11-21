@@ -1,6 +1,8 @@
 // Firma de ODT Afinia · MONTAJE de las vistas con el DOM mínimo y el repositorio sobre dobles
 // de Firestore (sin navegador). Caza errores de ejecución en el camino vivo de cada vista y
-// comprueba qué acciones ofrece cada persona según el turno (P1, D2, D3).
+// comprueba qué acciones ofrece cada persona según el turno (P1, D2, D3). Desde el 2026-11-21, también
+// el pie de cierre fijo del Responsable, Reemplazar y Registrar cierre en Afinia (admin, LISTA), la
+// pestaña «Cerradas» y que ninguna vista nueva deje restos «null» pintados.
 // Lo que NO cubre (necesita navegador): pdf.js (pintar, texto, tinta), pdf-lib cargado por
 // fetch + import(), Firebase Auth real (reautenticación) y el panel «Mi firma».
 import { test, describe, before, after } from 'node:test';
@@ -253,7 +255,7 @@ describe('contrato nuevo en pantalla (D6, Ver verificado, bandeja)', () => {
     await firmarComo(fs, repo, AZT, id);
     const c1 = await detalle(repo(ADMIN), ADMIN, id);
     assert.ok(c1.textContent.includes('Anular (administrador)'), 'PENDIENTE_RESPONSABLE: se puede anular');
-    await firmarComo(fs, repo, RESP, id, { fechaCierre: fechaBogota() });
+    await firmarComo(fs, repo, RESP, id);
     assert.equal(fs.store.get('odt_afinia/' + id).estado, 'LISTA');
     const c2 = await detalle(repo(ADMIN), ADMIN, id);
     assert.ok(!c2.textContent.includes('Anular (administrador)'));
@@ -316,5 +318,216 @@ describe('contrato nuevo en pantalla (D6, Ver verificado, bandeja)', () => {
     await montarBandeja(c, { repo: contado, sesion: AZT, alAbrir: () => {} });
     for (let i = 0; i < 3; i++) { await boton(c, 'Firmadas por mí').disparar('click'); await espera(); }
     assert.equal(lecturas, 1);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Decisiones del 2026-11-21 en pantalla: pie de cierre fijo, Reemplazar, Registrar cierre en Afinia, bandeja.
+// ═════════════════════════════════════════════════════════════════════════════
+describe('pie de cierre, reemplazo y cierre en Afinia en pantalla (sin restos «null»)', () => {
+  const detalle = (repo, s, id, extra = {}) => {
+    const c = caja();
+    return montarDetalle(c, { repo, cuenta: {}, sesion: s, odtId: id, miFirmaOdt: async () => ({ hay: false }), alVolver: () => {}, alCambiar: () => {}, pdfLib: async () => PDFLib, ...extra }).then(() => c);
+  };
+  async function lista() {
+    const b = await base();
+    await firmarComo(b.fs, b.repo, AZT, b.id);
+    await firmarComo(b.fs, b.repo, RESP, b.id);
+    assert.equal(b.fs.store.get('odt_afinia/' + b.id).estado, 'LISTA');
+    return b;
+  }
+  const SOPORTE_PRUEBA = 'SOPORTE_ODT_PRUEBA_01';
+
+  test('Firmar (Responsable): la FECHA CIERRE se muestra fija = la prevista, con «ODT GENERADA N° …»; no hay campo que editar', async () => {
+    const { fs, repo, id } = await base();
+    await firmarComo(fs, repo, AZT, id);
+    const c = await detalle(repo(RESP), RESP, id);
+    const t = c.textContent;
+    assert.ok(t.includes('Firmar como RESPONSABLE O.D.T.'));
+    assert.ok(t.includes('FECHA CIERRE'));
+    assert.ok(t.includes('01/01/2026 (fecha prevista de la orden)'));
+    // «ODT GENERADA N°» UNA sola vez en el pie: su fila dt/dd con el N.º (antes salía también en un párrafo repetido).
+    const gen = c.querySelectorAll('.odt-generada');
+    assert.equal(gen.length, 1);
+    assert.deepEqual(gen[0].todos().filter((x) => x.tagName === 'DT' || x.tagName === 'DD').map((x) => x.textContent), ['ODT GENERADA N°', NRO]);
+    assert.equal(t.split('ODT GENERADA N°').length - 1, 1, 'el dato no se repite en la pantalla de firma');
+    assert.ok(t.includes('¿SE CIERRA LA ODT?'));
+    assert.ok(!c.todos().some((x) => x.tagName === 'INPUT' && x.id === 'odtFechaCierre'), 'la fecha de cierre ya no se edita');
+    assert.ok(!t.includes('Fecha del trabajo'));
+    assert.ok(t.includes('Fecha prevista de la orden'));
+    // Con la fecha prevista ya cumplida (01/01/2026), «Preparar mi firma» está disponible y no hay aviso de espera.
+    assert.equal(boton(c, 'Preparar mi firma').disabled, false);
+    assert.ok(!t.includes('Todavía no puede firmar'));
+    sinRestos(c);
+  });
+  test('Firmar (Responsable) antes de la fecha prevista: «Preparar mi firma» deshabilitado y se le dice desde cuándo podrá firmar', async () => {
+    const { fs, repo, id } = await base();
+    await firmarComo(fs, repo, AZT, id);
+    const ruta = 'odt_afinia/' + id;
+    fs.poner(ruta, { ...fs.store.get(ruta), fechaTrabajo: '31/12/2099' });
+    const c = await detalle(repo(RESP), RESP, id);
+    const t = c.textContent;
+    const btn = boton(c, 'Preparar mi firma');
+    assert.ok(btn, 'el botón se ve (para que sepa dónde firmará)');
+    assert.equal(btn.disabled, true, 'pero no se ofrece mientras no llegue la fecha');
+    assert.ok(t.includes('Todavía no puede firmar: la fecha prevista de la orden es el 31/12/2099. Podrá firmar y cerrar la ODT desde ese día.'));
+    assert.ok(!t.includes('el Responsable firma y cierra'), 'le habla a él (no en tercera persona)');
+    // Aunque le llegue un clic (el doble de DOM no respeta disabled), no se lee nada ni se prepara.
+    let consultas = 0;
+    const cuenta = { uidVivo: async () => { consultas += 1; return RESP.uid; } };
+    const c2 = await detalle(repo(RESP), RESP, id, { cuenta });
+    await boton(c2, 'Preparar mi firma').disparar('click');
+    await espera();
+    assert.equal(consultas, 0, 'ni siquiera se consulta la cuenta');
+    assert.ok(!c2.textContent.includes('Preparando'));
+    sinRestos(c);
+  });
+  test('Firmar (AZT): sin pie de cierre (es del Responsable)', async () => {
+    const { repo, id } = await base();
+    const c = await detalle(repo(AZT), AZT, id);
+    assert.ok(!c.textContent.includes('ODT GENERADA N°'));
+    assert.ok(!c.textContent.includes('FECHA CIERRE'));
+    sinRestos(c);
+  });
+  test('LISTA (admin): ofrece «Registrar cierre en Afinia» y «Reemplazar»; un técnico firmante no los ve', async () => {
+    const { repo, id } = await lista();
+    const c = await detalle(repo(ADMIN), ADMIN, id);
+    assert.ok(c.textContent.includes('Reemplazar (administrador)'));
+    assert.ok(c.textContent.includes('Registrar cierre en Afinia (administrador)'));
+    assert.ok(boton(c, 'Descargar la ODT firmada'));
+    sinRestos(c);
+    const c2 = await detalle(repo(AZT), AZT, id);
+    assert.ok(!c2.textContent.includes('Reemplazar (administrador)'));
+    assert.ok(!c2.textContent.includes('Registrar cierre en Afinia'));
+    assert.ok(boton(c2, 'Descargar la ODT firmada'));
+  });
+  test('Reemplazar: confirmación en dos pasos y motivo; queda REEMPLAZADA, con su motivo a la vista y sin Descargar', async () => {
+    const { fs, repo, id } = await lista();
+    const cambios = [];
+    const c = await detalle(repo(ADMIN), ADMIN, id, { alCambiar: (m) => cambios.push(m) });
+    c.todos().find((x) => x.tagName === 'TEXTAREA' && x.id === 'odtMotivoReemplazar').value = 'La consignación del PDF no era la correcta.';
+    const confirmar = boton(c, 'Sí, reemplazarla');
+    assert.equal(confirmar.hidden, true, 'la confirmación aparece solo tras el primer clic');
+    await boton(c, 'Reemplazar la ODT').disparar('click');
+    assert.equal(confirmar.hidden, false);
+    assert.ok(c.textContent.includes('No se borra nada'));
+    await confirmar.disparar('click');
+    await espera();
+    assert.equal(fs.store.get('odt_afinia/' + id).estado, 'REEMPLAZADA');
+    assert.match(cambios[0], /reemplazada/);
+    const c2 = await detalle(repo(ADMIN), ADMIN, id);
+    const t = c2.textContent;
+    assert.ok(t.includes('Reemplazada'));
+    assert.ok(t.includes('La consignación del PDF no era la correcta.'), 'el motivo se ve');
+    assert.ok(!boton(c2, 'Descargar la ODT firmada'), 'una REEMPLAZADA no se descarga');
+    assert.ok(!t.includes('Reemplazar (administrador)') && !t.includes('Registrar cierre en Afinia') && !t.includes('Anular (administrador)'));
+    assert.ok(boton(c2, 'Ver la ODT en pantalla'), 'se sigue pudiendo ver');
+    sinRestos(c2);
+    // «Ver la ODT»: su título no manda a «Descargar» (no existe para una REEMPLAZADA); el de una LISTA sí.
+    const titulos = [];
+    const pintar = async (bytes, zona, o) => { titulos.push(o.titulo); return { paginas: 2 }; };
+    const c3 = await detalle(repo(ADMIN), ADMIN, id, { pintar });
+    await boton(c3, 'Ver la ODT en pantalla').disparar('click');
+    await espera();
+    assert.equal(titulos.length, 1);
+    assert.ok(!titulos[0].includes('Descargar'), titulos[0]);
+    assert.match(titulos[0], /versión reemplazada: se conserva para consulta; ya no se entrega ni se descarga/);
+    const otra = await lista();
+    const c4 = await detalle(otra.repo(ADMIN), ADMIN, otra.id, { pintar });
+    await boton(c4, 'Ver la ODT en pantalla').disparar('click');
+    await espera();
+    assert.match(titulos[1], /para entregarla, use «Descargar»/, 'control: una LISTA sí manda a Descargar');
+  });
+  test('Registrar cierre en Afinia: valida, confirma y queda CERRADA; el detalle y la constancia lo dicen; se sigue descargando', async () => {
+    const { fs, repo, id } = await lista();
+    const cambios = [];
+    const c = await detalle(repo(ADMIN), ADMIN, id, { alCambiar: (m) => cambios.push(m) });
+    const soporte = c.todos().find((x) => x.tagName === 'INPUT' && x.id === 'odtSoporteAfinia');
+    const fecha = c.todos().find((x) => x.tagName === 'INPUT' && x.id === 'odtFechaCierreAfinia');
+    assert.equal(fecha.value, fechaBogota(), 'propone la fecha de hoy');
+    const confirmar = boton(c, 'Sí, registrar el cierre');
+    soporte.value = 'ab';
+    await boton(c, 'Registrar cierre en Afinia').disparar('click');
+    assert.equal(confirmar.hidden, true, 'con un soporte corto no se ofrece confirmar');
+    assert.ok(c.textContent.includes('Escriba el soporte'));
+    soporte.value = SOPORTE_PRUEBA;
+    await boton(c, 'Registrar cierre en Afinia').disparar('click');
+    assert.equal(confirmar.hidden, false);
+    await confirmar.disparar('click');
+    await espera();
+    const o = fs.store.get('odt_afinia/' + id);
+    assert.equal(o.estado, 'CERRADA');
+    assert.equal(o.cierreAfinia.soporte, SOPORTE_PRUEBA);
+    assert.match(cambios[0], /cerrada en Afinia/);
+    const c2 = await detalle(repo(RESP), RESP, id);
+    const texto = 'Cerrada en Afinia el ' + fechaBogota() + ' · soporte ' + SOPORTE_PRUEBA + ' · registró ' + ADMIN.nombre;
+    assert.ok(c2.querySelectorAll('.odt-cerrada').length >= 2, 'en el detalle y en la constancia');
+    for (const el of c2.querySelectorAll('.odt-cerrada')) assert.ok(el.textContent.includes(texto), el.textContent);
+    assert.ok(boton(c2, 'Descargar la ODT firmada'), 'una CERRADA se descarga');
+    const c3 = await detalle(repo(ADMIN), ADMIN, id);
+    assert.ok(!c3.textContent.includes('Reemplazar (administrador)'), 'una CERRADA no se reemplaza');
+    assert.ok(!c3.textContent.includes('Registrar cierre en Afinia (administrador)'));
+    sinRestos(c2); sinRestos(c3);
+  });
+  test('bandeja: CERRADA en «Cerradas»; REEMPLAZADA en «Anuladas y reemplazadas»', async () => {
+    const { fs, repo, id } = await lista();
+    await repo(ADMIN).registrarCierreAfinia(id, { fecha: fechaBogota(), soporte: SOPORTE_PRUEBA });
+    const c = caja();
+    const r = await montarBandeja(c, { repo: repo(AZT), sesion: AZT, alAbrir: () => {} });
+    assert.equal(r.grupos.cerradas.length, 1);
+    assert.equal(r.grupos.listas.length, 0);
+    await boton(c, 'Cerradas').disparar('click');
+    assert.ok(c.textContent.includes('Cerrada en Afinia'));
+    assert.ok(c.textContent.includes('prevista 01/01/2026'));
+    sinRestos(c);
+    // Otra LISTA, reemplazada.
+    const b = await lista();
+    await b.repo(ADMIN).reemplazar(b.id, 'La consignación del PDF no era la correcta.');
+    const c2 = caja();
+    const r2 = await montarBandeja(c2, { repo: b.repo(AZT), sesion: AZT, alAbrir: () => {} });
+    assert.equal(r2.grupos.anuladas.length, 1);
+    await boton(c2, 'Anuladas y reemplazadas').disparar('click');
+    assert.ok(c2.textContent.includes('Reemplazada'));
+    sinRestos(c2);
+    void fs;
+  });
+  test('bandeja: abrir «Cerradas» sin ODT cerradas muestra su vacío (la guarda «|| []» la mira la prueba estática)', async () => {
+    const { repo } = await base();
+    const c = caja();
+    await montarBandeja(c, { repo: repo(AZT), sesion: AZT, alAbrir: () => {}, pestana: 'cerradas' });
+    assert.ok(c.textContent.includes('No hay ODT cerradas en Afinia.'));
+    sinRestos(c);
+  });
+  test('la ODT publicada sobre un N.º reemplazado dice «Reemplaza a la versión publicada el …»', async () => {
+    const { fs, repo, id } = await lista();
+    await repo(ADMIN).reemplazar(id, 'La consignación del PDF no era la correcta.');
+    const { bytes, estructura } = await armarOdt();
+    const zonas = validarOdt(estructura, { nro: NRO }).zonas;
+    const habs = await repo(ADMIN).listarHabilitados();
+    const { id: nueva } = await repo(ADMIN).publicar({
+      form: { nro: NRO, consignacion: '', subestacion: 'S/E Sintética', equipo: 'TR-Prueba', fechaTrabajo: '01/01/2026' },
+      preparado: await prepararPartes(bytes), zonas,
+      firmantes: { azt: habs.find((x) => x.uid === AZT.uid), responsable: habs.find((x) => x.uid === RESP.uid) }
+    });
+    assert.equal(fs.store.get('odt_afinia/' + nueva).reemplaza, id);
+    const c = await detalle(repo(ADMIN), ADMIN, nueva);
+    assert.ok(c.textContent.includes('Reemplaza a la versión publicada el '), c.textContent.slice(0, 300));
+    sinRestos(c);
+    // Si quien la abre no puede leer la anterior, queda el texto general (sin fecha).
+    const r = repo(AZT);
+    const sinLeer = { ...r, leerOdtDoc: async (x) => { if (x === id) throw new Error('sin permiso de prueba'); return r.leerOdtDoc(x); } };
+    const c2 = await detalle(sinLeer, AZT, nueva);
+    assert.ok(c2.textContent.includes('Reemplaza a una versión anterior publicada con el mismo N.º.'));
+    sinRestos(c2);
+  });
+  test('un repositorio viejo de la caché (sin reemplazar ni registrarCierreAfinia): se pide recargar en lugar de romper', async () => {
+    const { repo, id } = await lista();
+    const r = repo(ADMIN);
+    const viejo = { ...r }; delete viejo.reemplazar; delete viejo.registrarCierreAfinia;
+    const c = await detalle(viejo, ADMIN, id);
+    assert.ok(c.textContent.includes('Reemplazar (administrador)'));
+    assert.ok(c.textContent.includes('Recargue con Cmd + Shift + R'));
+    assert.ok(!boton(c, 'Reemplazar la ODT'));
+    sinRestos(c);
   });
 });

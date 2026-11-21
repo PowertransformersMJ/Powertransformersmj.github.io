@@ -132,7 +132,47 @@ describe('errorFirmantes: los mismos «no» de la regla de publicar', () => {
   });
 });
 
+describe('estados finales nuevos (2026-11-21): CERRADA y REEMPLAZADA salen de LISTA', () => {
+  test('nadie está en turno; las dos firmas cuentan como hechas', () => {
+    for (const e of [ESTADOS.CERRADA, ESTADOS.REEMPLAZADA]) {
+      assert.equal(rolEnTurno(e), null, e);
+      assert.equal(esMiTurno(odt(e), AZT), false);
+      assert.equal(esMiTurno(odt(e), RESP), false);
+      assert.equal(yaFirmo(odt(e), 'azt'), true, e);
+      assert.equal(yaFirmo(odt(e), 'responsable'), true, e);
+    }
+  });
+  test('ya no se firma (mensaje claro) ni se anula; las pendientes siguen igual', () => {
+    const c = cambioFirma(odt(ESTADOS.CERRADA), 'responsable', RESP);
+    assert.equal(c.ok, false); assert.equal(c.codigo, 'estado'); assert.match(c.mensaje, /cerrada en Afinia/);
+    const r = cambioFirma(odt(ESTADOS.REEMPLAZADA), 'azt', AZT);
+    assert.equal(r.ok, false); assert.equal(r.codigo, 'estado'); assert.match(r.mensaje, /reemplazada/);
+    const por = { uid: 'uid-admin-prueba', nombre: 'Admin de prueba' };
+    for (const e of [ESTADOS.CERRADA, ESTADOS.REEMPLAZADA]) {
+      assert.equal(puedeAnular(odt(e)), false, e);
+      const x = cambioAnular(odt(e, 3), { motivo: 'Motivo suficiente de prueba', por });
+      assert.equal(x.ok, false); assert.equal(x.codigo, 'estado');
+    }
+    assert.match(cambioAnular(odt(ESTADOS.CERRADA), { motivo: 'Motivo suficiente de prueba', por }).mensaje, /cerrada en Afinia/);
+    assert.match(cambioAnular(odt(ESTADOS.REEMPLAZADA), { motivo: 'Motivo suficiente de prueba', por }).mensaje, /reemplazada/);
+    // Control: desde PENDIENTE_AZT sí se anula.
+    assert.equal(cambioAnular(odt(ESTADOS.PENDIENTE_AZT), { motivo: 'Motivo suficiente de prueba', por }).ok, true);
+  });
+  test('etiquetas en pantalla', () => {
+    assert.equal(ETIQUETA_ESTADO[ESTADOS.CERRADA], 'Cerrada en Afinia');
+    assert.equal(ETIQUETA_ESTADO[ESTADOS.REEMPLAZADA], 'Reemplazada');
+  });
+});
+
 describe('bandeja', () => {
+  test('pestaña «Cerradas» y las REEMPLAZADAS con las anuladas; las dos cuentan en «firmadas por mí»', () => {
+    const lista = [odt(ESTADOS.LISTA), odt(ESTADOS.CERRADA), odt(ESTADOS.REEMPLAZADA), odt(ESTADOS.ANULADA)];
+    const b = bandeja(lista, AZT);
+    assert.deepEqual([b.listas.length, b.cerradas.length, b.anuladas.length, b.enCurso.length, b.miTurno.length], [1, 1, 2, 0, 0]);
+    assert.equal(b.firmadasPorMi.length, 3, 'LISTA, CERRADA y REEMPLAZADA: el AZT firmó las tres');
+    assert.equal(grupoBandeja(odt(ESTADOS.CERRADA), OTRO), 'cerradas');
+    assert.equal(grupoBandeja(odt(ESTADOS.REEMPLAZADA), OTRO), 'anuladas');
+  });
   test('cada ODT en su pestaña y «firmadas por mí» cruzada', () => {
     const lista = [odt(ESTADOS.PENDIENTE_AZT), odt(ESTADOS.PENDIENTE_RESPONSABLE), odt(ESTADOS.LISTA), odt(ESTADOS.ANULADA)];
     const b = bandeja(lista, AZT);
