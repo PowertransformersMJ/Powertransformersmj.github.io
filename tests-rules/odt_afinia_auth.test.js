@@ -1,15 +1,19 @@
 // ══════════════════════════════════════════════════════════════
-// Firma de ODT Afinia · prueba con el emulador de AUTH (revisión 20-11, lentes legal[0] y arq[5] del comité).
-// Las pruebas de reglas usan tokens simulados (`claims: {auth_time}`): nunca ejercitan que la reautenticación
-// RENUEVE auth_time en el token que de verdad se envía. Aquí, con el SDK cliente contra los emuladores de Auth y
-// Firestore:
+// Firma de ODT Afinia · prueba con el emulador de AUTH (revisión 20-11, lentes legal[0] y arq[5] del comité; rehecha
+// el 2026-11-21 con la decisión del Ingeniero «la contraseña solo al iniciar sesión, sin límite»).
+// Las pruebas de reglas usan tokens simulados (`claims: {auth_time}`): aquí, con el SDK cliente contra los emuladores
+// de Auth y Firestore, se usa el token que de verdad se envía:
 //   1) un usuario con correo verificado inicia sesión con contraseña: el token trae sign_in_provider 'password',
 //      email_verified y auth_time;
 //   2) refrescar el token (getIdToken(true)) SIN contraseña NO cambia auth_time; una contraseña errada tampoco;
-//   3) con ese token (sesión abierta ANTES de publicar) el acto de firmar se NIEGA (paliativo D5);
-//   4) tras esperar > 1 s, reauthenticateWithCredential + getIdToken(true) dan un auth_time NUEVO y mayor, y con
-//      ese token el MISMO lote de firma pasa; el acto guarda ese auth_time.
-// Lo que NO se puede en vivo: simular un token de hace más de 5 min (eso lo cubren las pruebas de reglas).
+//   3) HABILITARSE SÍ exige contraseña reciente: con las claims de ese token real y su auth_time corrido 10 min atrás,
+//      la habilitación se NIEGA (en vivo no se puede esperar 5 min); reautenticar (> 1 s después) da un auth_time
+//      NUEVO y mayor, y con ESE token vivo la habilitación pasa y guarda ese auth_time;
+//   4) FIRMAR NO exige reautenticar: con el token vivo de la sesión (abierta ANTES de publicar y solo renovado con
+//      getIdToken(true), sin escribir la contraseña) el lote de firma PASA y el acto guarda ese auth_time («sesión
+//      iniciada»). Declarar en el acto otro authTime no sirve.
+// Lo que las pruebas de reglas cubren aparte: otro proveedor, correo sin verificar, firmante no asignado, imagen ajena
+// y el Responsable con una sesión anterior a publicar y a la firma del AZT.
 // Se corre con `npm run test:rules:auth` (emulators:exec --only auth,firestore). Dentro de `npm run test:rules`
 // (sin emulador de Auth) se SALTA con su motivo a la vista; con SGM_EXIGE_AUTH=1 (lo pone el script) falta el
 // emulador ⇒ FALLA. Datos INVENTADOS: ningún uid, correo, nombre ni N.º real.
@@ -50,7 +54,6 @@ const sha = (u) => createHash('sha256').update(u).digest('hex');
 const FIRMA = (() => { const u = new Uint8Array(700).fill(42); u.set([0x89, 0x50, 0x4E, 0x47]); return u; })();
 const PDF = (() => { const u = new Uint8Array(1500).fill(0x41); u.set([0x25, 0x50, 0x44, 0x46, 0x2D]); return u; })();
 const espera = (ms) => new Promise((r) => setTimeout(r, ms));
-const haceMs = (ms) => Timestamp.fromMillis(Date.now() - ms);
 const fechaBogota = (dias) => {
   const t = new Date(Date.now() - 5 * 3600e3 + dias * 86400e3); const p = (x) => String(x).padStart(2, '0');
   return `${p(t.getUTCDate())}/${p(t.getUTCMonth() + 1)}/${t.getUTCFullYear()}`;
@@ -79,22 +82,25 @@ function loteFirmaAzt(authTime) {
   return b.commit();
 }
 
-describe('emulador de Auth: la reautenticación renueva auth_time y el paliativo D5 lo usa', { skip: SALTO }, () => {
+/** Lo que escribe la página al habilitarse: odt_afinia_firmantes/{uid} con el token recién reautenticado. */
+function documentoHabilitacion(authTime) {
+  return {
+    uid: UID, correo: CORREO, correoVerificado: true, proveedor: 'password', authTime,
+    acuerdoVersion: 'odt-acuerdo-v1', acuerdo: ACUERDO(NOMBRE, CORREO), nombre: NOMBRE, en: serverTimestamp()
+  };
+}
+
+describe('emulador de Auth: firmar NO pide reautenticar (2026-11-21); habilitarse SÍ', { skip: SALTO }, () => {
   before(async () => {
     testEnv = await initializeTestEnvironment({
       projectId: PROYECTO,
       firestore: { rules: readFileSync('firestore.rules', 'utf8'), host: '127.0.0.1', port: 8080 }
     });
     await crearUsuario();
-    // Perfil, habilitación (hace 2 h) y «Mi firma» (hace 1 h, después de habilitarse), con las reglas apagadas.
+    // Solo el perfil (con las reglas apagadas): la habilitación la escribe la prueba de reautenticar con el token vivo y «Mi firma»
+    // se sube después de ella.
     await testEnv.withSecurityRulesDisabled(async (c) => {
-      const d = c.firestore();
-      await setDoc(doc(d, 'usuarios', UID), { email: CORREO, rol: 'tecnico', activo: true, nombre: NOMBRE });
-      await setDoc(doc(d, 'odt_afinia_firmantes', UID), {
-        uid: UID, correo: CORREO, correoVerificado: true, proveedor: 'password', authTime: Math.floor(Date.now() / 1000) - 7200,
-        acuerdoVersion: 'odt-acuerdo-v1', acuerdo: ACUERDO(NOMBRE, CORREO), nombre: NOMBRE, en: haceMs(2 * 3600e3)
-      });
-      await setDoc(doc(d, 'firmas', UID), { imagen: Bytes.fromUint8Array(FIRMA), huella: sha(FIRMA), en: haceMs(3600e3) });
+      await setDoc(doc(c.firestore(), 'usuarios', UID), { email: CORREO, rol: 'tecnico', activo: true, nombre: NOMBRE });
     });
     app = initializeApp({ projectId: PROYECTO, apiKey: 'demo-clave-no-real' }, 'odt-auth-' + SUF);
     auth = getAuth(app);
@@ -110,7 +116,7 @@ describe('emulador de Auth: la reautenticación renueva auth_time y el paliativo
   });
 
   let t1;   // claims del token del inicio de sesión
-  let publicadoMs;
+  let t2;   // claims del token tras reautenticar (al habilitarse)
 
   test('inicio de sesión con contraseña: el token trae password, correo verificado y auth_time', async () => {
     const cred = await signInWithEmailAndPassword(auth, CORREO, CLAVE);
@@ -132,12 +138,38 @@ describe('emulador de Auth: la reautenticación renueva auth_time y el paliativo
     assert.equal((await auth.currentUser.getIdTokenResult()).claims.auth_time, t1.auth_time);
   });
 
-  test('D5: con la sesión abierta ANTES de publicar, el acto se niega (aunque tenga menos de 5 min)', async () => {
+  test('habilitarse SÍ exige contraseña reciente: las claims del token real con su auth_time de hace 10 min → no', async () => {
+    // En vivo no se puede esperar 5 min: se usan las MISMAS claims del token real, con su inicio de sesión corrido.
+    const vieja = t1.auth_time - 600;
+    const d = testEnv.authenticatedContext(UID, {
+      email: t1.email, email_verified: t1.email_verified, auth_time: vieja, firebase: { sign_in_provider: t1.firebase.sign_in_provider }
+    }).firestore();
+    await assertFails(setDoc(doc(d, 'odt_afinia_firmantes', UID), documentoHabilitacion(vieja)));
+    assert.equal((await getDoc(doc(db, 'odt_afinia_firmantes', UID))).exists(), false, 'no quedó habilitado');
+  });
+
+  test('reautenticar (> 1 s después) da un auth_time NUEVO y mayor; con ese token vivo la habilitación pasa', async () => {
     await espera(1100);
-    publicadoMs = Date.now();
+    await reauthenticateWithCredential(auth.currentUser, EmailAuthProvider.credential(CORREO, CLAVE));
+    await auth.currentUser.getIdToken(true);
+    t2 = (await auth.currentUser.getIdTokenResult()).claims;
+    assert.ok(t2.auth_time > t1.auth_time, `auth_time nuevo (${t2.auth_time}) > anterior (${t1.auth_time})`);
+    assert.equal(t2.firebase.sign_in_provider, 'password');
+    // Control de la misma prueba: declarar el auth_time viejo no sirve (authTime debe ser el del token).
+    await assertFails(setDoc(doc(db, 'odt_afinia_firmantes', UID), documentoHabilitacion(t1.auth_time)));
+    await assertSucceeds(setDoc(doc(db, 'odt_afinia_firmantes', UID), documentoHabilitacion(t2.auth_time)));
+    assert.equal((await getDoc(doc(db, 'odt_afinia_firmantes', UID))).data().authTime, t2.auth_time);
+    // «Mi firma» DESPUÉS de habilitarse (la regla del acto lo exige), con las reglas apagadas.
     await testEnv.withSecurityRulesDisabled(async (c) => {
-      const d = c.firestore();
-      await setDoc(doc(d, 'odt_afinia', ODT), {
+      await setDoc(doc(c.firestore(), 'firmas', UID), { imagen: Bytes.fromUint8Array(FIRMA), huella: sha(FIRMA), en: serverTimestamp() });
+    });
+  });
+
+  test('firmar NO exige reautenticar: con la sesión abierta ANTES de publicar (sin volver a escribir la contraseña) el acto pasa', async () => {
+    await espera(1100);
+    const publicadoMs = Date.now();
+    await testEnv.withSecurityRulesDisabled(async (c) => {
+      await setDoc(doc(c.firestore(), 'odt_afinia', ODT), {
         nro: NRO, consignacion: 'C-PRUEBA-AUTH', subestacion: 'S/E Prueba Auth', equipo: 'TX Prueba Auth', fechaTrabajo: fechaBogota(-3),
         firmantes: { azt: { uid: UID, nombre: NOMBRE, correo: CORREO }, responsable: { uid: 'oa_auth_resp', nombre: 'Resp Auth Prueba', correo: 'resp.auth@prueba.test' } },
         lectores: [UID, 'oa_auth_resp'], estado: 'PENDIENTE_AZT', rev: 0,
@@ -146,25 +178,18 @@ describe('emulador de Auth: la reautenticación renueva auth_time y el paliativo
         publicadoPor: { uid: 'oa_auth_admin', nombre: 'Admin Auth Prueba' }, publicadoEn: Timestamp.fromMillis(publicadoMs)
       });
     });
-    const vivo = (await auth.currentUser.getIdTokenResult()).claims;
-    assert.equal(vivo.auth_time, t1.auth_time);
-    assert.ok(vivo.auth_time * 1000 < publicadoMs, 'la sesión es anterior a la publicación');
-    await assertFails(loteFirmaAzt(vivo.auth_time));
-  });
-
-  test('reautenticar (> 1 s después) da un auth_time NUEVO y mayor; con ese token el mismo lote pasa', async () => {
+    // Lo que hace la página al confirmar la firma: renovar el token SIN contraseña (data/odt_afinia_sesion.js).
     await espera(1100);
-    await reauthenticateWithCredential(auth.currentUser, EmailAuthProvider.credential(CORREO, CLAVE));
     await auth.currentUser.getIdToken(true);
-    const t2 = (await auth.currentUser.getIdTokenResult()).claims;
-    assert.ok(t2.auth_time > t1.auth_time, `auth_time nuevo (${t2.auth_time}) > anterior (${t1.auth_time})`);
-    assert.ok(t2.auth_time * 1000 > publicadoMs, 'la sesión nueva es posterior a la publicación');
-    assert.equal(t2.firebase.sign_in_provider, 'password');
-    // Control de la misma prueba: el token viejo ya no está, y declarar el auth_time viejo en el acto tampoco sirve.
+    const vivo = (await auth.currentUser.getIdTokenResult()).claims;
+    assert.equal(vivo.auth_time, t2.auth_time, 'la sesión es la misma: renovar no la reinicia');
+    assert.ok(vivo.auth_time * 1000 < publicadoMs, 'la sesión es ANTERIOR a la publicación (antes, D5 la negaba)');
+    // Control: el acto con un authTime que no es el del token se niega.
     await assertFails(loteFirmaAzt(t1.auth_time));
-    await assertSucceeds(loteFirmaAzt(t2.auth_time));
+    await assertSucceeds(loteFirmaAzt(vivo.auth_time));
     const acto = (await getDoc(doc(db, 'odt_afinia', ODT, 'actos', 'azt'))).data();
-    assert.equal(acto.authTime, t2.auth_time);
+    assert.equal(acto.authTime, t2.auth_time, 'el acto guarda el inicio de la sesión («sesión iniciada»)');
     assert.equal((await getDoc(doc(db, 'odt_afinia', ODT))).data().estado, 'PENDIENTE_RESPONSABLE');
+    assert.equal((await auth.currentUser.getIdTokenResult()).claims.auth_time, t2.auth_time, 'firmar no reautenticó');
   });
 });

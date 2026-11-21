@@ -222,8 +222,9 @@ export function planPublicacion({ id, form = {}, preparado = {}, zonas, firmante
 // ── Firma (acto) ───────────────────────────────────────────────────────────────
 /**
  * Lote de firma: crear actos/{rol} y avanzar la ODT {estado, rev}, atados.
- * Todo sale de la COPIA congelada al pulsar «Preparar» (L-112) y del token
- * recién renovado tras la contraseña.
+ * Todo sale de la COPIA congelada al pulsar «Preparar» (L-112) y del token de la
+ * sesión abierta con correo y contraseña (desde el 2026-11-21 la firma no vuelve a
+ * pedir la contraseña; authTime es el inicio de esa sesión, solo registro).
  * @param {object} congelado  lo que devuelve prepararFirma (ui/odt-afinia/preparar.js)
  * @param {{email:string, auth_time:number, email_verified:boolean, sign_in_provider:string}} token
  * @param {{ts:any, aBytes:(u:Uint8Array)=>any}} dep

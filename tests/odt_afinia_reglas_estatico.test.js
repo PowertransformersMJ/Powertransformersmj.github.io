@@ -12,6 +12,9 @@
 //   · Decisiones del 2026-11-21: compositor @2 en los actos nuevos, FECHA CIERRE = la prevista, REEMPLAZADA y
 //     CERRADA solo desde LISTA y solo el admin, candado libre también tras REEMPLAZADA (con `reemplaza` sin
 //     lecturas de más) y descarga en LISTA o CERRADA. El presupuesto de lecturas no sube.
+//   · Decisión del Ingeniero del 2026-11-21 («la contraseña solo al iniciar sesión»): el acto de firmar exige una sesión
+//     abierta con correo y contraseña y el correo verificado, SIN ventana de 5 min ni paliativo D5; la habilitación
+//     sigue exigiendo contraseña reciente. Quitar D5 no cambia el presupuesto: sus lecturas ya se hacían para otra cosa.
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -147,7 +150,7 @@ describe('presupuesto de lecturas de documentos del bloque odt_afinia (peor caso
   test('se encontraron las reglas del bloque y todas sus funciones', () => {
     assert.ok(ALLOWS.length >= 25, 'allows encontrados: ' + ALLOWS.length);
     for (const n of ['odtPublicacion', 'odtParte', 'odtActo', 'odtTransicion', 'odtAnulacion', 'odtHabilitacion', 'odtCandado',
-      'odtCandadoLibre', 'odtLector', 'odtDescarga', 'odtDevolucion', 'odtReauth', 'odtReemplazo', 'odtCierreAfinia']) assert.ok(FNS.has(n), n);
+      'odtCandadoLibre', 'odtLector', 'odtDescarga', 'odtDevolucion', 'odtReauth', 'odtSesionContrasena', 'odtReemplazo', 'odtCierreAfinia']) assert.ok(FNS.has(n), n);
     // Sanidad del contador: la base de sesión/rol son 3 lecturas (perfil exists + get, y /admins del arranque).
     assert.deepEqual([...llamadas('isTeamMember() && hasProfile() && isAdmin() && profile().nombre == 1', FNS)].sort(), [
       'exists(/databases/$(database)/documents/admins/$(request.auth.uid))',
@@ -172,8 +175,10 @@ describe('presupuesto de lecturas de documentos del bloque odt_afinia (peor caso
     // Publicar = 9 + la lista blanca odt_afinia_config/firmantes (revisión 20-11): justo en el tope de 10.
     assert.equal(cuesta('odtPublicacion(id)'), 10);
     assert.ok(llamadas('odtPublicacion(id)', FNS).has('get(odtRutaConfig())'), 'publicar no lee la lista blanca');
-    // Firmar sigue en 8: el paliativo D5 usa la ODT y el acto del AZT, que ya se leían (mismo texto de llamada).
+    // Firmar sigue en 8 (2026-11-21): el paliativo D5 salió de la regla, pero usaba la ODT y el acto del AZT, que se
+    // siguen leyendo para otra cosa (el turno y «la misma cuenta no firma las dos casillas»): no baja.
     assert.equal(cuesta('odtActo(id, rol)'), 8);
+    assert.ok(llamadas('odtActo(id, rol)', FNS).has("get(odtRutaActo((id),'azt'))"), 'el acto del AZT se sigue leyendo (defensa en profundidad)');
     // El update de la ODT (firma, anulación, reemplazo o cierre) sigue en 5: reemplazar y cerrar solo leen el perfil.
     assert.equal(cuesta(UPDATE_ODT), 5);
     assert.equal(cuesta('odtReemplazo()'), 3);
@@ -208,10 +213,11 @@ describe('presupuesto de lecturas de documentos del bloque odt_afinia (peor caso
       "&& getAfter(odtRutaNro(d.nro)).data.odtId == id && exists(odtRutaNro('m0'));");
     assert.notEqual(mut0, REGLAS, 'la mutación 0 no encontró su ancla');
     assert.equal(llamadas('odtPublicacion(id)', funcionesDe(mut0)).size, 11);
-    // Y el paliativo D5 escrito con OTRA ruta del acto del AZT sí costaría una lectura más (9 > 8).
-    const mutD5 = REGLAS.replace("get(odtRutaActo(id, 'azt')).data.en.toMillis()", "get(odtRutaActo(id, 'azt2')).data.en.toMillis()");
-    assert.notEqual(mutD5, REGLAS, 'la mutación D5 no encontró su ancla');
-    assert.equal(llamadas('odtActo(id, rol)', funcionesDe(mutD5)).size, 9);
+    // Y en el acto, una comparación más con OTRA ruta del acto del AZT sí costaría una lectura más (9 > 8).
+    const mutActo = REGLAS.replace("&& get(odtRutaActo(id, 'azt')).data.uid != request.auth.uid));",
+      "&& get(odtRutaActo(id, 'azt')).data.uid != request.auth.uid && get(odtRutaActo(id, 'azt2')).data.en != null));");
+    assert.notEqual(mutActo, REGLAS, 'la mutación del acto no encontró su ancla');
+    assert.equal(llamadas('odtActo(id, rol)', funcionesDe(mutActo)).size, 9);
     // 2 lecturas nuevas en publicar → 12 > 10.
     const mut1 = REGLAS.replace('&& getAfter(odtRutaNro(d.nro)).data.odtId == id;',
       "&& getAfter(odtRutaNro(d.nro)).data.odtId == id && get(odtRutaNro('m1')).data.x == 1 && exists(odtRutaNro('m2'));");
@@ -341,10 +347,35 @@ describe('revisión 20-11 (D5, D6 y lente seg): las condiciones están en la reg
     assert.ok(cuerpo('odtPublicacion').includes(norm('d.firmantes.azt.uid in cfg.azt && d.firmantes.responsable.uid in cfg.responsable')));
     assert.ok(cuerpo('odtPublicacion').includes(norm('let cfg = get(odtRutaConfig()).data;')));
   });
-  test('D5: el acto exige sesión iniciada después de publicar, y el Responsable después del acto del AZT', () => {
+  test('2026-11-21: el acto ya NO exige D5 (sesión posterior a publicar o al acto del AZT) ni contraseña reciente', () => {
     const a = cuerpo('odtActo');
-    assert.ok(a.includes(norm('request.auth.token.auth_time * 1000 > o.publicadoEn.toMillis()')));
-    assert.ok(a.includes(norm("request.auth.token.auth_time * 1000 > get(odtRutaActo(id, 'azt')).data.en.toMillis()")));
+    assert.ok(!a.includes(norm('o.publicadoEn.toMillis()')), 'sin D5 respecto a la publicación');
+    assert.ok(!a.includes(norm(".data.en.toMillis()")), 'sin D5 respecto al acto del AZT');
+    assert.ok(!a.includes(norm('auth_time * 1000')), 'ninguna comparación con la hora de inicio de sesión');
+    assert.ok(!a.includes('odtReauth()'), 'el acto no pide la ventana de 5 min');
+    assert.ok(!a.includes('300000'));
+    // Sí sigue: sesión con correo y contraseña, correo verificado y el inicio de sesión registrado tal cual.
+    assert.ok(a.includes(norm('odtSesionContrasena() && odtCorreoDelPerfil()')));
+    assert.ok(a.includes(norm('d.authTime == request.auth.token.auth_time')));
+    assert.ok(a.includes(norm("d.correoVerificado == true && d.proveedor == 'password'")));
+    assert.ok(a.includes(norm("get(odtRutaActo(id, 'azt')).data.uid != request.auth.uid")), 'la misma cuenta no firma las dos casillas');
+  });
+  test('2026-11-21: la sesión que firma = correo y contraseña, correo verificado, correo y auth_time en el token (sin tiempo)', () => {
+    const s = cuerpo('odtSesionContrasena');
+    for (const x of ["t.get('firebase', {}).get('sign_in_provider', '') == 'password'", "t.get('email_verified', false) == true",
+      "t.get('email', null) is string", "t.get('auth_time', null) is int"]) assert.ok(s.includes(norm(x)), x);
+    assert.ok(!s.includes('300000') && !s.includes('request.time'), 'sin ventana de tiempo');
+  });
+  test('la HABILITACIÓN sigue exigiendo contraseña escrita hace ≤ 5 min (odtReauth = sesión con contraseña + ventana)', () => {
+    const r = cuerpo('odtReauth');
+    assert.ok(r.includes(norm('odtSesionContrasena()')));
+    assert.ok(r.includes(norm('request.time.toMillis() - request.auth.token.auth_time * 1000 <= 300000')));
+    assert.ok(cuerpo('odtHabilitacion').includes(norm('odtReauth() && odtCorreoDelPerfil()')));
+    // Mutación (L-144): una habilitación que pidiera solo la sesión (sin la ventana) se vería.
+    const mut = REGLAS.replace('&& odtReauth() && odtCorreoDelPerfil()\n        // uid, correo, correoVerificado, proveedor, authTime, acuerdoVersion',
+      '&& odtSesionContrasena() && odtCorreoDelPerfil()\n        // uid, correo, correoVerificado, proveedor, authTime, acuerdoVersion');
+    assert.notEqual(mut, REGLAS, 'la mutación de la habilitación no encontró su ancla');
+    assert.ok(!norm(funcionesDe(mut).get('odtHabilitacion').cuerpo).includes(norm('odtReauth() && odtCorreoDelPerfil()')));
   });
   test('el acto ata nombre y correo a lo publicado y la huella a la guardada por «Mi firma»', () => {
     const a = cuerpo('odtActo');

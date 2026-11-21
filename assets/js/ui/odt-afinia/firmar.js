@@ -1,13 +1,19 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// SGM · TRANSPOWER — Firma de ODT Afinia · FIRMAR (Preparar → Revisar → Firmar)
+// SGM · TRANSPOWER — Firma de ODT Afinia · FIRMAR (Preparar → Revisar → Firmar → Confirmar firma)
 // ──────────────────────────────────────────────────────────────────────────────
 //   1. Preparar: relee la ODT del servidor, lee su habilitación y «Mi firma» (lector
 //      propio que LANZA), compone EN MEMORIA el PDF con su firma y CONGELA la copia
 //      (uid, imagen, huellas, estado, rev, declaración; L-112).
 //   2. Revisar: pdf.js muestra ESOS bytes (las 2 páginas) con su huella.
-//   3. Declaración exacta + casilla NO premarcada + contraseña: se reautentica
-//      (reauthenticateWithCredential + getIdToken(true)), se comprueba que la cuenta
-//      viva sigue siendo la de la copia, y se escribe el lote de 2 (acto + estado).
+//   3. La declaración completa, tal cual se guarda, y el botón «Firmar»; al pulsarlo,
+//      «Confirmar firma» y «Cancelar» (confirmar-firma.js). Al confirmar se toma el token
+//      de la sesión abierta SIN pedir la contraseña (data/odt_afinia_sesion.js), se
+//      comprueba que la cuenta viva y la sesión son las de la copia, y se escribe el lote
+//      de 2 (acto + estado). Mientras tanto, nada se puede volver a pulsar.
+// Decisión del Ingeniero (2026-11-21, «solo al entrar, sin límite», sabiendo el riesgo):
+// la contraseña se escribe solo al iniciar sesión; aquí no se llama a reautenticar.
+// La habilitación (aceptar el acuerdo) sigue pidiéndola. Compromiso: Claude nunca pulsa
+// «Firmar» ni «Confirmar firma» en ninguna sesión.
 // Responsable (2026-11-21): la FECHA CIERRE ya NO se edita: es la fecha PREVISTA de la
 // orden y se muestra fija, junto con «ODT GENERADA N° {nro}» que se estampa al componer.
 // Si la fecha prevista todavía no llega (o no es válida), «Preparar mi firma» queda
@@ -24,16 +30,24 @@ import { ETIQUETA_ROL } from '../../domain/odt_afinia_rutas.js';
 import { rolDe } from '../../domain/odt_afinia_estados.js';
 import { fechaCierreDe, textoGenerada, ETIQUETA_GENERADA, avisoAntesDeFirmar, errorFirmaAlDia } from '../../domain/odt_afinia_cierre.js';
 import { h, vaciar, aviso, mensajeDe, cargarPdfLib } from './comun.js';
-import { prepararFirma, verificarAntesDeFirmar } from './preparar.js';
-import { armarDeclaracion } from './declaracion.js';
+import { prepararFirma } from './preparar.js';
+// Archivos NUEVOS (L-102): la firma sin contraseña no depende de vecinos que pudieron quedar viejos.
+import { armarConfirmacionFirma } from './confirmar-firma.js';
+import { crearSesionFirma, verificarSesionParaFirmar } from '../../data/odt_afinia_sesion.js';
 import { pintarPdf } from './vista-pdf.js';
 
 /**
  * @param {HTMLElement} contenedor
  * @param {{repo:object, cuenta:object, sesion:object, odt:object, bytesV0:Uint8Array, actos:object,
- *          miFirmaOdt:()=>Promise<object>, alFirmar:(mensaje:string)=>void}} p
+ *          miFirmaOdt:()=>Promise<object>, alFirmar:(mensaje:string)=>void,
+ *          sesionFirma?:{tokenVigente:(op:{uidEsperado:string})=>Promise<object>},
+ *          pdfLib?:()=>Promise<object>, pintar?:typeof pintarPdf}} p
+ *        sesionFirma, pdfLib y pintar se inyectan en las pruebas; por defecto, los de la página.
  */
-export function montarFirmar(contenedor, { repo, cuenta, sesion, odt, bytesV0, actos, miFirmaOdt, alFirmar }) {
+export function montarFirmar(contenedor, {
+  repo, cuenta, sesion, odt, bytesV0, actos, miFirmaOdt, alFirmar,
+  sesionFirma = crearSesionFirma(), pdfLib = cargarPdfLib, pintar = pintarPdf
+}) {
   const rol = rolDe(odt, sesion.uid);
   vaciar(contenedor);
   contenedor.appendChild(h('h3', { class: 'odt-subtitulo', text: 'Firmar como ' + ETIQUETA_ROL[rol] }));
@@ -59,7 +73,7 @@ export function montarFirmar(contenedor, { repo, cuenta, sesion, odt, bytesV0, a
 
   // Sin nulos en append(): el navegador los pintaría como el texto «null» (99 §231.12).
   contenedor.append(...[
-    h('p', { class: 'odt-parrafo', text: 'Primero se prepara la ODT con su firma, sin guardar nada. Revise las dos páginas; si está de acuerdo, acepte la declaración y escriba su contraseña.' }),
+    h('p', { class: 'odt-parrafo', text: 'Primero se prepara la ODT con su firma, sin guardar nada. Revise las dos páginas y lea la declaración; si está de acuerdo, pulse «Firmar» y después «Confirmar firma».' }),
     pieCierre,
     avisoFecha ? aviso(avisoFecha, 'aviso') : null,
     h('div', { class: 'odt-acciones' }, btnPreparar),
@@ -80,7 +94,7 @@ export function montarFirmar(contenedor, { repo, cuenta, sesion, odt, bytesV0, a
       const uidVivo = await cuenta.uidVivo();
       if (uidVivo !== sesion.uid) throw new Error('La sesión de esta pestaña cambió de cuenta. Recargue la página.');
       const [fresca, cta, hab, miFirma, PDFLib] = await Promise.all([
-        repo.leerOdtDoc(odt.id), cuenta.estadoCuenta(), repo.leerHabilitacion(), miFirmaOdt(), cargarPdfLib()
+        repo.leerOdtDoc(odt.id), cuenta.estadoCuenta(), repo.leerHabilitacion(), miFirmaOdt(), pdfLib()
       ]);
       if (fresca.estado !== odt.estado || fresca.rev !== odt.rev) throw new Error('La ODT cambió desde que la abrió. Recargue para ver su estado actual.');
       const preparado = await prepararFirma({
@@ -97,7 +111,7 @@ export function montarFirmar(contenedor, { repo, cuenta, sesion, odt, bytesV0, a
         estado.appendChild(aviso('La firma del AZT se comprobó: al recomponer la ODT sale exactamente lo que el AZT vio. '
           + 'Con su firma quedan en el pie: X en SI, FECHA CIERRE ' + congelado.cierre.fecha + ' y ' + textoGenerada(congelado.nro) + '.', 'ok'));
       }
-      const r = await pintarPdf(congelado.bytes, zonaVista, { titulo: 'Así queda la ODT con su firma (revise las 2 páginas):', huella: congelado.huellaVista });
+      const r = await pintar(congelado.bytes, zonaVista, { titulo: 'Así queda la ODT con su firma (revise las 2 páginas):', huella: congelado.huellaVista });
       if (r.paginas !== 2) throw new Error('La ODT compuesta no tiene 2 páginas: no se firma.');
       btnPreparar.textContent = 'Cambiar algo y volver a preparar'; btnPreparar.disabled = false;
       pintarDeclaracion();
@@ -111,17 +125,18 @@ export function montarFirmar(contenedor, { repo, cuenta, sesion, odt, bytesV0, a
     vaciar(zonaDecl);
     const c = congelado;
     let decl;
-    decl = armarDeclaracion({
+    decl = armarConfirmacionFirma({
       texto: c.declaracion.texto,
       version: c.declaracion.version,
-      etiquetaCasilla: 'Revisé las dos páginas y acepto esta declaración.',
-      etiquetaBoton: 'Firmar',
-      alConfirmar: async (clave) => {
-        decl.estado.textContent = 'Comprobando su contraseña…';
+      alConfirmar: async () => {
+        // Mientras se confirma no se vuelve a preparar (la copia en curso es la que se firma).
+        btnPreparar.disabled = true;
+        decl.estado.textContent = 'Comprobando su sesión…';
         try {
-          const token = await cuenta.reautenticar(clave, { uidEsperado: c.uid });
-          const motivo = verificarAntesDeFirmar(c, { uidVivo: await cuenta.uidVivo(), token });
-          if (motivo) { decl.estado.textContent = motivo; return; }
+          // El token de la sesión abierta: sin pedir la contraseña (decisión del 2026-11-21).
+          const token = await sesionFirma.tokenVigente({ uidEsperado: c.uid });
+          const motivo = verificarSesionParaFirmar(c, { uidVivo: await cuenta.uidVivo(), token });
+          if (motivo) { decl.estado.textContent = motivo; btnPreparar.disabled = false; return; }
           decl.estado.textContent = 'Registrando su firma…';
           decl.bloquear(true);
           const r = await repo.firmar(c, token);
@@ -129,7 +144,6 @@ export function montarFirmar(contenedor, { repo, cuenta, sesion, odt, bytesV0, a
           if (r && r.estado === 'pendiente') {
             // El lote sigue en curso: NO se ofrece firmar otra vez (ni volver a preparar) hasta que termine.
             decl.estado.textContent = r.mensaje;
-            btnPreparar.disabled = true;
             r.final.then(() => alFirmar(hecho), (e) => {
               btnPreparar.disabled = false; decl.bloquear(false);
               decl.estado.textContent = mensajeDe(e);
@@ -138,6 +152,7 @@ export function montarFirmar(contenedor, { repo, cuenta, sesion, odt, bytesV0, a
           }
           alFirmar(hecho);
         } catch (e) {
+          btnPreparar.disabled = false;
           decl.bloquear(false);
           decl.estado.textContent = mensajeDe(e);
         }

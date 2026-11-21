@@ -6,12 +6,13 @@
 //                      CONGELA una copia con uid, nombre, correo, imagen, huellas,
 //                      estado y rev (L-112). Lo que se muestra, lo que se firma
 //                      (huellaVista) y lo que se sube salen de ESA copia (L-107).
-//   · verificarAntesDeFirmar → al pulsar «Firmar»: la cuenta viva sigue siendo la
-//                      de la copia, el token renovado es de esa misma cuenta y su
-//                      inicio de sesión es posterior a la publicación (y, para el
-//                      Responsable, a la firma del AZT): paliativo D5. Las horas que
-//                      se comparan son TODAS del servidor (iat, auth_time, publicadoEn,
-//                      acto.en), nunca el reloj del equipo.
+//   · verificarAntesDeFirmar → SOLO compatibilidad (L-102): la firmar.js de antes del
+//                      2026-11-21 (contraseña en cada firma) la llama; desde entonces
+//                      es la misma verificación que verificarSesionParaFirmar
+//                      (data/odt_afinia_sesion.js): cuenta viva = la de la copia, sesión
+//                      de esa cuenta y ese correo, con correo y contraseña y correo
+//                      verificado. Sin ventana de 5 min ni paliativo D5: la regla ya no
+//                      los pide (decisión del Ingeniero del 2026-11-21).
 //   · verificarActoAzt → el Responsable recompone v0 + firma del AZT y exige la
 //                      huella que el AZT vio (nadie tocó nada fuera de su casilla).
 //   · componerParaVer → lo que se muestra en «Ver la ODT»: verificado contra la
@@ -32,7 +33,7 @@
 // pdf-lib llega INYECTADO. Archivo NUEVO a propósito (L-102).
 // ══════════════════════════════════════════════════════════════════════════════
 
-import { TOPES, PROVEEDOR, COMPOSITOR, esHuella } from '../../domain/odt_afinia_rutas.js';
+import { TOPES, COMPOSITOR } from '../../domain/odt_afinia_rutas.js';
 import { cambioFirma, rolDe } from '../../domain/odt_afinia_estados.js';
 import { declaracion, errorFechaCierre, nombreArchivo } from '../../domain/odt_afinia_textos.js';
 import { componerConHuella, ESTAMPA } from '../../domain/odt_afinia_componer.js';
@@ -42,8 +43,10 @@ import {
 import { errorZonasGuardadas } from '../../domain/odt_afinia_zonas.js';
 import { huella } from '../../domain/odt_afinia_partes.js';
 import { ErrorOdt } from '../../data/odt_afinia_lotes.js';
-import { MSG_IDENTIDAD_CAMBIO, MSG_SESION_ANTES_DE_PUBLICAR, MSG_SESION_ANTES_DEL_AZT } from '../../data/odt_afinia.js';
+import { MSG_IDENTIDAD_CAMBIO } from '../../data/odt_afinia.js';
 import { HUELLA_MI_FIRMA_DISTINTA } from '../../data/odt_afinia_mi_firma.js';
+// Archivo NUEVO (L-102): la verificación de la sesión para firmar (sin contraseña reciente).
+import { verificarSesionParaFirmar } from '../../data/odt_afinia_sesion.js';
 
 const falla = (codigo, mensaje) => { throw new ErrorOdt(codigo, mensaje); };
 
@@ -152,37 +155,21 @@ export async function prepararFirma({ odt, bytesV0, actos = {}, sesion, correo, 
     bytes: compuesto.bytes,
     huellaVista: compuesto.huella,
     declaracion: Object.freeze(decl),
-    // Horas del SERVIDOR para el paliativo D5 (verificarAntesDeFirmar).
-    publicadoEnMs: Number.isFinite(odt.publicadoEnMs) ? odt.publicadoEnMs : null,
-    aztEnMs: rol === 'responsable' && actos.azt && Number.isFinite(actos.azt.enMs) ? actos.azt.enMs : null,
     preparadoEnMs: ahora.getTime()
   });
 }
 
 /**
- * Justo antes de escribir: ¿sigue siendo la misma cuenta y el token es fresco?
- * El tope de 5 minutos se mide con `iat` (emisión del token, hora del SERVIDOR): un
- * reloj del equipo adelantado no bloquea la firma (la regla decide con request.time).
+ * Compatibilidad (L-102): la firmar.js de antes del 2026-11-21 (que pedía la contraseña en cada firma) llama a
+ * esta función desde una caché vieja. Desde esa fecha es EXACTAMENTE verificarSesionParaFirmar: la cuenta viva y
+ * la sesión son las de la copia; sin ventana de 5 minutos ni paliativo D5 (la regla ya no los pide). La firmar.js
+ * nueva llama directo a verificarSesionParaFirmar. Se puede quitar cuando ninguna caché tenga la firmar.js vieja.
  * @param {object} congelado
- * @param {{uidVivo:string|null, token:object, ahoraMs?:number}} p  ahoraMs solo si el token no trae iat
+ * @param {{uidVivo:string|null, token:object}} p
  * @returns {string|null}  el motivo para abortar, o null
  */
-export function verificarAntesDeFirmar(congelado, { uidVivo, token, ahoraMs = Date.now() } = {}) {
-  if (!congelado) return 'Primero prepare la firma.';
-  if (!uidVivo || uidVivo !== congelado.uid) return 'La sesión de esta pestaña cambió de cuenta. No se firma: recargue la página y entre con su propia cuenta.';
-  if (!token || token.uid !== congelado.uid) return 'La contraseña es de otra cuenta. No se firma.';
-  if (typeof token.email !== 'string' || !token.email) return 'Su sesión no trae el correo de la cuenta. Recargue la página, entre de nuevo y firme.';
-  if (token.email !== congelado.correo) return 'El correo de la cuenta autenticada no coincide con el de la declaración. Vuelva a preparar la firma.';
-  if (token.email_verified !== true) return 'Su correo no está verificado. Complete el paso 1 de «Habilitarme».';
-  if (token.sign_in_provider !== PROVEEDOR) return 'Debe autenticarse con su correo y contraseña.';
-  if (!Number.isInteger(token.auth_time)) return 'No se pudo leer la hora de su autenticación. Escriba de nuevo su contraseña.';
-  const referencia = Number.isInteger(token.iat) ? token.iat * 1000 : ahoraMs;
-  if (referencia - token.auth_time * 1000 > TOPES.reautenticacionMs) return 'La autenticación venció (más de 5 minutos). Escriba de nuevo su contraseña.';
-  const authMs = token.auth_time * 1000;
-  if (congelado.publicadoEnMs != null && !(authMs > congelado.publicadoEnMs)) return MSG_SESION_ANTES_DE_PUBLICAR;
-  if (congelado.rol === 'responsable' && congelado.aztEnMs != null && !(authMs > congelado.aztEnMs)) return MSG_SESION_ANTES_DEL_AZT;
-  if (!esHuella(congelado.huellaVista)) return 'La firma preparada no tiene huella.';
-  return null;
+export function verificarAntesDeFirmar(congelado, { uidVivo, token } = {}) {
+  return verificarSesionParaFirmar(congelado, { uidVivo, token });
 }
 
 /**

@@ -5,6 +5,8 @@
 // Desde el 2026-11-21: el Responsable cierra con la fecha PREVISTA y el compositor @2 (N.º en
 // «ODT GENERADA N°»; una ODT firmada con @1 se sigue recomponiendo igual); REEMPLAZAR una LISTA
 // (y volver a publicar su N.º con `reemplaza`) y registrar su CIERRE EN AFINIA (→ CERRADA).
+// Decisión del Ingeniero del 2026-11-21 («la contraseña solo al iniciar sesión»): firmar usa el token de la sesión
+// abierta (data/odt_afinia_sesion.js, sin contraseña ni ventana de 5 min ni D5); habilitarse sigue con contraseña.
 // Que las reglas acepten esa forma lo prueba tests-rules/odt_afinia.rules.test.js.
 // Datos inventados (repo público): uids uid-*-prueba, correos @prueba.test, N.º 00000001.
 import { test, describe } from 'node:test';
@@ -19,6 +21,7 @@ import { crearCuenta, claimsDe } from '../assets/js/data/odt_afinia_cuenta.js';
 import { miFirmaOdt, HUELLA_MI_FIRMA_DISTINTA } from '../assets/js/data/odt_afinia_mi_firma.js';
 import { ErrorOdt, planPublicacion, planFirma, documentoHabilitacion } from '../assets/js/data/odt_afinia_lotes.js';
 import { prepararFirma, verificarAntesDeFirmar, descargarOdt, prepararDescarga } from '../assets/js/ui/odt-afinia/preparar.js';
+import { crearSesionFirma, verificarSesionParaFirmar } from '../assets/js/data/odt_afinia_sesion.js';
 import { validarOdt } from '../assets/js/domain/odt_afinia_formato.js';
 import { prepararPartes } from '../assets/js/domain/odt_afinia_partes.js';
 import { textoAcuerdo, declaracionAzt, declaracionResponsable, fechaBogota } from '../assets/js/domain/odt_afinia_textos.js';
@@ -240,7 +243,7 @@ describe('firmar: lote de 2 (acto + estado) desde la copia congelada', () => {
     assert.equal(sha(c.bytes), c.huellaVista, 'la huella es la de los bytes que se muestran');
     assert.equal(c.declaracion.texto, declaracionAzt({ nombre: AZT.nombre, correo: correoDe(AZT), nro: NRO }));
     const tk = tokenFalso({ uid: AZT.uid, email: correoDe(AZT) });
-    assert.equal(verificarAntesDeFirmar(c, { uidVivo: AZT.uid, token: tk }), null);
+    assert.equal(verificarSesionParaFirmar(c, { uidVivo: AZT.uid, token: tk }), null);
     await r.firmar(c, tk);
     const lote = e.fs.lotes.at(-1).ops;
     assert.equal(lote.length, 2);
@@ -353,11 +356,20 @@ describe('firmar: lote de 2 (acto + estado) desde la copia congelada', () => {
     const { id } = await publicada(e);
     const { r, c } = await prepararDe(e, AZT, id);
     const tk = tokenFalso({ uid: AZT.uid, email: correoDe(AZT) });
-    assert.match(verificarAntesDeFirmar(c, { uidVivo: 'uid-otra-prueba', token: tk }), /cambió de cuenta/);
-    assert.match(verificarAntesDeFirmar(c, { uidVivo: AZT.uid, token: { ...tk, uid: 'uid-otra-prueba' } }), /otra cuenta/);
-    assert.match(verificarAntesDeFirmar(c, { uidVivo: AZT.uid, token: { ...tk, email: 'otro@prueba.test' } }), /correo/);
-    assert.match(verificarAntesDeFirmar(c, { uidVivo: AZT.uid, token: { ...tk, auth_time: tk.auth_time - 301 } }), /5 minutos/);
-    assert.match(verificarAntesDeFirmar(c, { uidVivo: AZT.uid, token: { ...tk, email_verified: false } }), /verificado/);
+    const v = (token, uidVivo = AZT.uid) => verificarSesionParaFirmar(c, { uidVivo, token });
+    assert.match(v(tk, 'uid-otra-prueba'), /cambió de cuenta/);
+    assert.match(v(tk, null), /cambió de cuenta/);
+    assert.match(v({ ...tk, uid: 'uid-otra-prueba' }), /otra cuenta/);
+    assert.match(v({ ...tk, email: 'otro@prueba.test' }), /correo/);
+    assert.match(v({ ...tk, email: '' }), /no trae el correo/);
+    assert.match(v({ ...tk, email_verified: false }), /verificado/);
+    assert.match(v({ ...tk, sign_in_provider: 'google.com' }), /correo y contraseña/);
+    assert.match(v({ ...tk, sign_in_provider: 'custom' }), /correo y contraseña/);
+    assert.match(v({ ...tk, auth_time: NaN }), /inicio de sesión/);
+    assert.match(v(null), /otra cuenta/);
+    assert.match(verificarSesionParaFirmar(null, { uidVivo: AZT.uid, token: tk }), /prepare/);
+    // Control: la misma sesión, exacta, pasa.
+    assert.equal(v(tk), null);
     const antes = e.fs.lotes.length;
     await assert.rejects(e.repo(RESP).firmar(c, tk), (x) => x.codigo === 'cuenta', 'otra sesión no escribe la copia ajena');
     await assert.rejects(r.firmar(c, { ...tk, email: 'otro@prueba.test' }), (x) => x.codigo === 'validacion');
@@ -407,9 +419,10 @@ describe('red caída a mitad del lote', () => {
     const { p } = await firmarCon({ rechazarRed: true, sinRedLectura: true });
     await assert.rejects(p, (x) => x.codigo === 'sin_red');
   });
-  test('«sin permiso» dice la causa probable leyendo el estado actual', async () => {
+  test('«sin permiso» dice la causa probable leyendo el estado actual (sin culpar a la contraseña ni a la hora de la sesión)', async () => {
     const { p } = await firmarCon({ denegarLote: true });
-    await assert.rejects(p, (x) => x.codigo === 'sin_permiso' && /5 minutos|cambió|anulada/.test(x.message));
+    await assert.rejects(p, (x) => x.codigo === 'sin_permiso' && /Causas posibles|cambió|anulada/.test(x.message)
+      && !/5 minutos|escribió su contraseña|inicio de sesión es anterior/.test(x.message));
   });
   test('conTope corta una promesa colgada', async () => {
     await assert.rejects(conTope(new Promise(() => {}), 5), (x) => x.codigo === 'tiempo');
@@ -517,15 +530,18 @@ describe('contrato nuevo: lista blanca, D5, D6 y causas de rechazo', () => {
     assert.equal(res.estado, 'pendiente');
     assert.match(res.mensaje, /NO repita/);
   });
-  test('causaRechazoFirma: inicio de sesión anterior a la publicación → «inicie sesión de nuevo y firme»', async () => {
+  test('causaRechazoFirma (2026-11-21): un inicio de sesión anterior a la publicación YA NO es causa (la regla no lo mira)', async () => {
     const e = await escenario();
     const { id } = await publicada(e);
     const { r, c } = await prepararDe(e, AZT, id);
     const odt = await r.leerOdtDoc(id);
-    const viejo = tokenFalso({ uid: AZT.uid, email: correoDe(AZT), ahoraMs: odt.publicadoEnMs - 60000 });
-    assert.equal(await r.causaRechazoFirma(c, viejo), 'La plataforma no aceptó su firma. ' + MSG_SESION_ANTES_DE_PUBLICAR);
+    const viejo = tokenFalso({ uid: AZT.uid, email: correoDe(AZT), ahoraMs: odt.publicadoEnMs - 3 * 3600e3 });
+    const causa = await r.causaRechazoFirma(c, viejo);
+    assert.notEqual(causa, 'La plataforma no aceptó su firma. ' + MSG_SESION_ANTES_DE_PUBLICAR);
+    assert.ok(!/inicio de sesión es anterior|5 minutos|escribió su contraseña/.test(causa), causa);
+    assert.match(causa, /^La plataforma no aceptó su firma\. Causas posibles: /);
   });
-  test('causaRechazoFirma: el Responsable con sesión anterior a la firma del AZT; nombre/correo distintos de lo publicado', async () => {
+  test('causaRechazoFirma: el Responsable con sesión anterior a la firma del AZT ya no es causa; nombre/correo distintos de lo publicado sí', async () => {
     const e = await escenario();
     const { id } = await publicada(e);
     const a = await prepararDe(e, AZT, id);
@@ -534,9 +550,12 @@ describe('contrato nuevo: lista blanca, D5, D6 y causas de rechazo', () => {
     const actoAzt = await p.r.leerActo(id, 'azt');
     const odt = await p.r.leerOdtDoc(id);
     assert.ok(actoAzt.enMs > odt.publicadoEnMs);
-    const entre = actoAzt.enMs; // auth_time (s) == firma del AZT: no es POSTERIOR, y sí es posterior a publicar
-    const tk = tokenFalso({ uid: RESP.uid, email: correoDe(RESP), ahoraMs: entre });
-    assert.equal(await p.r.causaRechazoFirma(p.c, tk), 'La plataforma no aceptó su firma. ' + MSG_SESION_ANTES_DEL_AZT);
+    // Sesión del Responsable abierta ANTES de publicar y antes de la firma del AZT: ya no se le culpa (2026-11-21).
+    const tk = tokenFalso({ uid: RESP.uid, email: correoDe(RESP), ahoraMs: odt.publicadoEnMs - 3600e3 });
+    const causa = await p.r.causaRechazoFirma(p.c, tk);
+    assert.notEqual(causa, 'La plataforma no aceptó su firma. ' + MSG_SESION_ANTES_DEL_AZT);
+    assert.notEqual(causa, 'La plataforma no aceptó su firma. ' + MSG_SESION_ANTES_DE_PUBLICAR);
+    assert.match(causa, /Causas posibles: /);
     const ruta = 'odt_afinia/' + id;
     const o = e.fs.store.get(ruta);
     e.fs.poner(ruta, { ...o, firmantes: { ...o.firmantes, responsable: { ...o.firmantes.responsable, correo: 'otro@prueba.test' } } });
@@ -575,14 +594,37 @@ describe('cuenta: horas del SERVIDOR (iat, auth_time), nunca el reloj del equipo
     const sinIat = crearCuenta({ authSdk: {}, auth: { currentUser: usuarioFalso({ auth_time: 1000 }) } });
     await assert.rejects(sinIat.edadSesion(), (x) => x.codigo === 'cuenta');
   });
-  test('verificarAntesDeFirmar mide los 5 min con iat: un reloj local adelantado no bloquea', async () => {
+  test('2026-11-21: firmar no mide la edad de la sesión (una abierta hace horas, antes de publicar, firma); el alias viejo dice lo mismo', async () => {
     const e = await escenario();
     const { id } = await publicada(e);
     const { c } = await prepararDe(e, AZT, id);
-    const tk = tokenFalso({ uid: AZT.uid, email: correoDe(AZT) });
-    const conIat = { ...tk, iat: tk.auth_time + 10 };
-    assert.equal(verificarAntesDeFirmar(c, { uidVivo: AZT.uid, token: conIat, ahoraMs: Date.now() + 3600e3 }), null, 'reloj del equipo +1 h');
-    assert.match(verificarAntesDeFirmar(c, { uidVivo: AZT.uid, token: { ...tk, iat: tk.auth_time + 301 } }), /5 minutos/);
+    const odt = await e.repo(AZT).leerOdtDoc(id);
+    const tk = tokenFalso({ uid: AZT.uid, email: correoDe(AZT), ahoraMs: odt.publicadoEnMs - 5 * 3600e3 });
+    const vieja = { ...tk, iat: tk.auth_time + 5 * 3600 + 30 };
+    assert.equal(verificarSesionParaFirmar(c, { uidVivo: AZT.uid, token: vieja }), null, 'sesión de hace 5 h, anterior a la publicación');
+    // Compatibilidad (L-102): una firmar.js vieja de la caché llama a verificarAntesDeFirmar; ahora es la misma verificación.
+    for (const t of [vieja, { ...vieja, email_verified: false }, { ...vieja, sign_in_provider: 'custom' }, { ...vieja, uid: 'uid-otra-prueba' }]) {
+      assert.equal(verificarAntesDeFirmar(c, { uidVivo: AZT.uid, token: t }), verificarSesionParaFirmar(c, { uidVivo: AZT.uid, token: t }));
+    }
+    // Y el lote se arma con ESE inicio de sesión (authTime == auth_time del token: «sesión iniciada», solo registro).
+    await e.repo(AZT).firmar(c, vieja);
+    assert.equal(e.fs.lotes.at(-1).ops[0].datos.authTime, vieja.auth_time);
+  });
+  test('crearSesionFirma.tokenVigente: renueva el token SIN pedir la contraseña y devuelve sus claims', async () => {
+    const llamadas = [];
+    const u = {
+      uid: AZT.uid, email: correoDe(AZT),
+      async getIdToken(forzar) { llamadas.push('getIdToken:' + forzar); return 'tk'; },
+      async getIdTokenResult() { llamadas.push('getIdTokenResult'); return { claims: { email: correoDe(AZT), email_verified: true, auth_time: 1000, iat: 90000, firebase: { sign_in_provider: 'password' } } }; }
+    };
+    const s = crearSesionFirma({ auth: { currentUser: u } });
+    assert.deepEqual(await s.tokenVigente({ uidEsperado: AZT.uid }),
+      { uid: AZT.uid, email: correoDe(AZT), email_verified: true, auth_time: 1000, iat: 90000, sign_in_provider: 'password' });
+    assert.deepEqual(llamadas, ['getIdToken:true', 'getIdTokenResult'], 'solo renueva y lee: ninguna credencial');
+    await assert.rejects(s.tokenVigente({ uidEsperado: 'uid-otra-prueba' }), (x) => x instanceof ErrorOdt && x.codigo === 'cuenta');
+    await assert.rejects(crearSesionFirma({ auth: { currentUser: null } }).tokenVigente(), (x) => x.codigo === 'cuenta' && /No hay una sesión abierta/.test(x.message));
+    const sinRed = { ...u, async getIdToken() { const e = new Error('x'); e.code = 'auth/network-request-failed'; throw e; } };
+    await assert.rejects(crearSesionFirma({ auth: { currentUser: sinRed } }).tokenVigente(), (x) => x.codigo === 'red');
   });
 });
 

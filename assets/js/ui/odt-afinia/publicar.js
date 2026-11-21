@@ -17,16 +17,19 @@
 //      Al validar se consulta si el N.º ya se publicó: con la vigente ANULADA o REEMPLAZADA
 //      se puede volver a publicar (la nueva guarda `reemplaza` = la anterior); con la vigente
 //      pendiente, LISTA o CERRADA se dice por qué no, antes de enviar nada (2026-11-21).
-//   4. Publicar: un lote (ODT + partes + candado del N.º). Antes, procedimiento D5: si
-//      la sesión del admin se abrió hace menos de 5 minutos (hora del servidor), se avisa
-//      y se pide confirmar (en esa ventana la sesión podría firmar). Después se RELEE
-//      del servidor y se compara la huella. Si el lote no responde a tiempo queda
+//   4. Publicar: un lote (ODT + partes + candado del N.º). Después se RELEE del
+//      servidor y se compara la huella. Si el lote no responde a tiempo queda
 //      «pendiente» (NO repita) y se espera su desenlace.
+//      Sin el aviso D5 de «5 minutos» antes de publicar (quitado el 2026-11-21): desde la
+//      decisión del Ingeniero de pedir la contraseña solo al iniciar sesión, cualquier sesión
+//      abierta con correo y contraseña puede firmar, a cualquier hora; esperar ya no
+//      protegía nada y el aviso decía algo falso. Queda el compromiso: Claude nunca pulsa
+//      «Firmar» ni «Confirmar firma» en ninguna sesión.
 // Publicar NO pide contraseña (D4: publicar sí, firmar nunca).
 // Archivo NUEVO a propósito (L-102).
 // ══════════════════════════════════════════════════════════════════════════════
 
-import { ETIQUETA_ROL, TOPES, esNro } from '../../domain/odt_afinia_rutas.js';
+import { ETIQUETA_ROL, esNro } from '../../domain/odt_afinia_rutas.js';
 import { errorFirmantes, ETIQUETA_ESTADO } from '../../domain/odt_afinia_estados.js';
 import { etiquetaEstado } from '../../domain/odt_afinia_cierre.js';
 import { estructuraConPdfLib, conTextos, validarOdt, nrosEnTexto } from '../../domain/odt_afinia_formato.js';
@@ -58,32 +61,11 @@ export function motivosEnLlano(motivos) {
 }
 
 /**
- * Procedimiento D5 (ADR): quien opera la sesión del admin no publica en los 5 minutos que
- * siguen a escribir la contraseña (en esa ventana la sesión podría firmar como Responsable).
- * @param {{edadSeg:number}|null} edad   de cuenta.edadSesion() (segundos del SERVIDOR)
- * @param {Error|null} [error]           si no se pudo leer
- * @returns {string|null}  el aviso que pide confirmar, o null si se puede publicar sin preguntar
- */
-export function avisoSesionReciente(edad, error = null) {
-  const limiteSeg = TOPES.reautenticacionMs / 1000;
-  if (error || !edad || !Number.isFinite(edad.edadSeg)) {
-    return 'No se pudo comprobar cuándo se abrió esta sesión de administrador' + (error ? ' (' + mensajeDe(error) + ')' : '')
-      + '. Si la contraseña se escribió hace menos de 5 minutos, en esa ventana esta sesión podría firmar: confirme que es usted, el titular de la cuenta, quien publica.';
-  }
-  if (edad.edadSeg < limiteSeg) {
-    const min = Math.max(1, Math.ceil((limiteSeg - edad.edadSeg) / 60));
-    return 'Esta sesión de administrador se abrió hace menos de 5 minutos: en esa ventana podría firmar como Responsable. '
-      + 'Lo indicado es esperar unos ' + min + ' min y publicar después; publique ahora solo si es usted, el titular de la cuenta, quien está en el equipo.';
-  }
-  return null;
-}
-
-/**
  * @param {HTMLElement} contenedor
- * @param {{repo:object, cuenta?:object, sesion:object, alPublicar:(odtId:string)=>void}} p
- *        cuenta: para el aviso D5 (edadSesion); sin ella, se pide confirmar siempre.
+ * @param {{repo:object, sesion:object, alPublicar:(odtId:string)=>void}} p
+ *        (app.js aún pasa `cuenta`: ya no se usa aquí desde que salió el aviso D5, 2026-11-21).
  */
-export async function montarPublicar(contenedor, { repo, cuenta, sesion, alPublicar }) {
+export async function montarPublicar(contenedor, { repo, sesion, alPublicar }) {
   vaciar(contenedor);
   if (!sesion.esAdmin || sesion.legacy) {
     contenedor.appendChild(aviso(sesion.legacy
@@ -264,26 +246,9 @@ export async function montarPublicar(contenedor, { repo, cuenta, sesion, alPubli
 
     btnPublicar.addEventListener('click', async () => {
       if (!validado || !vigente()) return;
+      // Botones ocupados desde el primer clic: no hay doble envío. Sin aviso D5 (2026-11-21, ver cabecera).
       btnPublicar.disabled = true; btnValidar.disabled = true;
-      vaciar(estado); estado.appendChild(h('p', { class: 'odt-cargando', text: 'Comprobando la hora de su inicio de sesión…' }));
-      // Procedimiento D5: sesión abierta hace < 5 min → avisar y pedir confirmación.
-      let edad = null; let errEdad = null;
-      if (cuenta && typeof cuenta.edadSesion === 'function') {
-        try { edad = await cuenta.edadSesion(); } catch (e) { errEdad = e; }
-      } else {
-        errEdad = new Error('sin acceso a la cuenta');
-      }
-      if (!vigente()) return;
-      const motivo = avisoSesionReciente(edad, errEdad);
-      vaciar(estado);
-      if (!motivo) { await publicarYa(); return; }
-      const si = h('button', { type: 'button', class: 'odt-btn odt-btn--peligro', text: 'Soy el titular: publicar ahora' });
-      const no = h('button', { type: 'button', class: 'odt-btn', text: 'Esperar' });
-      const caja = h('div', { class: 'odt-confirmar', role: 'alertdialog', 'aria-label': 'Confirmar la publicación' },
-        aviso(motivo, 'aviso'), h('div', { class: 'odt-acciones' }, si, no));
-      estado.appendChild(caja);
-      no.addEventListener('click', () => { vaciar(estado); btnPublicar.disabled = false; btnValidar.disabled = false; });
-      si.addEventListener('click', async () => { si.disabled = true; no.disabled = true; await publicarYa(); });
+      await publicarYa();
     });
 
     async function publicarYa() {

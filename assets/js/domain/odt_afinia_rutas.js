@@ -77,7 +77,7 @@ export const TOPES = Object.freeze({
   motivoMax: 500,
   listado: 50,                // list de odt: limit <= 50
   actos: 2,                   // list de actos: limit <= 2
-  reautenticacionMs: 300000,  // 5 min entre la contraseña y la firma (en milisegundos enteros, L-129)
+  reautenticacionMs: 300000,  // 5 min entre la contraseña y la HABILITACIÓN (odtReauth; ms enteros, L-129). Firmar y Publicar ya no lo usan (2026-11-21)
   paginas: 2                  // la ODT tiene exactamente 2 páginas («revisé las dos páginas»)
 });
 

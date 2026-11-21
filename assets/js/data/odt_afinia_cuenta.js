@@ -8,15 +8,19 @@
 //                             devuelve las «claims» del token NUEVO: email,
 //                             email_verified, auth_time (segundos, entero) y
 //                             sign_in_provider, más `iat` (hora de EMISIÓN del token, del
-//                             servidor: el chequeo previo de 5 min usa iat, nunca el reloj
-//                             del equipo). La regla exige ≤ 5 min entre la contraseña y la
-//                             escritura (habilitarse y firmar).
+//                             servidor, nunca el reloj del equipo). La regla exige ≤ 5 min
+//                             entre la contraseña y la escritura SOLO al habilitarse: desde
+//                             el 2026-11-21 la firma no vuelve a pedir la contraseña (usa el
+//                             token de la sesión: data/odt_afinia_sesion.js).
 //   · edadSesion              cuánto hace que se abrió la sesión (iat − auth_time de un token
-//                             recién emitido, SIN pedir contraseña): Publicar avisa si es
-//                             menos de 5 min (procedimiento D5 del ADR).
+//                             recién emitido, SIN pedir contraseña). Desde el 2026-11-21
+//                             ninguna pantalla nueva lo usa: Publicar ya no avisa de los
+//                             «5 minutos» (procedimiento D5), porque la firma no mide esa
+//                             ventana. Se conserva porque una publicar.js vieja de la caché
+//                             lo pide (L-102).
 // La contraseña solo pasa por aquí y no se guarda en ningún lado: la escribe el
 // TITULAR en su equipo (D4 cubre publicar, nunca firmar; Claude no escribe
-// contraseñas). Publicar NO pasa por aquí.
+// contraseñas). Ni publicar ni firmar pasan por reautenticar: solo habilitarse.
 // SDK de Auth y `auth` inyectables (pruebas). Archivo NUEVO a propósito (L-102).
 // ══════════════════════════════════════════════════════════════════════════════
 
