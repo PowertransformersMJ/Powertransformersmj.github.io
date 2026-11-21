@@ -24,6 +24,7 @@
     "guardia:cedulas": "node scripts/guardia-cedulas.mjs --historia",
     "test:trigger": "firebase emulators:exec --only firestore,functions --project lordpowertransformersmj \"node --test functions/tests/*.test.mjs\"",
     "test:rules": "firebase emulators:exec --only firestore,storage --project demo-sgm-rules \"node --test --test-concurrency=1 tests-rules/*.test.js\"",
+    "test:rules:auth": "firebase emulators:exec --only auth,firestore --project demo-sgm-rules \"SGM_EXIGE_AUTH=1 node --test --test-concurrency=1 tests-rules/odt_afinia_auth.test.js\"",
     "test": "npm run lint && npm run test:unit"
   },
   "devDependencies": {
@@ -32,6 +33,7 @@
     "firebase-admin": "^13.8.0",
     "html-validate": "^8.24.0",
     "jszip": "^3.10.1",
+    "pdf-lib": "1.17.1",
     "xlsx": "^0.18.5"
   },
   "engines": {
