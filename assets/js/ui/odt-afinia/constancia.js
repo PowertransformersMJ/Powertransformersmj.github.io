@@ -3,7 +3,11 @@
 // ──────────────────────────────────────────────────────────────────────────────
 // La prueba de quién firmó no es la imagen del PDF (R4): es el ACTO guardado en
 // SGM. Esta tarjeta lo muestra completo: quién, con qué cuenta, cuándo firmó,
-// cuándo escribió su contraseña, qué declaró y las huellas de lo que vio.
+// cuándo inició la sesión con la que firmó («Sesión iniciada», el auth_time que guarda
+// el acto), qué declaró y las huellas de lo que vio. Desde el 2026-11-21 la firma no
+// vuelve a pedir la contraseña (se escribe al iniciar sesión); en los actos de antes,
+// ese dato es la hora en que la escribió para firmar, que también abrió esa sesión: el
+// mismo rótulo es verdad para todos.
 // También la anulación, el REEMPLAZO (motivo, quién, cuándo), el CIERRE EN AFINIA
 // («Cerrada en Afinia el … · soporte … · registró …») y las devoluciones («no firmo»).
 // Con el compositor @2, el acto del Responsable dice además el N.º estampado en
@@ -34,7 +38,7 @@ export function tarjetaActo(rol, acto, odt) {
     fila('Firmó', acto.nombre),
     fila('Con la cuenta', acto.correo),
     fila('Fecha y hora de la firma', fechaHora(acto.enMs)),
-    fila('Escribió su contraseña', horaAutenticacion(acto.authTime)),
+    fila('Sesión iniciada', horaAutenticacion(acto.authTime)),
     fila('N.º de ODT', acto.nro)
   ];
   if (rol === 'responsable' && acto.cierre) datos.push(fila('Fecha de cierre declarada', acto.cierre.fecha));

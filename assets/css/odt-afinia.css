@@ -130,6 +130,9 @@
 }
 .odt-btn:hover:not(:disabled) { background: var(--odt-sup-suave, #f6f8fc); }
 .odt-btn:disabled { opacity: .5; cursor: not-allowed; }
+/* El atributo hidden debe ganarle al display de .odt-btn: sin esto, los «Sí, …» de las confirmaciones en dos pasos
+   (anular, reemplazar, registrar cierre) se veían desde el principio (99 §232.9). */
+.odt-btn[hidden] { display: none; }
 .odt-btn:focus-visible, .odt-nav-btn:focus-visible, .odt-pestana:focus-visible, .odt-fila-btn:focus-visible { outline: 3px solid var(--odt-marca, #007aff); outline-offset: 2px; }
 .odt-btn--primario { background: var(--odt-marca, #007aff); color: #fff; border-color: var(--odt-marca, #007aff); }
 .odt-btn--primario:hover:not(:disabled) { background: var(--odt-marca-hondo, #0051d5); }

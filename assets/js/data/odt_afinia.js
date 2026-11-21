@@ -60,9 +60,11 @@ export const TIEMPO_LOTE_MS = 60000;
 
 // ── Mensajes de rechazo que la pantalla muestra tal cual ───────────────────────
 export const MSG_NO_EXISTE = 'La ODT no existe o usted no es uno de sus firmantes.';
-/** Paliativo D5 (regla): la sesión que firma se abrió DESPUÉS de publicar. */
+/**
+ * Del paliativo D5, que la regla YA NO aplica (decisión del Ingeniero del 2026-11-21: la contraseña solo al iniciar
+ * sesión). Nadie los muestra ya; se conservan porque una preparar.js vieja de la caché los importa por nombre (L-102).
+ */
 export const MSG_SESION_ANTES_DE_PUBLICAR = 'Su inicio de sesión es anterior a la publicación de esta ODT: vuelva a iniciar sesión y firme.';
-/** Paliativo D5 (regla), solo el Responsable: su sesión se abrió DESPUÉS de la firma del AZT. */
 export const MSG_SESION_ANTES_DEL_AZT = 'Su inicio de sesión es anterior a la firma del AZT: vuelva a iniciar sesión y firme.';
 /** La regla compara nombre y correo del acto con los PUBLICADOS en la ODT. */
 export const MSG_IDENTIDAD_CAMBIO = 'Su nombre o correo cambió después de publicar: el admin debe anular y volver a publicar.';
@@ -468,7 +470,8 @@ export function crearRepositorioOdt(opciones = {}) {
     // ── Firmar (lote de 2, atado) ─────────────────────────────────────────────
     /**
      * @param {object} congelado  la copia de «Preparar» (L-112)
-     * @param {object} token      claims del token renovado tras la contraseña
+     * @param {object} token      claims del token de la sesión abierta (con correo y contraseña; desde el 2026-11-21
+     *                            la firma no vuelve a pedir la contraseña: data/odt_afinia_sesion.js)
      * @returns {Promise<{estado:'entro'} | {estado:'pendiente', mensaje:string, final:Promise<'entro'>}>}
      *          o lanza ErrorOdt ('sin_permiso' con la causa, 'no_entro', 'sin_red', …)
      */
@@ -520,9 +523,10 @@ export function crearRepositorioOdt(opciones = {}) {
 
     /**
      * Causa probable de un «sin permiso» al firmar, leyendo el estado ACTUAL del servidor:
-     * ODT anulada o avanzada; nombre/correo distintos de los PUBLICADOS; inicio de sesión
-     * anterior a la publicación o (Responsable) a la firma del AZT (D5); «Mi firma» cambiada
+     * ODT anulada o avanzada; nombre/correo distintos de los PUBLICADOS; «Mi firma» cambiada
      * o con huella incoherente; fecha de cierre posterior a hoy (Bogotá); token sin correo.
+     * La hora del inicio de sesión ya NO es causa (2026-11-21: la regla no mide cuánto hace
+     * que se escribió la contraseña ni la compara con la publicación o con la firma del AZT).
      */
     async causaRechazoFirma(congelado, token) {
       const c = congelado || {};
@@ -537,12 +541,6 @@ export function crearRepositorioOdt(opciones = {}) {
         if (pub && (pub.nombre !== c.nombre || pub.correo !== c.correo)) return base + MSG_IDENTIDAD_CAMBIO;
         // FECHA CIERRE = la fecha PREVISTA de la orden (2026-11-21): la regla exige esa, exacta.
         if (c.cierre && c.cierre.fecha !== o.fechaTrabajo) return base + 'La fecha de cierre (' + c.cierre.fecha + ') no es la fecha prevista de la orden (' + o.fechaTrabajo + '): recargue y prepare de nuevo.';
-        const authMs = token && Number.isInteger(token.auth_time) ? token.auth_time * 1000 : null;
-        if (authMs != null && o.publicadoEnMs != null && authMs <= o.publicadoEnMs) return base + MSG_SESION_ANTES_DE_PUBLICAR;
-        if (authMs != null && c.rol === 'responsable') {
-          const az = await repo.leerActo(c.odtId, 'azt');
-          if (az && az.enMs != null && authMs <= az.enMs) return base + MSG_SESION_ANTES_DEL_AZT;
-        }
       } catch (_) { /* sin lectura de la ODT: siguen las otras comprobaciones */ }
       if (!token || typeof token.email !== 'string' || !token.email) return base + 'Su sesión no trae el correo de la cuenta. Recargue la página, entre de nuevo y firme.';
       try {
@@ -555,7 +553,7 @@ export function crearRepositorioOdt(opciones = {}) {
         return base + 'La fecha prevista de la orden (' + c.cierre.fecha + ') es posterior a hoy en la hora de Colombia: podrá firmar y cerrar la ODT desde ese día.';
       }
       if (errorFirmaAlDia(c)) return base + MSG_RECARGAR_FIRMA;
-      return base + 'Causas posibles: pasaron más de 5 minutos desde que escribió su contraseña, '
+      return base + 'Causas posibles: su sesión no se abrió con su correo y contraseña o su correo no está verificado, '
         + 'su firma («Mi firma») es anterior a su habilitación, su perfil quedó inactivo, o el nombre o el correo de su perfil cambiaron. '
         + 'Vuelva a preparar la firma; si sigue, avise al administrador.';
     },

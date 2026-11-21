@@ -1,16 +1,19 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// SGM · TRANSPOWER — Firma de ODT Afinia · la DECLARACIÓN + casilla + contraseña
+// SGM · TRANSPOWER — Firma de ODT Afinia · el ACUERDO + casilla + contraseña (habilitarse)
 // ──────────────────────────────────────────────────────────────────────────────
 // Lo que la persona lee es EXACTAMENTE lo que se guarda: el texto va con
 // textContent (sin HTML, sin recortes) desde la misma cadena que se escribirá
-// en el acto (comité W-11, legal: «el textContent de la declaración que se
-// muestra es idéntico a la cadena que se guarda»). La casilla «Acepto» empieza
-// DESMARCADA y el botón queda inactivo hasta marcarla y escribir la contraseña.
+// (comité W-11, legal: «el textContent de la declaración que se muestra es
+// idéntico a la cadena que se guarda»). La casilla «Acepto» empieza DESMARCADA y
+// el botón queda inactivo hasta marcarla y escribir la contraseña.
 // La contraseña la escribe el titular; se borra del campo al usarla.
-// Sirve para firmar (declaración del rol) y para habilitarse (acuerdo).
+// Desde el 2026-11-21 (decisión del Ingeniero: la contraseña solo al iniciar sesión)
+// sirve SOLO para habilitarse (aceptar el acuerdo, una vez). La firma usa
+// confirmar-firma.js: la declaración completa + «Firmar» → «Confirmar firma», sin
+// casilla ni contraseña. (Una firmar.js vieja de la caché aún podría usar esta pieza:
+// sigue funcionando igual, L-102.)
 // Mientras el Ingeniero no apruebe los textos (TEXTOS_APROBADOS = false), encima va
-// el rótulo «Borrador · pendiente del Ingeniero» (W-11, modo paso a paso): en la
-// firma y en la habilitación, porque las dos usan esta pieza.
+// el rótulo «Borrador · pendiente del Ingeniero» (W-11, modo paso a paso).
 // Archivo NUEVO a propósito (L-102).
 // ══════════════════════════════════════════════════════════════════════════════
 
@@ -63,7 +66,7 @@ export function armarDeclaracion({ texto, version, etiquetaCasilla, etiquetaBoto
       h('label', { htmlFor: id + 'Casilla', text: etiquetaCasilla || 'Leí la declaración y la acepto.' })
     ),
     h('div', { class: 'odt-declaracion-clave' },
-      h('label', { htmlFor: id + 'Clave', text: 'Contraseña (se le pide en cada firma; no se guarda):' }),
+      h('label', { htmlFor: id + 'Clave', text: 'Contraseña (se le pide para aceptar el acuerdo; no se guarda):' }),
       contrasena
     ),
     h('div', { class: 'odt-acciones' }, boton),

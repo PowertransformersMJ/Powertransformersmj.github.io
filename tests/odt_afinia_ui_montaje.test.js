@@ -3,8 +3,11 @@
 // comprueba qué acciones ofrece cada persona según el turno (P1, D2, D3). Desde el 2026-11-21, también
 // el pie de cierre fijo del Responsable, Reemplazar y Registrar cierre en Afinia (admin, LISTA), la
 // pestaña «Cerradas» y que ninguna vista nueva deje restos «null» pintados.
+// Decisión del Ingeniero del 2026-11-21 («la contraseña solo al iniciar sesión»): Firmar se monta sin campo de
+// contraseña ni casilla: «Preparar mi firma» → «Firmar» → «Confirmar firma», con el token de la sesión (sin
+// reautenticar), un solo envío y sin restos «null». La habilitación conserva su casilla y su contraseña.
 // Lo que NO cubre (necesita navegador): pdf.js (pintar, texto, tinta), pdf-lib cargado por
-// fetch + import(), Firebase Auth real (reautenticación) y el panel «Mi firma».
+// fetch + import(), Firebase Auth real (reautenticación al habilitarse) y el panel «Mi firma».
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -13,7 +16,7 @@ import { armarOdt, pngFirma, NRO, PDFLib } from './odt_afinia_fixture.js';
 import { tokenFalso } from './odt_afinia_ui_dobles.js';
 import { miFirmaOdt } from '../assets/js/data/odt_afinia_mi_firma.js';
 import { prepararFirma } from '../assets/js/ui/odt-afinia/preparar.js';
-import { fechaBogota } from '../assets/js/domain/odt_afinia_textos.js';
+import { fechaBogota, declaracionAzt } from '../assets/js/domain/odt_afinia_textos.js';
 import { crearRepositorioOdt } from '../assets/js/data/odt_afinia.js';
 import { validarOdt } from '../assets/js/domain/odt_afinia_formato.js';
 import { prepararPartes } from '../assets/js/domain/odt_afinia_partes.js';
@@ -166,7 +169,7 @@ describe('Habilitarme y Publicar', () => {
     assert.ok(!c.todos().some((x) => x.tagName === 'INPUT' && x.type === 'checkbox'));
     void repo;
   });
-  test('habilitarme: con correo verificado y contraseña cambiada aparece el acuerdo, con la casilla desmarcada', async () => {
+  test('habilitarme: con correo verificado y contraseña cambiada aparece el acuerdo, con la casilla desmarcada y la contraseña', async () => {
     const c = caja();
     const fs2 = crearFirestoreFalso();
     const r = crearRepositorioOdt({ sdk: fs2.F, db: fs2.db, sesion: () => TERCERO });
@@ -177,6 +180,10 @@ describe('Habilitarme y Publicar', () => {
     const casilla = c.todos().find((x) => x.tagName === 'INPUT' && x.type === 'checkbox');
     assert.ok(casilla, 'aparece la casilla del acuerdo');
     assert.equal(casilla.checked, false);
+    // La habilitación SÍ sigue pidiendo la contraseña (2026-11-21: solo la firma dejó de pedirla).
+    assert.ok(c.todos().some((x) => x.tagName === 'INPUT' && x.type === 'password'), 'campo de contraseña del acuerdo');
+    assert.ok(c.textContent.includes('se le pide para aceptar el acuerdo'));
+    assert.ok(!c.textContent.includes('en cada firma'));
     assert.ok(c.textContent.includes('acepto firmar electrónicamente las ODT de Afinia en SGM'));
     assert.ok(c.textContent.includes('En la ODT solo se estampa su firma, desde su cuenta.'));
   });
@@ -318,6 +325,14 @@ describe('contrato nuevo en pantalla (D6, Ver verificado, bandeja)', () => {
     await montarBandeja(c, { repo: contado, sesion: AZT, alAbrir: () => {} });
     for (let i = 0; i < 3; i++) { await boton(c, 'Firmadas por mí').disparar('click'); await espera(); }
     assert.equal(lecturas, 1);
+    // 2026-11-21: la columna es «Sesión iniciada» (la firma ya no pide la contraseña).
+    const ths = c.todos().filter((x) => x.tagName === 'TH').map((x) => x.textContent);
+    assert.ok(ths.includes('Sesión iniciada'), ths.join(' | '));
+    assert.ok(!ths.some((t) => /contraseña/i.test(t)), ths.join(' | '));
+    const fila = c.todos().filter((x) => x.tagName === 'TD').map((x) => x.textContent);
+    // Columnas: N.º · Firmé como · Fecha y hora de la firma · Sesión iniciada · (botón).
+    assert.equal(ths.indexOf('Sesión iniciada'), 3);
+    assert.match(fila[3], /^\d{2}\/\d{2}\/\d{4}, \d{2}:\d{2}:\d{2}$/, 'la hora del inicio de sesión se muestra: ' + fila.join(' | '));
   });
 });
 
@@ -529,5 +544,138 @@ describe('pie de cierre, reemplazo y cierre en Afinia en pantalla (sin restos «
     assert.ok(c.textContent.includes('Recargue con Cmd + Shift + R'));
     assert.ok(!boton(c, 'Reemplazar la ODT'));
     sinRestos(c);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Decisión del Ingeniero del 2026-11-21: firmar sin volver a escribir la contraseña.
+// «Preparar mi firma» (igual que antes) → «Firmar» → «Confirmar firma» (+ «Cancelar») → lote.
+// ═════════════════════════════════════════════════════════════════════════════
+const { montarFirmar } = await import('../assets/js/ui/odt-afinia/firmar.js');
+describe('Firmar sin contraseña: Preparar → Firmar → Confirmar firma', () => {
+  const HORA = 3600e3;
+  /** Monta Firmar con dobles: la cuenta NO deja reautenticar (si se llamara, la prueba lo vería). */
+  async function montar(s, b, { token, ...extra } = {}) {
+    const r = b.repo(s);
+    const { odt, bytesV0 } = await r.leerOdt(b.id);
+    const actos = await r.leerActos(b.id);
+    const c = caja(); const hechos = []; const pintados = []; const pedidos = []; const reaut = [];
+    const cuenta = {
+      uidVivo: async () => s.uid,
+      estadoCuenta: async () => ({ uid: s.uid, correo: s.correoPerfil, verificado: true, proveedor: 'password' }),
+      reautenticar: async (...a) => { reaut.push(a); throw new Error('firmar NO debe pedir la contraseña'); }
+    };
+    // Por defecto, una sesión abierta hace 6 h (antes de publicar): ya no importa (2026-11-21).
+    const tk = token || tokenFalso({ uid: s.uid, email: s.correoPerfil, ahoraMs: Date.now() - 6 * HORA });
+    const sesionFirma = { tokenVigente: async (op) => { pedidos.push(op); return tk; } };
+    montarFirmar(c, {
+      repo: r, cuenta, sesion: s, odt, bytesV0, actos, alFirmar: (m) => hechos.push(m),
+      miFirmaOdt: () => miFirmaOdt({ sdk: b.fs.F, db: b.fs.db, sesion: () => s }),
+      sesionFirma, pdfLib: async () => PDFLib, pintar: async (bytes, zona, o) => { pintados.push({ hx: sha(bytes), o }); return { paginas: 2 }; },
+      ...extra
+    });
+    return { c, hechos, pintados, pedidos, reaut, tk };
+  }
+  const exacto = (el, t) => botones(el).find((x) => x.textContent === t);
+  const sinCampos = (el) => !el.todos().some((x) => x.tagName === 'INPUT');
+
+  test('AZT: sin campo de contraseña ni casilla; «Firmar» → «Confirmar firma» / «Cancelar»; un solo lote, con el inicio de sesión', async () => {
+    const b = await base();
+    const m = await montar(AZT, b);
+    const { c } = m;
+    assert.ok(exacto(c, 'Preparar mi firma'));
+    assert.ok(!exacto(c, 'Firmar'), '«Firmar» aparece solo después de preparar');
+    assert.ok(c.textContent.includes('pulse «Firmar» y después «Confirmar firma»'));
+    assert.ok(!/escriba su contraseña/i.test(c.textContent));
+    assert.ok(sinCampos(c));
+    sinRestos(c);
+
+    await exacto(c, 'Preparar mi firma').disparar('click');
+    assert.equal(m.pintados.length, 1, 'se muestra la ODT con su firma');
+    const decl = declaracionAzt({ nombre: AZT.nombre, correo: AZT.correoPerfil, nro: NRO });
+    assert.ok(c.textContent.includes(decl), 'la declaración completa, tal cual se guarda');
+    assert.ok(sinCampos(c), 'ni contraseña ni casilla');
+    const firmar = exacto(c, 'Firmar'); const confirmar = exacto(c, 'Confirmar firma'); const cancelar = exacto(c, 'Cancelar');
+    assert.ok(firmar && confirmar && cancelar);
+    const cajaConfirmar = c.querySelectorAll('.odt-confirmar')[0];
+    assert.equal(cajaConfirmar.hidden, true, '«Confirmar firma» aún no se ve');
+    sinRestos(c);
+
+    const antes = b.fs.lotes.length;
+    await firmar.disparar('click');
+    assert.equal(cajaConfirmar.hidden, false);
+    assert.ok(cajaConfirmar.textContent.includes('Al confirmar, acepta la declaración de arriba y su firma queda registrada.'));
+    await cancelar.disparar('click');
+    assert.equal(cajaConfirmar.hidden, true, '«Cancelar» vuelve atrás');
+    assert.equal(b.fs.lotes.length, antes, 'ni «Firmar» ni «Cancelar» escriben');
+    await firmar.disparar('click');
+    // Doble clic: un solo envío.
+    await Promise.all([confirmar.disparar('click'), confirmar.disparar('click')]);
+    assert.equal(b.fs.lotes.length, antes + 1, 'un solo lote');
+    assert.deepEqual(m.pedidos, [{ uidEsperado: AZT.uid }], 'el token de la sesión, una vez');
+    assert.deepEqual(m.reaut, [], 'no se llamó a reautenticar');
+    assert.deepEqual(m.hechos, ['Su firma quedó registrada en la ODT N.º ' + NRO + '.']);
+    const [acto, upd] = b.fs.lotes.at(-1).ops;
+    assert.equal(acto.ruta, 'odt_afinia/' + b.id + '/actos/azt');
+    assert.equal(acto.datos.authTime, m.tk.auth_time, 'authTime = el inicio de la sesión (solo registro)');
+    assert.equal(acto.datos.declaracion, decl);
+    assert.deepEqual(upd.datos, { estado: 'PENDIENTE_RESPONSABLE', rev: 1 });
+    // Firmada: nada más se ofrece.
+    assert.equal(confirmar.disabled, true); assert.equal(firmar.disabled, true);
+    assert.equal(exacto(c, 'Cambiar algo y volver a preparar').disabled, true);
+    sinRestos(c);
+  });
+
+  test('Responsable: con una sesión abierta ANTES de publicar y antes de la firma del AZT, firma → LISTA (sin contraseña)', async () => {
+    const b = await base();
+    await firmarComo(b.fs, b.repo, AZT, b.id);
+    const odt = await b.repo(RESP).leerOdtDoc(b.id);
+    const tk = tokenFalso({ uid: RESP.uid, email: RESP.correoPerfil, ahoraMs: odt.publicadoEnMs - 2 * HORA });
+    const m = await montar(RESP, b, { token: tk });
+    await exacto(m.c, 'Preparar mi firma').disparar('click');
+    assert.ok(m.c.textContent.includes('declaro que revisé las dos páginas de la ODT N.º ' + NRO + ', verifiqué la firma del AZT'));
+    assert.ok(sinCampos(m.c));
+    await exacto(m.c, 'Firmar').disparar('click');
+    await exacto(m.c, 'Confirmar firma').disparar('click');
+    assert.deepEqual(m.reaut, []);
+    assert.equal(b.fs.store.get('odt_afinia/' + b.id).estado, 'LISTA');
+    assert.equal(b.fs.store.get('odt_afinia/' + b.id + '/actos/responsable').authTime, tk.auth_time);
+    sinRestos(m.c);
+  });
+
+  test('la sesión no sirve (no abierta con contraseña, correo sin verificar u otro correo): se dice en llano y NO se escribe', async () => {
+    for (const [cambio, texto] of [
+      [{ sign_in_provider: 'google.com' }, 'su sesión debe abrirse con su correo y contraseña'],
+      [{ email_verified: false }, 'Su correo no está verificado'],
+      [{ email: 'otro@prueba.test' }, 'El correo de su sesión no coincide']
+    ]) {
+      const b = await base();
+      const tk = { ...tokenFalso({ uid: AZT.uid, email: AZT.correoPerfil }), ...cambio };
+      const m = await montar(AZT, b, { token: tk });
+      await exacto(m.c, 'Preparar mi firma').disparar('click');
+      const antes = b.fs.lotes.length;
+      await exacto(m.c, 'Firmar').disparar('click');
+      await exacto(m.c, 'Confirmar firma').disparar('click');
+      assert.equal(b.fs.lotes.length, antes, JSON.stringify(cambio) + ': no se escribe');
+      assert.ok(m.c.textContent.includes(texto), JSON.stringify(cambio) + ': ' + texto);
+      assert.deepEqual(m.hechos, []);
+      assert.equal(exacto(m.c, 'Confirmar firma').disabled, false, 'se puede corregir y reintentar');
+      assert.equal(exacto(m.c, 'Cambiar algo y volver a preparar').disabled, false);
+      sinRestos(m.c);
+    }
+  });
+
+  test('lote sin respuesta: «NO repita» y nada se puede volver a pulsar', async () => {
+    const b = await base();
+    const m = await montar(AZT, b);
+    await exacto(m.c, 'Preparar mi firma').disparar('click');
+    b.fs.opciones.colgarLote = true;
+    await exacto(m.c, 'Firmar').disparar('click');
+    await exacto(m.c, 'Confirmar firma').disparar('click');
+    assert.ok(m.c.textContent.includes('NO repita'));
+    assert.equal(exacto(m.c, 'Confirmar firma').disabled, true);
+    assert.equal(exacto(m.c, 'Cambiar algo y volver a preparar').disabled, true);
+    assert.deepEqual(m.hechos, []);
+    sinRestos(m.c);
   });
 });

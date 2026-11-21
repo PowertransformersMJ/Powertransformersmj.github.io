@@ -2052,10 +2052,16 @@ service cloud.firestore {
     //     escribe (aquí write false); la lee el admin para ofrecer firmantes. Sin ella, nadie publica.
     //   · odt_afinia_nro/{nro}: candado de unicidad del N.º; se reasigna solo si la ODT vigente está ANULADA o REEMPLAZADA.
     //   · odt_afinia_descargas/{auto}: registro de cada descarga de una ODT LISTA o CERRADA (lo leen solo los admin).
-    // Firmar (y habilitarse) exige reautenticación con contraseña en los últimos 5 minutos (auth_time del token)
-    // y correo verificado: publicar NO la exige (D4 cubre publicar, nunca firmar). Paliativo D5 (20-11: el
-    // Responsable firma con su MISMA cuenta admin): el inicio de sesión del token que firma es POSTERIOR a la
-    // publicación, y el del Responsable además posterior al acto del AZT. Este bloque no nombra ninguna
+    // Contraseña (decisión del Ingeniero del 2026-11-21, «solo al entrar, sin límite», tomada sabiendo el riesgo:
+    // una sesión abierta podría firmar y la firma pierde fuerza como prueba):
+    //   · HABILITARSE (aceptar el acuerdo, una vez) exige contraseña escrita en los últimos 5 minutos (auth_time del
+    //     token), con correo verificado (odtReauth).
+    //   · FIRMAR exige solo una sesión abierta con correo y contraseña y el correo verificado (odtSesionContrasena):
+    //     ya no mide cuánto hace que se escribió la contraseña ni la compara con la publicación o con el acto del
+    //     AZT (el paliativo D5 del 20-11 salió de la regla). El acto guarda authTime == auth_time del token: es
+    //     «sesión iniciada el …», solo registro. R3/D5 queda como COMPROMISO: Claude nunca pulsa «Firmar» ni
+    //     «Confirmar firma» en ninguna sesión.
+    //   · Publicar NO pide contraseña (D4 cubre publicar, nunca firmar). Este bloque no nombra ninguna
     // colección de firmas custodiadas ni delegadas (prueba estática: tests/odt_afinia_reglas_estatico.test.js,
     // que también cuenta sus llamadas get/exists por operación y por lote). Los textos de acuerdo y declaración
     // son la plantilla v1 (aprobada por el Ingeniero el 20-11) y se comparan aquí carácter a carácter.
@@ -2086,14 +2092,19 @@ service cloud.firestore {
       let t = request.time - duration.value(5, 'h');
       return t.year() * 10000 + t.month() * 100 + t.day();
     }
-    // Reautenticación reciente con contraseña y correo verificado (el token lo firma Firebase Auth, no el cliente).
-    function odtReauth() {
+    // Sesión abierta con correo y contraseña y correo verificado (el token lo firma Firebase Auth, no el cliente).
+    // Es lo que exige FIRMAR desde el 2026-11-21: no mide cuánto hace que se escribió la contraseña.
+    function odtSesionContrasena() {
       let t = request.auth.token;
       return t.get('firebase', {}).get('sign_in_provider', '') == 'password'
         && t.get('email_verified', false) == true
         && t.get('email', null) is string
-        && t.get('auth_time', null) is int
-        && request.time.toMillis() - t.auth_time * 1000 <= 300000;
+        && t.get('auth_time', null) is int;
+    }
+    // Además, contraseña escrita en los últimos 5 minutos: solo para HABILITARSE (aceptar el acuerdo, una vez).
+    function odtReauth() {
+      return odtSesionContrasena()
+        && request.time.toMillis() - request.auth.token.auth_time * 1000 <= 300000;
     }
     // El correo de la credencial es el del perfil (sin distinguir mayúsculas).
     function odtCorreoDelPerfil() {
@@ -2212,7 +2223,8 @@ service cloud.firestore {
       let firma = get(odtRutaFirmaPropia(request.auth.uid)).data;
       let hab = get(odtRutaHab(request.auth.uid)).data;
       return isTeamMember() && hasProfile() && rol in ['azt', 'responsable']
-        && odtReauth() && odtCorreoDelPerfil()
+        // Sesión abierta con correo y contraseña, correo verificado; sin ventana de 5 min ni D5 (2026-11-21).
+        && odtSesionContrasena() && odtCorreoDelPerfil()
         // rol, uid, correo, correoVerificado, proveedor, authTime, nombre, nro, imagen, huellaImagen, huellaBase,
         // huellaVista, compositor, declaracionVersion, declaracion, en (+ cierre, solo el Responsable): todos se leen abajo.
         && d.size() == (rol == 'azt' ? 16 : 17)
@@ -2221,12 +2233,11 @@ service cloud.firestore {
         && d.uid == request.auth.uid && o.firmantes[rol].uid == request.auth.uid
         && d.correo == request.auth.token.email
         && d.correoVerificado == true && d.proveedor == 'password'
+        // «Sesión iniciada el …» (solo registro): el inicio de la sesión que firma, tal como lo trae el token.
         && d.authTime == request.auth.token.auth_time
         && d.nombre == profile().get('nombre', '')
         // La identidad del acto es la PUBLICADA (copia de su habilitación): un perfil renombrado después no firma.
         && d.nombre == o.firmantes[rol].nombre && d.correo == o.firmantes[rol].correo
-        // Paliativo D5: la sesión que firma se abrió DESPUÉS de publicar (una sesión vieja del admin no firma).
-        && request.auth.token.auth_time * 1000 > o.publicadoEn.toMillis()
         && d.nro == o.nro
         // Turno y atadura al cambio de estado del mismo lote.
         && o.estado == (rol == 'azt' ? 'PENDIENTE_AZT' : 'PENDIENTE_RESPONSABLE')
@@ -2256,9 +2267,8 @@ service cloud.firestore {
                // lo compuesto en @1 (sin el N.º); su cierre no trae `generada` y aquí se niega.
                && d.cierre.generada == o.nro
                && d.declaracion == odtDeclaracionResp(d.nombre, d.correo, o.nro, d.cierre.fecha)
-               && get(odtRutaActo(id, 'azt')).data.uid != request.auth.uid
-               // Paliativo D5: el Responsable inició sesión DESPUÉS de la firma del AZT (misma lectura, sin costo).
-               && request.auth.token.auth_time * 1000 > get(odtRutaActo(id, 'azt')).data.en.toMillis()));
+               // Defensa en profundidad: la misma cuenta no firma las dos casillas.
+               && get(odtRutaActo(id, 'azt')).data.uid != request.auth.uid));
     }
     function odtTransicion(id) {
       let o = resource.data;

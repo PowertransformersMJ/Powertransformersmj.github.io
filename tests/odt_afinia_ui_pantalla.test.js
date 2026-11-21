@@ -1,11 +1,13 @@
 // Firma de ODT Afinia · PANTALLA sin navegador (DOM mínimo de tests/odt_afinia_ui_dobles.js).
 //   · la declaración que se MUESTRA es, carácter a carácter, la cadena que se GUARDA (comité W-11, legal);
-//   · la casilla «Acepto» empieza DESMARCADA y el botón no actúa sin casilla y contraseña;
-//   · la contraseña sale del campo al usarla;
+//   · HABILITARSE (acuerdo): la casilla «Acepto» empieza DESMARCADA y el botón no actúa sin casilla y contraseña;
+//     la contraseña sale del campo al usarla;
+//   · FIRMAR (decisión del Ingeniero del 2026-11-21): la declaración completa, «Firmar» → «Confirmar firma» y «Cancelar»,
+//     sin casilla ni contraseña, y un solo envío aunque se pulse dos veces;
 //   · un nombre con «<…>» se muestra como texto, no como HTML;
 //   · Habilitarme: estado de los cuatro pasos (la firma debe ser POSTERIOR a la habilitación);
 //   · Bandeja: pestañas pedidas y aviso de suplantación en «Firmadas por mí»;
-//   · Constancia: muestra quién, con qué cuenta, cuándo firmó y cuándo escribió su contraseña.
+//   · Constancia: muestra quién, con qué cuenta, cuándo firmó y cuándo inició la sesión con la que firmó.
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { crearDomFalso } from './odt_afinia_ui_dobles.js';
@@ -17,6 +19,7 @@ before(() => { guardado = globalThis.document; globalThis.document = crearDomFal
 after(() => { if (guardado === undefined) delete globalThis.document; else globalThis.document = guardado; });
 
 const { armarDeclaracion } = await import('../assets/js/ui/odt-afinia/declaracion.js');
+const { armarConfirmacionFirma, LINEA_CONFIRMAR } = await import('../assets/js/ui/odt-afinia/confirmar-firma.js');
 const { estadoPasos, TEXTO_MI_FIRMA } = await import('../assets/js/ui/odt-afinia/habilitarme.js');
 const { PESTANAS, AVISO_SUPLANTACION } = await import('../assets/js/ui/odt-afinia/bandeja.js');
 const { constancia } = await import('../assets/js/ui/odt-afinia/constancia.js');
@@ -78,6 +81,77 @@ describe('declaración: lo que se muestra es lo que se guarda', () => {
   });
 });
 
+describe('firmar (2026-11-21): declaración completa, «Firmar» → «Confirmar firma», sin casilla ni contraseña', () => {
+  const sinCampos = (el) => !el.todos().some((x) => x.tagName === 'INPUT');
+  for (const [nombre, texto, version] of [
+    ['AZT', declaracionAzt(DATOS), 'odt-azt-v1'],
+    ['Responsable', declaracionResponsable({ ...DATOS, fecha: '15/11/2026' }), 'odt-resp-v1']
+  ]) {
+    test(nombre + ': lo que se muestra es la cadena que se guarda (completa, un solo nodo de texto)', () => {
+      const d = armarConfirmacionFirma({ texto, version, alConfirmar: () => {} });
+      assert.equal(d.textoEl.textContent, texto);
+      assert.equal(d.textoMostrado(), texto);
+      assert.equal(d.textoEl.childNodes.length, 1);
+      assert.ok(d.raiz.textContent.includes(texto), 'la declaración entera está en la pantalla');
+      assert.ok(d.raiz.textContent.includes('Texto ' + version + ' (se guarda tal cual):'));
+      assert.ok(sinCampos(d.raiz), 'ni casilla ni contraseña');
+    });
+  }
+  test('al empezar solo se ve «Firmar»; al pulsarlo aparecen «Confirmar firma», «Cancelar» y la línea en llano', async () => {
+    const llamadas = [];
+    const d = armarConfirmacionFirma({ texto: declaracionAzt(DATOS), version: 'odt-azt-v1', alConfirmar: () => { llamadas.push(1); } });
+    assert.equal(d.boton.textContent, 'Firmar');
+    assert.equal(d.pasoFirmar.hidden, false); assert.equal(d.boton.disabled, false);
+    assert.equal(d.caja.hidden, true, '«Confirmar firma» no se ve hasta pulsar «Firmar»');
+    assert.equal(d.confirmar.textContent, 'Confirmar firma');
+    assert.equal(d.cancelar.textContent, 'Cancelar');
+    assert.equal(LINEA_CONFIRMAR, 'Al confirmar, acepta la declaración de arriba y su firma queda registrada.');
+    assert.ok(d.caja.textContent.includes(LINEA_CONFIRMAR));
+    // Un clic en «Confirmar firma» con la caja escondida no hace nada (solo se confirma después de «Firmar»).
+    await d.confirmar.disparar('click');
+    assert.equal(llamadas.length, 0);
+    await d.boton.disparar('click');
+    assert.equal(d.caja.hidden, false); assert.equal(d.pasoFirmar.hidden, true, '«Firmar» se va mientras se confirma');
+    assert.equal(llamadas.length, 0, 'pulsar «Firmar» no firma');
+    await d.cancelar.disparar('click');
+    assert.equal(d.caja.hidden, true); assert.equal(d.pasoFirmar.hidden, false);
+    assert.equal(llamadas.length, 0, '«Cancelar» no firma');
+    await d.boton.disparar('click');
+    await d.confirmar.disparar('click');
+    assert.equal(llamadas.length, 1, '«Confirmar firma» firma');
+  });
+  test('sin doble envío: dos clics seguidos en «Confirmar firma» llaman UNA vez; mientras trabaja, todo ocupado', async () => {
+    let soltar; let n = 0;
+    const d = armarConfirmacionFirma({ texto: declaracionAzt(DATOS), version: 'odt-azt-v1', alConfirmar: () => { n++; return new Promise((r) => { soltar = r; }); } });
+    await d.boton.disparar('click');
+    const p1 = d.confirmar.disparar('click');
+    const p2 = d.confirmar.disparar('click');
+    assert.equal(n, 1);
+    assert.equal(d.confirmar.disabled, true); assert.equal(d.cancelar.disabled, true); assert.equal(d.boton.disabled, true);
+    await d.cancelar.disparar('click');
+    assert.equal(d.caja.hidden, false, 'no se cancela a mitad del envío');
+    soltar(); await Promise.all([p1, p2]);
+    assert.equal(d.confirmar.disabled, false, 'terminó: se puede reintentar si falló');
+    // bloquear (firma enviada o pendiente): ya nada se ofrece.
+    d.bloquear(true);
+    await d.confirmar.disparar('click');
+    assert.equal(n, 1);
+    assert.equal(d.confirmar.disabled, true); assert.equal(d.boton.disabled, true);
+    d.bloquear(false);
+    assert.equal(d.confirmar.disabled, false);
+  });
+  test('un texto con «<b>» se muestra literal; sin texto o sin alConfirmar no se arma; ningún «null» pintado', () => {
+    const t = declaracionAzt({ ...DATOS, nombre: 'Nombre <b>raro</b>' });
+    const d = armarConfirmacionFirma({ texto: t, version: 'odt-azt-v1', alConfirmar: () => {} });
+    assert.equal(d.textoEl.textContent, t);
+    assert.ok(!d.textoEl.childNodes.some((c) => c.nodeType === 1));
+    assert.ok(!/\bnull\b|\bundefined\b/.test(d.raiz.textContent));
+    assert.equal(d.rotulo, null, 'textos aprobados: sin rótulo de borrador');
+    assert.throws(() => armarConfirmacionFirma({ texto: '', alConfirmar: () => {} }));
+    assert.throws(() => armarConfirmacionFirma({ texto: t }));
+  });
+});
+
 describe('Habilitarme: los cuatro pasos', () => {
   const perfil = { nombre: 'Azt De Prueba', correoPerfil: 'azt@prueba.test' };
   const cuenta = { correo: 'azt@prueba.test', verificado: true, proveedor: 'password' };
@@ -118,7 +192,7 @@ describe('Bandeja', () => {
 });
 
 describe('Constancia de firmas', () => {
-  test('muestra el acto: nombre, cuenta, hora de firma y de contraseña, declaración y huellas', () => {
+  test('muestra el acto: nombre, cuenta, hora de firma y de inicio de sesión, declaración y huellas', () => {
     const odt = {
       estado: 'PENDIENTE_RESPONSABLE', huella: 'a'.repeat(64), publicadoPor: { nombre: 'Admin De Prueba' }, publicadoEnMs: Date.UTC(2026, 10, 20, 14),
       firmantes: { azt: { uid: 'u1', nombre: 'Azt De Prueba', correo: 'azt@prueba.test' }, responsable: { uid: 'u2', nombre: 'Resp De Prueba', correo: 'resp@prueba.test' } }
@@ -132,6 +206,16 @@ describe('Constancia de firmas', () => {
     for (const x of ['Azt De Prueba', 'azt@prueba.test', '20/11/2026', '10:30:05', '10:29:00', NRO, declaracionAzt(DATOS), 'Sin firmar', 'Resp De Prueba']) {
       assert.ok(t.includes(x), 'falta: ' + x);
     }
+    // 2026-11-21: la firma ya no pide la contraseña. El dato es «Sesión iniciada» (verdad también en los actos viejos:
+    // su authTime fue la contraseña que abrió esa sesión), nunca «Escribió su contraseña».
+    assert.ok(t.includes('Sesión iniciada'));
+    assert.ok(!t.includes('Escribió su contraseña'));
+    const fila = constancia({ odt, actos: { azt: acto } }).todos().find((x) => x.tagName === 'DT' && x.textContent === 'Sesión iniciada');
+    assert.ok(fila, 'la fila «Sesión iniciada»');
+    assert.equal(fila.parentNode.todos().find((x) => x.tagName === 'DD').textContent, '20/11/2026, 10:29:00');
+    // Una sesión iniciada horas antes de firmar se muestra tal cual (no se inventa otra hora).
+    const vieja = { ...acto, authTime: Math.floor(Date.UTC(2026, 10, 20, 11, 0, 0) / 1000) };
+    assert.ok(constancia({ odt, actos: { azt: vieja } }).textContent.includes('20/11/2026, 06:00:00'));
   });
 });
 
@@ -179,7 +263,8 @@ describe('decisiones del 2026-11-21 en la Constancia y la bandeja', () => {
 
 const { TEXTOS_APROBADOS, ROTULO_BORRADOR } = await import('../assets/js/domain/odt_afinia_textos.js');
 const { mensajeEsDeLaVista } = await import('../assets/js/ui/odt-afinia/app.js');
-const { avisoSesionReciente, motivosEnLlano } = await import('../assets/js/ui/odt-afinia/publicar.js');
+const PUBLICAR = await import('../assets/js/ui/odt-afinia/publicar.js');
+const { motivosEnLlano } = PUBLICAR;
 const { cargarPdfLib, bloquearCopia } = await import('../assets/js/ui/odt-afinia/comun.js');
 const { PDF_LIB } = await import('../assets/js/domain/odt_afinia_rutas.js');
 
@@ -225,16 +310,9 @@ describe('app: el mensaje de una ODT va a SU vista', () => {
   });
 });
 
-describe('Publicar: procedimiento D5 y motivos en llano', () => {
-  test('sesión de admin abierta hace < 5 min (hora del servidor) → avisa y pide confirmar', () => {
-    assert.match(avisoSesionReciente({ edadSeg: 30 }), /menos de 5 minutos/);
-    assert.match(avisoSesionReciente({ edadSeg: 299 }), /titular/);
-    assert.equal(avisoSesionReciente({ edadSeg: 300 }), null);
-    assert.equal(avisoSesionReciente({ edadSeg: 3600 }), null);
-  });
-  test('si no se puede saber, también pide confirmar (no se da por vieja)', () => {
-    assert.match(avisoSesionReciente(null, new Error('sin red')), /No se pudo comprobar[\s\S]*sin red/);
-    assert.match(avisoSesionReciente({ edadSeg: NaN }), /No se pudo comprobar/);
+describe('Publicar: sin el aviso D5 de «5 minutos» (2026-11-21) y motivos en llano', () => {
+  test('el aviso D5 salió: con la contraseña solo al iniciar sesión, esperar 5 minutos ya no impide firmar', () => {
+    assert.equal(PUBLICAR.avisoSesionReciente, undefined, 'publicar.js ya no exporta el aviso');
   });
   test('motivos de tinta y de la revisión estructural, sin repetir', () => {
     assert.equal(motivosEnLlano(['anotacion:Ink', 'tinta:0.034']), 'trae una anotación (Ink) y tinta');

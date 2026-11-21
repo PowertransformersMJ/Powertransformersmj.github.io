@@ -8,10 +8,15 @@
 //   · actos/{rol}: firmar = crear el acto + avanzar el estado en el MISMO lote (atado en las dos direcciones),
 //     con la imagen de firmas/{uid} del propio firmante (bytes y sha256), subida después de habilitarse.
 //   · odt_afinia_nro/{nro}, odt_afinia_descargas, devoluciones; lectura solo de sus dos firmantes y del admin.
-//   · Revisión del 20-11: lista blanca odt_afinia_config/firmantes (solo consola), paliativo D5 (la sesión que firma
-//     se abrió después de publicar; la del Responsable, además, después del acto del AZT), nombre/correo del acto =
+//   · Revisión del 20-11: lista blanca odt_afinia_config/firmantes (solo consola), nombre/correo del acto =
 //     los publicados, huella de «Mi firma» = la de sus bytes, días inexistentes, devolución «rol_rev», D6 (una LISTA
-//     no se anula) y las negativas con su control que pidió la lente de seguridad.
+//     no se anula) y las negativas con su control que pidió la lente de seguridad. (El paliativo D5 de esa revisión
+//     salió de la regla el 2026-11-21: ver abajo.)
+//   · Decisión del Ingeniero del 2026-11-21 («la contraseña solo al iniciar sesión, sin límite», sabiendo el riesgo):
+//     FIRMAR exige una sesión abierta con correo y contraseña y el correo verificado, sin ventana de 5 min ni D5: por
+//     eso `firmar()` usa por defecto una sesión de HACE 3 HORAS (anterior a publicar y a la firma del AZT) y todas las
+//     firmas que pasan lo ejercitan. HABILITARSE sigue exigiendo contraseña de ≤ 5 min. Con su control en las dos
+//     direcciones: otro proveedor, correo sin verificar, firmante no asignado, imagen ajena… siguen NEGADOS.
 //   · Decisiones del 2026-11-21: actos nuevos con compositor 'odt-afinia@2'; el Responsable cierra con la FECHA
 //     PREVISTA (cierre.fecha == o.fechaTrabajo, real y no posterior a hoy en Bogotá) y escribe su pie completo
 //     (cierre.generada == N.º: el acto de un armador viejo de la caché no lo trae y se niega, L-102); REEMPLAZAR una LISTA (solo admin,
@@ -57,7 +62,9 @@ const P = {
   oa_h2: { rol: 'tecnico', nombre: 'Habilita Prueba Dos', email: 'habilita.dos@prueba.test' },
   oa_hsin: { rol: 'tecnico', email: 'habilita.sin@prueba.test' },                       // perfil sin nombre
   oa_hvis: { rol: 'visitante', nombre: 'Habilita Visitante', email: 'habilita.vis@prueba.test' },
-  oa_hinact: { rol: 'tecnico', nombre: 'Habilita Inactivo', email: 'habilita.inact@prueba.test', activo: false }
+  oa_hinact: { rol: 'tecnico', nombre: 'Habilita Inactivo', email: 'habilita.inact@prueba.test', activo: false },
+  // 2026-11-21: la sesión que firma (de hace horas) no le sirve para habilitarse.
+  oa_h4: { rol: 'tecnico', nombre: 'Habilita Prueba Cuatro', email: 'habilita.cuatro@prueba.test' }
 };
 const NOMBRE = (u) => (P[u] && P[u].nombre) || '';
 const CORREO = (u) => (P[u] ? P[u].email : u + '@prueba.test').toLowerCase();
@@ -87,18 +94,9 @@ const HOY = fechaBogota(0);
 const TRABAJO = fechaBogota(-10);
 // Con microsegundos (L-129): los sellos sembrados no son milisegundos redondos.
 const haceMs = (ms) => { const t = Date.now() - ms; return new Timestamp(Math.floor(t / 1000), (t % 1000) * 1e6 + 367123); };
-const espera = (ms) => new Promise((r) => setTimeout(r, ms));
 const msDe = (t) => (t && typeof t.toMillis === 'function' ? t.toMillis() : null);
-/**
- * auth_time (s) de una sesión abierta DESPUÉS de los instantes dados (paliativo D5): si hace falta, espera al
- * siguiente segundo entero. Nunca devuelve un auth_time futuro (un token real no lo trae).
- */
-async function sesionTras(...instantesMs) {
-  const tope = Math.max(0, ...instantesMs.filter((x) => x != null));
-  const falta = (Math.floor(tope / 1000) + 1) * 1000 - Date.now();
-  if (falta > 0) await espera(falta + 30);
-  return ahoraS();
-}
+/** auth_time (s) de una sesión abierta hace `horas` (2026-11-21: firmar ya no mira cuánto hace). */
+const sesionDeHace = (horas) => ahoraS() - Math.round(horas * 3600);
 
 /* ── bytes sintéticos ───────────────────────────────────────────────────────── */
 const sha = (u) => createHash('sha256').update(u).digest('hex');
@@ -118,7 +116,10 @@ const FIRMA = {
 const FIRMA_NUEVA_AZT2 = png(24);
 
 /* ── contextos ──────────────────────────────────────────────────────────────── */
-/** Sesión recién reautenticada con contraseña y correo verificado (lo que pide firmar y habilitarse). */
+/**
+ * Sesión abierta con contraseña y correo verificado; por defecto, recién autenticada (lo que pide HABILITARSE).
+ * Firmar pasa su propio auth_time (por defecto, de hace 3 h: `firmar()`).
+ */
 const ctx = (uid, claims = {}) => testEnv.authenticatedContext(uid, {
   email: CORREO(uid), email_verified: true, auth_time: ahoraS() - 5, firebase: { sign_in_provider: 'password' }, ...claims
 }).firestore();
@@ -175,13 +176,10 @@ function actoDe(uid, rol, o, at, extra = {}) {
 }
 async function firmar(uid, id, rol, { claims = {}, acto = {}, quitar = [], cambio, sinActo = false, sinCambio = false } = {}) {
   const o = await leer('odt_afinia/' + id);
-  // Por defecto, una sesión abierta después de publicar y (Responsable) después del acto del AZT: así cada negativa
-  // falla por SU causa y no por el paliativo D5, que tiene sus propias pruebas.
-  let at = claims.auth_time;
-  if (at === undefined) {
-    const azt = rol === 'responsable' ? await leer('odt_afinia/' + id + '/actos/azt') : null;
-    at = await sesionTras(msDe(o && o.publicadoEn), msDe(azt && azt.en));
-  }
+  // Por defecto, una sesión abierta HACE 3 HORAS: antes de publicar y antes de la firma del AZT, y fuera de la
+  // ventana vieja de 5 min. Desde el 2026-11-21 la regla no lo mira: cada firma que pasa lo demuestra, y cada
+  // negativa falla por SU causa.
+  const at = claims.auth_time === undefined ? sesionDeHace(3) : claims.auth_time;
   const d = ctx(uid, { ...claims, auth_time: at }); const b = writeBatch(d);
   const a = actoDe(uid, rol, o, at, typeof acto === 'function' ? acto(o, at) : acto);
   for (const k of quitar) delete a[k];
@@ -439,7 +437,7 @@ describe('candado del N.º — nace con la ODT, en el mismo lote, y no se repite
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
-describe('firmar como AZT — su imagen, su credencial reciente, su turno, atado al estado', () => {
+describe('firmar como AZT — su imagen, su sesión con contraseña, su turno, atado al estado', () => {
   test('el admin custodio no crea actos/azt: ni a nombre del AZT con la imagen de él, ni a su propio nombre', async () => {
     await assertFails(firmar('oa_resp', ID(1), 'azt', { acto: { uid: 'oa_azt', imagen: by(FIRMA.oa_azt), huellaImagen: sha(FIRMA.oa_azt) } }));
     await assertFails(firmar('oa_resp', ID(1), 'azt'));
@@ -457,11 +455,14 @@ describe('firmar como AZT — su imagen, su credencial reciente, su turno, atado
     await assertFails(firmar('oa_azt', ID(1), 'azt', { acto: { huellaImagen: sha(otra) } }));
   });
 
-  test('reautenticación: auth_time de hace más de 5 min, sin correo verificado, otro proveedor, authTime ≠ token → no', async () => {
-    await assertFails(firmar('oa_azt', ID(1), 'azt', { claims: { auth_time: ahoraS() - 301 } }));
+  test('sesión: sin correo verificado, otro proveedor, sin auth_time entero o authTime ≠ token → no (la edad ya no importa)', async () => {
     await assertFails(firmar('oa_azt', ID(1), 'azt', { claims: { email_verified: false } }));
     await assertFails(firmar('oa_azt', ID(1), 'azt', { claims: { firebase: { sign_in_provider: 'custom' } } }));
+    await assertFails(firmar('oa_azt', ID(1), 'azt', { claims: { firebase: { sign_in_provider: 'google.com' } } }));
+    await assertFails(firmar('oa_azt', ID(1), 'azt', { claims: { firebase: { sign_in_provider: 'anonymous' } } }));
+    await assertFails(firmar('oa_azt', ID(1), 'azt', { claims: { auth_time: 1.5 } }));
     await assertFails(firmar('oa_azt', ID(1), 'azt', { acto: (o, at) => ({ authTime: at - 1 }) }));
+    // Control: la misma sesión de hace 3 h, exacta, firma (prueba «con todo exacto» de abajo).
   });
 
   test('correo: el del acto ≠ el del token, o el del token ≠ el del perfil → no', async () => {
@@ -511,8 +512,12 @@ describe('firmar como AZT — su imagen, su credencial reciente, su turno, atado
     await assertSucceeds(firmar('oa_azt2', ID(5), 'azt'));
   });
 
-  test('con todo exacto el AZT firma (sesión abierta después de publicar); no firma dos veces ni en otro estado', async () => {
-    await assertSucceeds(firmar('oa_azt', ID(1), 'azt'));
+  test('con todo exacto el AZT firma (con una sesión abierta hace 3 h, antes de publicar); no firma dos veces ni en otro estado', async () => {
+    const pub = msDe((await leer('odt_afinia/' + ID(1))).publicadoEn);
+    const at = sesionDeHace(3);
+    assert.ok(at * 1000 < pub, 'la sesión es anterior a la publicación');
+    await assertSucceeds(firmar('oa_azt', ID(1), 'azt', { claims: { auth_time: at } }));
+    assert.equal((await leer('odt_afinia/' + ID(1) + '/actos/azt')).authTime, at, 'el acto guarda el inicio de esa sesión');
     const o = await leer('odt_afinia/' + ID(1));
     assert.equal(o.estado, 'PENDIENTE_RESPONSABLE'); assert.equal(o.rev, 1);
     await assertFails(firmar('oa_azt', ID(1), 'azt'));                                          // set sobre acto existente
@@ -566,9 +571,11 @@ describe('firmar como Responsable — después del AZT, otra persona, cerrando c
     await assertSucceeds(firmar('oa_resp', ID(45), 'responsable'));                     // control: la prevista es hoy
   });
 
-  test('el AZT no firma como Responsable; sin reautenticación reciente → no', async () => {
+  test('el AZT no firma como Responsable; la sesión del Responsable sin contraseña o sin correo verificado → no', async () => {
     await assertFails(firmar('oa_azt', ID(1), 'responsable'));
-    await assertFails(firmar('oa_resp', ID(1), 'responsable', { claims: { auth_time: ahoraS() - 400 } }));
+    await assertFails(firmar('oa_resp', ID(1), 'responsable', { claims: { firebase: { sign_in_provider: 'custom' } } }));
+    await assertFails(firmar('oa_resp', ID(1), 'responsable', { claims: { email_verified: false } }));
+    // Control: con una sesión de hace 3 h (antes de publicar y de la firma del AZT), la prueba siguiente pasa.
   });
 
   test('con todo exacto (compositor @2, cierre con la fecha prevista y «ODT GENERADA» = el N.º) el Responsable cierra → LISTA; después nadie firma', async () => {
@@ -791,7 +798,8 @@ describe('descargas y devoluciones', () => {
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
-// Revisión del 20-11 (lentes seg/cod/comp + decisiones D5 y D6 del Ingeniero). Cada negativa con su control.
+// Revisión del 20-11 (lentes seg/cod/comp + decisiones D5 y D6 del Ingeniero; D5 salió de la regla el 2026-11-21).
+// Cada negativa con su control.
 // ═════════════════════════════════════════════════════════════════════════════
 describe('lista blanca odt_afinia_config/firmantes — solo la consola la escribe; publicar exige el uid en la lista de SU rol', () => {
   test('la lee solo el admin con perfil; nadie la lista ni la escribe (ni el admin)', async () => {
@@ -827,32 +835,54 @@ describe('lista blanca odt_afinia_config/firmantes — solo la consola la escrib
   });
 });
 
-describe('paliativo D5 — la sesión que firma se abrió DESPUÉS de publicar (y la del Responsable, después del acto del AZT)', () => {
-  test('AZT con una sesión abierta antes de publicar (aunque tenga < 5 min) → no; abierta después → sí', async () => {
+describe('2026-11-21: firmar sin contraseña reciente — la edad de la sesión ya no importa; lo demás, sí', () => {
+  test('AZT con una sesión abierta ANTES de publicar (1 s antes y en el mismo segundo): las negativas siguen por su causa; luego firma', async () => {
     await assertSucceeds(publicar('oa_admin', ID(32), NRO(32), { azt: 'oa_azt', resp: 'oa_resp' }));
     const pub = msDe((await leer('odt_afinia/' + ID(32))).publicadoEn);
-    await assertFails(firmar('oa_azt', ID(32), 'azt', { claims: { auth_time: Math.floor(pub / 1000) - 1 } }));
-    await assertFails(firmar('oa_azt', ID(32), 'azt', { claims: { auth_time: Math.floor(pub / 1000) } }));   // mismo segundo: no es «después»
-    await assertSucceeds(firmar('oa_azt', ID(32), 'azt'));
+    const antes = Math.floor(pub / 1000) - 1;
+    // Con esa sesión vieja, lo demás se sigue exigiendo: proveedor, correo verificado, firmante asignado, imagen propia.
+    await assertFails(firmar('oa_azt', ID(32), 'azt', { claims: { auth_time: antes, firebase: { sign_in_provider: 'google.com' } } }));
+    await assertFails(firmar('oa_azt', ID(32), 'azt', { claims: { auth_time: antes, email_verified: false } }));
+    await assertFails(firmar('oa_aztB', ID(32), 'azt', { claims: { auth_time: antes } }));                     // no asignado
+    await assertFails(firmar('oa_azt', ID(32), 'azt', { claims: { auth_time: antes }, acto: { imagen: by(FIRMA.oa_aztB), huellaImagen: sha(FIRMA.oa_aztB) } }));
+    await assertFails(firmar('oa_resp', ID(32), 'azt', { claims: { auth_time: antes } }));                     // el admin no firma por él
+    // Antes, D5 la negaba (la sesión no era POSTERIOR a publicar: mismo segundo). Ahora pasa.
+    await assertSucceeds(firmar('oa_azt', ID(32), 'azt', { claims: { auth_time: Math.floor(pub / 1000) } }));   // mismo segundo
+    assert.equal((await leer('odt_afinia/' + ID(32))).estado, 'PENDIENTE_RESPONSABLE');
   });
 
-  test('Responsable: cierre con una clave de más → no; sesión posterior a publicar pero anterior al acto del AZT → no; posterior → sí', async () => {
+  test('Responsable con una sesión ANTERIOR a publicar y a la firma del AZT: cierre con una clave de más o sin contraseña → no; exacto → LISTA', async () => {
     const o = await leer('odt_afinia/' + ID(32));
     const azt = await leer('odt_afinia/' + ID(32) + '/actos/azt');
-    const entre = Math.floor(msDe(azt.en) / 1000);
-    assert.ok(entre * 1000 > msDe(o.publicadoEn), 'la sesión «entre» debe ser posterior a publicar');
-    await assertFails(firmar('oa_resp', ID(32), 'responsable', { acto: (x) => ({ cierre: { si: true, fecha: x.fechaTrabajo, generada: x.nro, hora: '10:00' } }) }));
-    await assertFails(firmar('oa_resp', ID(32), 'responsable', { claims: { auth_time: entre } }));
-    await assertSucceeds(firmar('oa_resp', ID(32), 'responsable'));
+    const vieja = Math.floor(msDe(o.publicadoEn) / 1000) - 3600;
+    assert.ok(vieja * 1000 < msDe(azt.en), 'la sesión es anterior a la firma del AZT');
+    await assertFails(firmar('oa_resp', ID(32), 'responsable', { claims: { auth_time: vieja }, acto: (x) => ({ cierre: { si: true, fecha: x.fechaTrabajo, generada: x.nro, hora: '10:00' } }) }));
+    await assertFails(firmar('oa_resp', ID(32), 'responsable', { claims: { auth_time: vieja, firebase: { sign_in_provider: 'custom' } } }));
+    await assertFails(firmar('oa_azt', ID(32), 'responsable', { claims: { auth_time: vieja } }));                // el AZT no cierra
+    // Antes, D5 la negaba (sesión anterior al acto del AZT). Ahora pasa.
+    await assertSucceeds(firmar('oa_resp', ID(32), 'responsable', { claims: { auth_time: vieja } }));
+    const fin = await leer('odt_afinia/' + ID(32));
+    assert.equal(fin.estado, 'LISTA');
+    assert.equal((await leer('odt_afinia/' + ID(32) + '/actos/responsable')).authTime, vieja);
   });
 
-  test('publicada hace 6 min: el AZT reautenticado hace 4 min firma (la ventana de 5 min sigue igual)', async () => {
+  test('publicada hace 6 min: el AZT con una sesión de hace 7 min (antes de publicar y fuera de la ventana vieja) firma', async () => {
     await sembrar(async (d) => {
       await setDoc(doc(d, 'odt_afinia', ID(33)), { ...metaOdt('oa_admin', NRO(33), [parte(0)], { azt: 'oa_azt', resp: 'oa_resp' }), publicadoEn: haceMs(6 * 60e3) });
     });
-    await assertFails(firmar('oa_azt', ID(33), 'azt', { claims: { auth_time: ahoraS() - 7 * 60 } }));   // antes de publicar (y vencida)
-    await assertFails(firmar('oa_azt', ID(33), 'azt', { claims: { auth_time: ahoraS() - 301 } }));      // después, pero vencida
-    await assertSucceeds(firmar('oa_azt', ID(33), 'azt', { claims: { auth_time: ahoraS() - 240 } }));
+    await assertFails(firmar('oa_azt', ID(33), 'azt', { claims: { auth_time: ahoraS() - 7 * 60, email_verified: false } }));   // control: su causa
+    await assertSucceeds(firmar('oa_azt', ID(33), 'azt', { claims: { auth_time: ahoraS() - 7 * 60 } }));
+  });
+
+  test('la misma sesión de hace 3 h que FIRMA no HABILITA: aceptar el acuerdo sigue pidiendo la contraseña (≤ 5 min)', async () => {
+    await assertSucceeds(publicar('oa_admin', ID(60), NRO(60), { azt: 'oa_azt', resp: 'oa_resp' }));
+    const vieja = sesionDeHace(3);
+    await assertFails(habilitar('oa_h4', { claims: { auth_time: vieja } }));
+    await assertFails(habilitar('oa_h4', { claims: { auth_time: ahoraS() - 301 } }));
+    await assertSucceeds(firmar('oa_azt', ID(60), 'azt', { claims: { auth_time: vieja } }));
+    // Control: recién escrita la contraseña, se habilita.
+    await assertSucceeds(habilitar('oa_h4', { claims: { auth_time: ahoraS() - 240 } }));
+    assert.equal((await leer('odt_afinia_firmantes/oa_h4')).nombre, NOMBRE('oa_h4'));
   });
 });
 

@@ -8,8 +8,9 @@
 // «Firmadas por mí» lleva el aviso del Decreto 2364/2012 art. 6: si ve una que no
 // firmó, avise de inmediato y cambie su contraseña (el titular es el único que
 // puede detectar una suplantación; comité W-11, legal). Muestra N.º, fecha y
-// hora de la firma y hora de autenticación (leídas del acto UNA vez por bandeja: cada
-// acto trae la imagen de la firma, así que no se vuelve a bajar en cada clic).
+// hora de la firma y la hora en que inició la sesión con la que firmó («Sesión iniciada»;
+// desde el 2026-11-21 la firma no vuelve a pedir la contraseña), leídas del acto UNA vez
+// por bandeja: cada acto trae la imagen de la firma, así que no se vuelve a bajar en cada clic.
 // La lista sale del servidor (limit 50); el estado se filtra aquí.
 // Estado cero: sin ODT y sin habilitación, la bandeja orienta a «Habilitarme y Mi firma».
 // Archivo NUEVO a propósito (L-102).
@@ -111,9 +112,9 @@ export async function montarBandeja(contenedor, { repo, sesion, alAbrir, pestana
     const items = de(p.clave);
     if (!items.length) { lista.appendChild(h('p', { class: 'odt-vacio', text: p.vacio })); return; }
     if (clave !== 'firmadasPorMi') { lista.appendChild(h('ul', { class: 'odt-filas' }, items.map(filaOdt))); return; }
-    // Firmadas por mí: N.º, fecha y hora de la firma y hora de autenticación, leídas del acto.
+    // Firmadas por mí: N.º, fecha y hora de la firma y hora del inicio de sesión, leídas del acto.
     const tabla = h('table', { class: 'odt-tabla' },
-      h('thead', {}, h('tr', {}, ['N.º ODT', 'Firmé como', 'Fecha y hora de la firma', 'Escribí mi contraseña', ''].map((t) => h('th', { scope: 'col', text: t })))));
+      h('thead', {}, h('tr', {}, ['N.º ODT', 'Firmé como', 'Fecha y hora de la firma', 'Sesión iniciada', ''].map((t) => h('th', { scope: 'col', text: t })))));
     const cuerpo = h('tbody');
     tabla.appendChild(cuerpo);
     lista.appendChild(h('div', { class: 'odt-tabla-caja' }, tabla));
