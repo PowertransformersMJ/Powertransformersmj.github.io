@@ -1,7 +1,10 @@
 // ══════════════════════════════════════════════════════════════════════════════
 // SGM · TRANSPOWER — Firma de ODT Afinia · BANDEJA
 // ──────────────────────────────────────────────────────────────────────────────
-// Pestañas: Mi turno · En curso · Listas · Firmadas por mí (+ Anuladas).
+// Pestañas: Mi turno · En curso · Listas · Cerradas · Firmadas por mí · Anuladas y reemplazadas.
+// «Cerradas» (2026-11-21): las que el admin registró como cerradas en Afinia; reposan aquí.
+// Las REEMPLAZADAS van con las anuladas. Si odt_afinia_estados.js quedó viejo en la caché
+// (sin la clave `cerradas`), la pestaña sale vacía en lugar de romper la bandeja (L-102).
 // «Firmadas por mí» lleva el aviso del Decreto 2364/2012 art. 6: si ve una que no
 // firmó, avise de inmediato y cambie su contraseña (el titular es el único que
 // puede detectar una suplantación; comité W-11, legal). Muestra N.º, fecha y
@@ -14,14 +17,16 @@
 
 import { bandeja, rolDe, ETIQUETA_ESTADO } from '../../domain/odt_afinia_estados.js';
 import { ETIQUETA_ROL } from '../../domain/odt_afinia_rutas.js';
+import { etiquetaEstado } from '../../domain/odt_afinia_cierre.js';
 import { h, vaciar, aviso, fechaHora, horaAutenticacion, mensajeDe } from './comun.js';
 
 export const PESTANAS = Object.freeze([
   { clave: 'miTurno', titulo: 'Mi turno', vacio: 'No tiene ODT esperando su firma.' },
   { clave: 'enCurso', titulo: 'En curso', vacio: 'No hay ODT en curso.' },
   { clave: 'listas', titulo: 'Listas', vacio: 'Todavía no hay ODT con las dos firmas.' },
+  { clave: 'cerradas', titulo: 'Cerradas', vacio: 'No hay ODT cerradas en Afinia.' },
   { clave: 'firmadasPorMi', titulo: 'Firmadas por mí', vacio: 'No ha firmado ninguna ODT.' },
-  { clave: 'anuladas', titulo: 'Anuladas', vacio: 'No hay ODT anuladas.' }
+  { clave: 'anuladas', titulo: 'Anuladas y reemplazadas', vacio: 'No hay ODT anuladas ni reemplazadas.' }
 ]);
 
 export const AVISO_SUPLANTACION = 'Si ve aquí una ODT que usted no firmó, avise de inmediato al Ingeniero y cambie su contraseña.';
@@ -47,6 +52,8 @@ export async function montarBandeja(contenedor, { repo, sesion, alAbrir, pestana
     return;
   }
   const grupos = bandeja(datos.odts, sesion.uid);
+  /** Las ODT de una pestaña (una clave que un módulo viejo no trae = vacía, nunca un error). */
+  const de = (clave) => grupos[clave] || [];
   // Estado cero que orienta: sin ODT, ¿le falta habilitarse? (si no se puede saber, se dice).
   let orientacion = null;
   if (!datos.odts.length && typeof repo.leerHabilitacion === 'function') {
@@ -77,7 +84,7 @@ export async function montarBandeja(contenedor, { repo, sesion, alAbrir, pestana
   const botones = PESTANAS.map((p) => h('button', {
     type: 'button', class: 'odt-pestana', role: 'tab', 'aria-selected': 'false', dataset: { clave: p.clave },
     onclick: () => elegir(p.clave)
-  }, p.titulo + ' ', h('span', { class: 'odt-cuenta', text: String(grupos[p.clave].length) })));
+  }, p.titulo + ' ', h('span', { class: 'odt-cuenta', text: String(de(p.clave).length) })));
   contenedor.appendChild(h('div', { class: 'odt-pestanas', role: 'tablist', 'aria-label': 'Bandeja de ODT' }, botones));
   if (datos.tope) contenedor.appendChild(aviso('Se muestran las 50 ODT más recientes.', 'info'));
   contenedor.appendChild(lista);
@@ -92,8 +99,8 @@ export async function montarBandeja(contenedor, { repo, sesion, alAbrir, pestana
     return h('li', { class: 'odt-fila' },
       h('button', { type: 'button', class: 'odt-fila-btn', onclick: () => alAbrir(o.id) },
         h('span', { class: 'odt-fila-nro', text: 'ODT N.º ' + o.nro }),
-        h('span', { class: 'odt-fila-meta', text: [o.subestacion, o.equipo, 'trabajo ' + o.fechaTrabajo].filter(Boolean).join(' · ') }),
-        h('span', { class: 'odt-chip odt-chip--' + String(o.estado).toLowerCase(), text: ETIQUETA_ESTADO[o.estado] || o.estado }),
+        h('span', { class: 'odt-fila-meta', text: [o.subestacion, o.equipo, 'prevista ' + o.fechaTrabajo].filter(Boolean).join(' · ') }),
+        h('span', { class: 'odt-chip odt-chip--' + String(o.estado).toLowerCase(), text: etiquetaEstado(o.estado, ETIQUETA_ESTADO) }),
         rol ? h('span', { class: 'odt-mini', text: 'Usted firma como ' + ETIQUETA_ROL[rol] }) : null));
   }
 
@@ -101,7 +108,7 @@ export async function montarBandeja(contenedor, { repo, sesion, alAbrir, pestana
     vaciar(lista);
     const p = PESTANAS.find((x) => x.clave === clave) || PESTANAS[0];
     if (clave === 'firmadasPorMi') lista.appendChild(aviso(AVISO_SUPLANTACION, 'aviso'));
-    const items = grupos[p.clave];
+    const items = de(p.clave);
     if (!items.length) { lista.appendChild(h('p', { class: 'odt-vacio', text: p.vacio })); return; }
     if (clave !== 'firmadasPorMi') { lista.appendChild(h('ul', { class: 'odt-filas' }, items.map(filaOdt))); return; }
     // Firmadas por mí: N.º, fecha y hora de la firma y hora de autenticación, leídas del acto.

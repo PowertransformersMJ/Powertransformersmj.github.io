@@ -196,6 +196,64 @@ describe('capa de datos', () => {
   });
 });
 
+describe('decisiones del 2026-11-21 en la pantalla (L-102: caché de 10 min)', () => {
+  test('Publicar: la fecha se llama «Fecha prevista de la orden (dd/mm/aaaa)» y consulta el N.º antes de publicar', () => {
+    const c = codigo(UI['publicar.js']);
+    assert.match(c, /'Fecha prevista de la orden \(dd\/mm\/aaaa\)'/);
+    assert.ok(!/Fecha del trabajo/.test(c));
+    assert.match(c, /typeof repo\.previaDelNro === 'function'/, 'un repositorio viejo sin previaDelNro no rompe la validación');
+  });
+  test('Firmar: el Responsable ya no edita la FECHA CIERRE (sin campo) y la toma de la ODT', () => {
+    const c = codigo(UI['firmar.js']);
+    assert.ok(!/odtFechaCierre/.test(c), 'no hay campo de fecha de cierre');
+    assert.match(c, /fechaCierre: rol === 'responsable' \? fechaCierreDe\(fresca\) : undefined/);
+  });
+  test('lo nuevo se importa del archivo NUEVO (odt_afinia_cierre.js); de los vecinos viejos, solo nombres que ya existían', () => {
+    // Nombres que un vecino que quedó viejo en la caché NO tendría: ninguna pantalla los pide por nombre a ese vecino.
+    const nuevos = ['COMPOSITOR_V2', 'COMPOSITOR_VIGENTE', 'ESTADOS_CIERRE', 'puedeDescargar', 'puedeReemplazar', 'textoCierreAfinia', 'MSG_RECARGAR',
+      'MSG_RECARGAR_FIRMA', 'etiquetaEstado', 'errorFirmaAlDia', 'avisoAntesDeFirmar', 'cierreDelResponsable'];
+    const pedidos = (t) => [...codigo(t).matchAll(/import\s*\{([^}]*)\}\s*from\s*'([^']+)'/g)]
+      .filter((m) => !m[2].endsWith('odt_afinia_cierre.js'))
+      .flatMap((m) => nuevos.filter((x) => new RegExp('\\b' + x + '\\b').test(m[1])).map((x) => x + ' a ' + m[2]));
+    for (const [n, t] of Object.entries({ ...UI, ...DATOS })) assert.deepEqual(pedidos(t), [], n);
+    // Mutación (L-144): pedirle un nombre nuevo a un vecino viejo SÍ se ve.
+    assert.deepEqual(pedidos("import { puedeDescargar } from '../../domain/odt_afinia_estados.js';"), ['puedeDescargar a ../../domain/odt_afinia_estados.js']);
+  });
+  test('bandeja: una pestaña sin su clave (dominio viejo) sale vacía, y el repositorio viejo sin reemplazar/cerrar pide recargar', () => {
+    assert.match(codigo(UI['bandeja.js']), /const de = \(clave\) => grupos\[clave\] \|\| \[\];/);
+    assert.ok(!/grupos\[p\.clave\]\.length/.test(codigo(UI['bandeja.js'])));
+    assert.match(codigo(UI['detalle.js']), /typeof repo\[nombre\] !== 'function'/);
+  });
+  test('preparar: no prepara una firma @2 con un compositor viejo de la caché (marca ESTAMPA.dyGenerada)', () => {
+    const c = codigo(UI['preparar.js']);
+    assert.match(c, /Number\.isFinite\(ESTAMPA\.dyGenerada\)/);
+    assert.match(c, /COMPOSITOR !== COMPOSITOR_VIGENTE/);
+    assert.match(c, /cierre = cierreDelResponsable\(odt, fecha\)/, 'el pie completo {si, fecha, generada} sale del archivo nuevo');
+  });
+  test('caché mezclada (L-102): el compositor que se ESCRIBE sale de odt_afinia_cierre.js, y firmar/datos miran la copia antes', () => {
+    // Un odt_afinia_rutas.js nuevo (COMPOSITOR = @2) con un armador viejo escribía «@2» sobre lo compuesto en @1:
+    // el armador y la capa de datos ya no leen COMPOSITOR de rutas; la regla además exige cierre.generada == N.º.
+    const lotes = codigo(DATOS['odt_afinia_lotes.js']);
+    assert.match(lotes, /import \{ COMPOSITOR_VIGENTE \} from '\.\.\/domain\/odt_afinia_cierre\.js'/);
+    assert.match(lotes, /exige\(c\.compositor === COMPOSITOR_VIGENTE/);
+    assert.match(lotes, /datos\.cierre = \{ si: true, fecha: c\.cierre\.fecha, generada: c\.cierre\.generada \}/);
+    for (const [n, t] of [['odt_afinia_lotes.js', lotes], ['odt_afinia.js', codigo(DATOS['odt_afinia.js'])]]) {
+      const deRutas = /import\s*\{([^}]*)\}\s*from\s*'\.\.\/domain\/odt_afinia_rutas\.js'/.exec(t);
+      assert.ok(deRutas && !/\bCOMPOSITOR\b/.test(deRutas[1]), n + ' no toma COMPOSITOR de rutas');
+    }
+    // La capa de datos compara la copia y el acto armado ANTES de escribir el lote.
+    const datos = codigo(DATOS['odt_afinia.js']);
+    const iPlan = datos.indexOf('const plan = planFirma(congelado');
+    const iGuarda = datos.indexOf('errorFirmaAlDia(congelado, plan.acto.datos)');
+    const iLote = datos.indexOf('const lote = aplicarLote(F, d, [', iPlan);
+    assert.ok(iPlan > 0 && iGuarda > iPlan && iLote > iGuarda, 'planFirma → guarda → lote');
+    // firmar.js: la copia de un preparar.js viejo no se muestra ni se firma; antes de la fecha prevista no hay botón activo.
+    const firmar = codigo(UI['firmar.js']);
+    assert.match(firmar, /const errAlDia = errorFirmaAlDia\(preparado\);\s*if \(errAlDia\) throw new Error\(errAlDia\);\s*congelado = preparado;/);
+    assert.match(firmar, /if \(bloqueada\) return;/);
+  });
+});
+
 describe('repo público', () => {
   test('sin correos ni dominios reales en el módulo (solo @prueba.test en pruebas)', () => {
     const textos = [...Object.values(UI), ...Object.values(DATOS), PAGINA, CSS];

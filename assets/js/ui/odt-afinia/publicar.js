@@ -14,6 +14,9 @@
 //      (odt_afinia_config/firmantes, la escribe el Ingeniero en la consola), entre los
 //      habilitados con perfil activo; distintos entre sí y el AZT nunca es quien publica
 //      (el Responsable sí puede ser el admin: D5).
+//      Al validar se consulta si el N.º ya se publicó: con la vigente ANULADA o REEMPLAZADA
+//      se puede volver a publicar (la nueva guarda `reemplaza` = la anterior); con la vigente
+//      pendiente, LISTA o CERRADA se dice por qué no, antes de enviar nada (2026-11-21).
 //   4. Publicar: un lote (ODT + partes + candado del N.º). Antes, procedimiento D5: si
 //      la sesión del admin se abrió hace menos de 5 minutos (hora del servidor), se avisa
 //      y se pide confirmar (en esa ventana la sesión podría firmar). Después se RELEE
@@ -23,8 +26,9 @@
 // Archivo NUEVO a propósito (L-102).
 // ══════════════════════════════════════════════════════════════════════════════
 
-import { ETIQUETA_ROL, TOPES } from '../../domain/odt_afinia_rutas.js';
-import { errorFirmantes } from '../../domain/odt_afinia_estados.js';
+import { ETIQUETA_ROL, TOPES, esNro } from '../../domain/odt_afinia_rutas.js';
+import { errorFirmantes, ETIQUETA_ESTADO } from '../../domain/odt_afinia_estados.js';
+import { etiquetaEstado } from '../../domain/odt_afinia_cierre.js';
 import { estructuraConPdfLib, conTextos, validarOdt, nrosEnTexto } from '../../domain/odt_afinia_formato.js';
 import { textoDePagina, CLAVES_ZONA, ANCLAS_CALIBRADAS } from '../../domain/odt_afinia_zonas.js';
 import { revisarCasillas } from '../../domain/odt_afinia_casilla.js';
@@ -32,7 +36,7 @@ import { revisarEstructura } from '../../domain/odt_afinia_estructura.js';
 import { esPdf, prepararPartes, presupuesto, huella } from '../../domain/odt_afinia_partes.js';
 import { esFechaDMA } from '../../domain/odt_afinia_textos.js';
 import { MSG_FALTA_LISTA_BLANCA } from '../../data/odt_afinia.js';
-import { h, vaciar, aviso, mensajeDe, cargarPdfLib } from './comun.js';
+import { h, vaciar, aviso, mensajeDe, cargarPdfLib, fechaHora } from './comun.js';
 import { pintarPdf, leerParaPublicar } from './vista-pdf.js';
 
 const NOMBRES_CASILLA = { azt: 'AZT EN SITIO', responsable: 'RESPONSABLE O.D.T.', si: 'SI', fecha: 'FECHA CIERRE' };
@@ -189,7 +193,7 @@ export async function montarPublicar(contenedor, { repo, cuenta, sesion, alPubli
     const fCons = campo('odtConsignacion', 'Consignación (opcional)', { maxLength: 60 });
     const fSub = campo('odtSubestacion', 'Subestación', { maxLength: 120 });
     const fEq = campo('odtEquipo', 'Equipo', { maxLength: 120 });
-    const fFecha = campo('odtFechaTrabajo', 'Fecha del trabajo (dd/mm/aaaa)', { maxLength: 10, placeholder: 'dd/mm/aaaa' });
+    const fFecha = campo('odtFechaTrabajo', 'Fecha prevista de la orden (dd/mm/aaaa)', { maxLength: 10, placeholder: 'dd/mm/aaaa' });
     const opciones = (lista) => [h('option', { value: '', text: '— elija —' }),
       ...lista.map((x) => h('option', { value: x.uid, text: x.nombre + ' · ' + x.correo }))];
     const sAzt = h('select', { id: 'odtAzt', class: 'odt-campo' }, opciones(cand.azt));
@@ -218,7 +222,13 @@ export async function montarPublicar(contenedor, { repo, cuenta, sesion, alPubli
       if (!v.ok) errores.push(...v.errores.map((e) => e.mensaje));
       if (!form.subestacion) errores.push('Escriba la subestación.');
       if (!form.equipo) errores.push('Escriba el equipo.');
-      if (!esFechaDMA(form.fechaTrabajo)) errores.push('La fecha del trabajo debe ser dd/mm/aaaa.');
+      if (!esFechaDMA(form.fechaTrabajo)) errores.push('La fecha prevista de la orden debe ser dd/mm/aaaa (es la FECHA CIERRE que estampa el Responsable).');
+      // ¿El N.º ya se publicó? Libre si la vigente está ANULADA o REEMPLAZADA; si no, se dice ya.
+      let previa = null;
+      if (esNro(form.nro) && typeof repo.previaDelNro === 'function') {
+        try { previa = await repo.previaDelNro(form.nro); } catch (e) { errores.push('No se pudo comprobar si el N.º ya está publicado: ' + mensajeDe(e)); }
+      }
+      if (previa && !previa.libre) errores.push(previa.mensaje);
       const azt = cand.azt.find((x) => x.uid === sAzt.value); const responsable = cand.responsable.find((x) => x.uid === sResp.value);
       const errF = errorFirmantes({ azt, responsable }, sesion.uid);
       if (errF) errores.push(errF);
@@ -245,6 +255,10 @@ export async function montarPublicar(contenedor, { repo, cuenta, sesion, alPubli
       if (errores.length) { estado.appendChild(h('ul', { class: 'odt-errores' }, errores.map((t) => h('li', { text: t })))); return; }
       validado = { form, zonas: v.zonas, firmantes: { azt, responsable } };
       estado.appendChild(aviso('La ODT cumple el formato y sus casillas están vacías (tinta y contenido). AZT: ' + azt.nombre + ' · Responsable: ' + responsable.nombre + '. Ya puede publicarla.', 'ok'));
+      if (previa && previa.libre) {
+        estado.appendChild(aviso('Este N.º ya se publicó antes (' + etiquetaEstado(previa.estado, ETIQUETA_ESTADO).toLowerCase()
+          + (Number.isFinite(previa.publicadoEnMs) ? ', publicada el ' + fechaHora(previa.publicadoEnMs) : '') + '): la nueva publicación queda como su reemplazo.', 'info'));
+      }
       btnPublicar.disabled = false;
     });
 

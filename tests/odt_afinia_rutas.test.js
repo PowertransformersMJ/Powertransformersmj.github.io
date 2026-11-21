@@ -24,15 +24,15 @@ describe('constantes (DISENO-FINAL §2-§3)', () => {
     });
     assert.ok(!Object.values(COL).some((c) => /firmas?_(equipo|delegad)|delegaciones_/.test(c)));
   });
-  test('estados, roles y etiquetas', () => {
-    assert.deepEqual([...LISTA_ESTADOS], ['PENDIENTE_AZT', 'PENDIENTE_RESPONSABLE', 'LISTA', 'ANULADA']);
+  test('estados, roles y etiquetas (CERRADA y REEMPLAZADA se agregan AL FINAL: cambio compatible, 2026-11-21)', () => {
+    assert.deepEqual([...LISTA_ESTADOS], ['PENDIENTE_AZT', 'PENDIENTE_RESPONSABLE', 'LISTA', 'ANULADA', 'CERRADA', 'REEMPLAZADA']);
     assert.equal(ESTADOS.LISTA, 'LISTA');
     assert.deepEqual([...ROLES], ['azt', 'responsable']);
     assert.deepEqual({ ...ETIQUETA_ROL }, { azt: 'AZT EN SITIO', responsable: 'RESPONSABLE O.D.T.' });
   });
   test('versiones, compositor y proveedor', () => {
     assert.deepEqual({ ...VERSIONES }, { acuerdo: 'odt-acuerdo-v1', azt: 'odt-azt-v1', responsable: 'odt-resp-v1' });
-    assert.equal(COMPOSITOR, 'odt-afinia@1');
+    assert.equal(COMPOSITOR, 'odt-afinia@2', 'el vigente (2026-11-21): estampa además el N.º en «ODT GENERADA N°»');
     assert.equal(PROVEEDOR, 'password');
     for (const v of Object.values(VERSIONES)) assert.ok(PLANTILLAS[v], 'plantilla de ' + v);
   });

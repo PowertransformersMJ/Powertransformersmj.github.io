@@ -5,12 +5,19 @@
 // (pruebas: tests-rules/odt_afinia.rules.test.js). Lo que se escribe lo arma
 // data/odt_afinia_lotes.js (puro); aquí solo va la entrada y salida:
 //   · publicar          lote: ODT + partes 0..n-1 + candado del N.º (solo admin; los dos
-//                       firmantes deben estar en la LISTA BLANCA de su rol)
+//                       firmantes deben estar en la LISTA BLANCA de su rol). Si el N.º ya tuvo
+//                       una ODT ANULADA o REEMPLAZADA, la nueva guarda `reemplaza` = su id
+//   · previaDelNro      ¿el N.º ya está publicado? {odtId, estado, libre, mensaje} (lo usa Publicar)
 //   · candidatos        habilitados × lista blanca × perfil activo (lo que ofrece Publicar)
 //   · leerOdt           lee la ODT y sus partes DEL SERVIDOR, las une y verifica
 //                       cada huella y la del total (si no cuadra, lanza)
-//   · firmar            lote de 2: actos/{rol} + {estado, rev} de la ODT
+//   · firmar            lote de 2: actos/{rol} + {estado, rev} de la ODT (antes de escribir, la copia
+//                       y el acto deben ser del compositor vigente @2, con el N.º de «ODT GENERADA» en el
+//                       cierre del Responsable: una pieza vieja de la caché no firma, L-102)
 //   · anular            update {estado:'ANULADA', rev, anulacion} (solo admin; D6: nunca una LISTA)
+//   · reemplazar        update {estado:'REEMPLAZADA', rev, reemplazo} (solo admin, solo una LISTA, con motivo)
+//   · registrarCierreAfinia  update {estado:'CERRADA', rev, cierreAfinia} (solo admin, solo una LISTA)
+//                       (los dos son de 2026-11-21: sus reglas de armado viven en domain/odt_afinia_cierre.js)
 //   · habilitarme       odt_afinia_firmantes/{uidPropio} (una vez)
 //   · devolver          odt_afinia/{id}/devoluciones/{rol_rev} (id determinista: una por turno)
 //   · registrarDescarga odt_afinia_descargas/{auto}
@@ -30,7 +37,7 @@
 // Archivo NUEVO a propósito (L-102).
 // ══════════════════════════════════════════════════════════════════════════════
 
-import { COL, CONFIG_FIRMANTES, ESTADOS, ROLES, TOPES, esNro, esRol, idDevolucion } from '../domain/odt_afinia_rutas.js';
+import { COL, CONFIG_FIRMANTES, ROLES, TOPES, esNro, esRol, idDevolucion } from '../domain/odt_afinia_rutas.js';
 import { errorFirmantes, errorListaBlanca, firmantesElegibles } from '../domain/odt_afinia_estados.js';
 import { fechaBogota, ordenDMA } from '../domain/odt_afinia_textos.js';
 import { unirVerificado } from '../domain/odt_afinia_partes.js';
@@ -40,6 +47,9 @@ import {
   documentoDevolucion, documentoDescarga
 } from './odt_afinia_lotes.js';
 import { miFirmaOdt, HUELLA_MI_FIRMA_DISTINTA } from './odt_afinia_mi_firma.js';
+import {
+  liberaNro, mensajeNroOcupado, cambioReemplazar, cambioCerrarAfinia, errorFirmaAlDia, MSG_RECARGAR, MSG_RECARGAR_FIRMA
+} from '../domain/odt_afinia_cierre.js';
 
 const CDN_FIRESTORE = 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 /** Perfiles de la plataforma (activo, rol): los lee el admin al elegir firmantes. */
@@ -163,6 +173,30 @@ export function crearRepositorioOdt(opciones = {}) {
   async function leerConfig(F, d) {
     const s = await getServidor(F, F.doc(d, CONFIG_FIRMANTES.col, CONFIG_FIRMANTES.doc));
     return s.exists() ? normalizarConfig(s.data()) : null;
+  }
+  /**
+   * El candado del N.º y su ODT vigente, del servidor: null si el N.º nunca se publicó; si no,
+   * {odtId, estado, publicadoEnMs, libre (ANULADA o REEMPLAZADA), mensaje (por qué no, si no está libre)}.
+   */
+  async function leerPreviaDelNro(F, d, nro) {
+    const cand = await getServidor(F, F.doc(d, COL.nro, nro));
+    if (!cand.exists()) return null;
+    const odtId = cand.data().odtId;
+    const sp = esIdOdt(odtId) ? await getServidor(F, F.doc(d, COL.odt, odtId)) : null;
+    const o = sp && sp.exists() ? sp.data() : null;
+    const estado = o ? o.estado : null;
+    const libre = !!o && liberaNro(estado);
+    return { odtId, estado, publicadoEnMs: o ? aMs(o.publicadoEn) : null, libre, mensaje: libre ? null : mensajeNroOcupado(estado) };
+  }
+  /** Un update de la ODT (anular, reemplazar, cerrar) con su «no» explicado si la regla lo niega. */
+  async function actualizarOdt(F, d, odtId, cambios, msgConflicto) {
+    try {
+      await conTope(aplicarLote(F, d, [{ tipo: 'update', ruta: [COL.odt, odtId], datos: cambios }]), tiempoLote);
+    } catch (e) {
+      const err = errorDesdeFirebase(e);
+      if (err.codigo === 'sin_permiso') throw new ErrorOdt('conflicto', msgConflicto);
+      throw err;
+    }
   }
 
   const repo = {
@@ -353,17 +387,18 @@ export function crearRepositorioOdt(opciones = {}) {
         const errLB = errorListaBlanca(await leerConfig(F, d), firmantes);
         if (errLB) throw new ErrorOdt('sin_permiso', errLB);
         // Candado del N.º: si ya hay una ODT vigente con ese número, se avisa ANTES (la regla lo niega igual).
-        const cand = await getServidor(F, F.doc(d, COL.nro, nro));
-        if (cand.exists()) {
-          const previa = cand.data().odtId;
-          const sp = esIdOdt(previa) ? await getServidor(F, F.doc(d, COL.odt, previa)) : null;
-          if (!sp || !sp.exists() || sp.data().estado !== ESTADOS.ANULADA) throw new ErrorOdt('duplicado');
-        }
+        // Con la vigente ANULADA o REEMPLAZADA el N.º está libre y la nueva guarda `reemplaza` = su id
+        // (la regla del candado exige que coincida con el candado anterior).
+        const previa = await leerPreviaDelNro(F, d, nro);
+        if (previa && !previa.libre) throw new ErrorOdt('duplicado', previa.mensaje);
+        const reemplaza = previa ? previa.odtId : null;
         const id = F.doc(F.collection(d, COL.odt)).id;
         const plan = planPublicacion({
-          id, form, preparado, zonas, firmantes,
+          id, form, preparado, zonas, firmantes, reemplaza,
           quien: { uid: s.uid, nombre: s.nombre }, ts: F.serverTimestamp(), aBytes: aBytesDe(F)
         });
+        // Un armador viejo de la caché no sabría de `reemplaza` y la regla negaría el lote: se dice antes.
+        if ((plan.odt.reemplaza || null) !== reemplaza) throw new ErrorOdt('estado', MSG_RECARGAR);
         const lote = aplicarLote(F, d, plan.operaciones);
         try {
           await conTope(lote, tiempoLote);
@@ -393,12 +428,8 @@ export function crearRepositorioOdt(opciones = {}) {
       try {
         const F = await sdk(); const d = await db();
         if (esNro(nro)) {
-          const cand = await getServidor(F, F.doc(d, COL.nro, nro));
-          if (cand.exists()) {
-            const previa = cand.data().odtId;
-            const sp = esIdOdt(previa) ? await getServidor(F, F.doc(d, COL.odt, previa)) : null;
-            if (!sp || !sp.exists() || sp.data().estado !== ESTADOS.ANULADA) return { codigo: 'duplicado', mensaje: MENSAJES.duplicado };
-          }
+          const previa = await leerPreviaDelNro(F, d, nro);
+          if (previa && !previa.libre) return { codigo: 'duplicado', mensaje: previa.mensaje || MENSAJES.duplicado };
         }
         const errLB = errorListaBlanca(await leerConfig(F, d), firmantes);
         if (errLB) causas.push(errLB);
@@ -423,6 +454,17 @@ export function crearRepositorioOdt(opciones = {}) {
       return { codigo: 'sin_permiso', mensaje: base + 'No se encontró la causa: recargue, vuelva a validar y publique; si sigue, avise al Ingeniero.' };
     },
 
+    /**
+     * ¿El N.º ya está publicado? (solo admin; lo consulta Publicar al validar). null si nunca se
+     * publicó; si no, {odtId, estado, publicadoEnMs, libre, mensaje}.
+     */
+    async previaDelNro(nro) {
+      exigirAdmin();
+      const n = String(nro || '').trim();
+      if (!esNro(n)) throw new ErrorOdt('validacion', 'El N.º de ODT debe tener 8 dígitos.');
+      return op(async () => leerPreviaDelNro(await sdk(), await db(), n));
+    },
+
     // ── Firmar (lote de 2, atado) ─────────────────────────────────────────────
     /**
      * @param {object} congelado  la copia de «Preparar» (L-112)
@@ -436,6 +478,10 @@ export function crearRepositorioOdt(opciones = {}) {
       return op(async () => {
         const F = await sdk(); const d = await db();
         const plan = planFirma(congelado, token, { ts: F.serverTimestamp(), aBytes: aBytesDe(F) });
+        // L-102: un preparar.js o un armador (odt_afinia_lotes.js) viejos de la caché no dejan el compositor
+        // vigente ni el N.º de «ODT GENERADA» en el cierre: se dice ANTES de escribir (la regla lo niega igual).
+        const errAlDia = errorFirmaAlDia(congelado, plan.acto.datos);
+        if (errAlDia) throw new ErrorOdt('validacion', errAlDia);
         const lote = aplicarLote(F, d, [
           { ruta: plan.acto.ruta, datos: plan.acto.datos },
           { tipo: 'update', ruta: plan.odt.ruta, datos: plan.odt.cambios }
@@ -483,10 +529,14 @@ export function crearRepositorioOdt(opciones = {}) {
       const base = 'La plataforma no aceptó su firma. ';
       try {
         const o = await repo.leerOdtDoc(c.odtId);
-        if (o.estado === ESTADOS.ANULADA) return base + 'La ODT fue anulada.';
+        if (o.estado === 'ANULADA') return base + 'La ODT fue anulada.';
+        if (o.estado === 'REEMPLAZADA') return base + 'La ODT fue reemplazada por otra versión.';
+        if (o.estado === 'CERRADA') return base + 'La ODT ya está cerrada en Afinia.';
         if (o.estado !== c.estadoPrevio || o.rev !== c.revPrevio) return base + 'La ODT cambió (ya firmada o en otro paso). Recargue para ver su estado.';
         const pub = o.firmantes && o.firmantes[c.rol];
         if (pub && (pub.nombre !== c.nombre || pub.correo !== c.correo)) return base + MSG_IDENTIDAD_CAMBIO;
+        // FECHA CIERRE = la fecha PREVISTA de la orden (2026-11-21): la regla exige esa, exacta.
+        if (c.cierre && c.cierre.fecha !== o.fechaTrabajo) return base + 'La fecha de cierre (' + c.cierre.fecha + ') no es la fecha prevista de la orden (' + o.fechaTrabajo + '): recargue y prepare de nuevo.';
         const authMs = token && Number.isInteger(token.auth_time) ? token.auth_time * 1000 : null;
         if (authMs != null && o.publicadoEnMs != null && authMs <= o.publicadoEnMs) return base + MSG_SESION_ANTES_DE_PUBLICAR;
         if (authMs != null && c.rol === 'responsable') {
@@ -502,8 +552,9 @@ export function crearRepositorioOdt(opciones = {}) {
         if (e && e.message === HUELLA_MI_FIRMA_DISTINTA) return base + HUELLA_MI_FIRMA_DISTINTA;
       }
       if (c.cierre && ordenDMA(c.cierre.fecha) > ordenDMA(fechaBogota())) {
-        return base + 'La fecha de cierre (' + c.cierre.fecha + ') es posterior a hoy en la hora de Colombia: prepare de nuevo con otra fecha.';
+        return base + 'La fecha prevista de la orden (' + c.cierre.fecha + ') es posterior a hoy en la hora de Colombia: podrá firmar y cerrar la ODT desde ese día.';
       }
+      if (errorFirmaAlDia(c)) return base + MSG_RECARGAR_FIRMA;
       return base + 'Causas posibles: pasaron más de 5 minutos desde que escribió su contraseña, '
         + 'su firma («Mi firma») es anterior a su habilitación, su perfil quedó inactivo, o el nombre o el correo de su perfil cambiaron. '
         + 'Vuelva a preparar la firma; si sigue, avise al administrador.';
@@ -516,13 +567,40 @@ export function crearRepositorioOdt(opciones = {}) {
       return op(async () => {
         const F = await sdk(); const d = await db();
         const cambios = cambiosAnulacion(o, { motivo, quien: { uid: s.uid, nombre: s.nombre }, ts: F.serverTimestamp() });
-        try {
-          await conTope(aplicarLote(F, d, [{ tipo: 'update', ruta: [COL.odt, odtId], datos: cambios }]), tiempoLote);
-        } catch (e) {
-          const err = errorDesdeFirebase(e);
-          if (err.codigo === 'sin_permiso') throw new ErrorOdt('conflicto', 'No se pudo anular: la ODT cambió mientras tanto (por ejemplo, alguien firmó). Recargue y vuelva a intentarlo.');
-          throw err;
-        }
+        await actualizarOdt(F, d, odtId, cambios, 'No se pudo anular: la ODT cambió mientras tanto (por ejemplo, alguien firmó). Recargue y vuelva a intentarlo.');
+        return { estado: 'entro', rev: cambios.rev };
+      });
+    },
+
+    // ── Reemplazar (admin, con motivo; solo una LISTA; 2026-11-21, revierte D6 con su visto bueno) ──
+    /**
+     * La ODT queda REEMPLAZADA (final): no se borra nada (actos, partes y constancia se conservan y se
+     * leen) y su N.º se puede volver a publicar en «Publicar ODT».
+     */
+    async reemplazar(odtId, motivo) {
+      const s = exigirAdmin();
+      const o = await repo.leerOdtDoc(odtId);
+      return op(async () => {
+        const F = await sdk(); const d = await db();
+        const r = cambioReemplazar(o, { motivo, por: { uid: s.uid, nombre: s.nombre } });
+        if (!r.ok) throw new ErrorOdt(r.codigo === 'estado' ? 'estado' : 'validacion', r.mensaje);
+        const cambios = { estado: r.cambios.estado, rev: r.cambios.rev, reemplazo: { ...r.cambios.reemplazo, en: F.serverTimestamp() } };
+        await actualizarOdt(F, d, odtId, cambios, 'No se pudo reemplazar: la ODT cambió mientras tanto (por ejemplo, alguien registró su cierre en Afinia). Recargue y vuelva a intentarlo.');
+        return { estado: 'entro', rev: cambios.rev };
+      });
+    },
+
+    // ── Registrar el cierre en Afinia (admin; solo una LISTA; queda CERRADA, final) ──
+    /** @param {{fecha:string, soporte:string}} datos  fecha 'dd/mm/aaaa' (entre la prevista y hoy) y el soporte */
+    async registrarCierreAfinia(odtId, { fecha, soporte } = {}) {
+      const s = exigirAdmin();
+      const o = await repo.leerOdtDoc(odtId);
+      return op(async () => {
+        const F = await sdk(); const d = await db();
+        const r = cambioCerrarAfinia(o, { fecha, soporte, por: { uid: s.uid, nombre: s.nombre } });
+        if (!r.ok) throw new ErrorOdt(r.codigo === 'estado' ? 'estado' : 'validacion', r.mensaje);
+        const cambios = { estado: r.cambios.estado, rev: r.cambios.rev, cierreAfinia: { ...r.cambios.cierreAfinia, en: F.serverTimestamp() } };
+        await actualizarOdt(F, d, odtId, cambios, 'No se pudo registrar el cierre: la ODT cambió mientras tanto (por ejemplo, alguien la reemplazó). Recargue y vuelva a intentarlo.');
         return { estado: 'entro', rev: cambios.rev };
       });
     },

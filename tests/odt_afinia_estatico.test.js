@@ -41,10 +41,11 @@ function importados(texto) {
 
 const MODULO = archivos(JS).filter((p) => /(^|\/)odt_afinia[^/]*\.js$/.test(p) || /\/ui\/odt-afinia\//.test(p));
 const DOMINIO = MODULO.filter((p) => p.includes('/domain/'));
-const ESPERADOS = ['rutas', 'estados', 'formato', 'zonas', 'casilla', 'componer', 'partes', 'textos'].map((n) => 'odt_afinia_' + n + '.js');
+// 'cierre' (2026-11-21): compositor @2, reemplazo y CERRADA; archivo nuevo (L-102), también puro.
+const ESPERADOS = ['rutas', 'estados', 'formato', 'zonas', 'casilla', 'componer', 'partes', 'textos', 'cierre'].map((n) => 'odt_afinia_' + n + '.js');
 
 describe('archivos del dominio', () => {
-  test('existen los ocho módulos del diseño (§4)', () => {
+  test('existen los módulos del diseño (§4) y el de cierre (2026-11-21)', () => {
     const nombres = DOMINIO.map((p) => p.split('/').pop()).sort();
     for (const n of ESPERADOS) assert.ok(nombres.includes(n), n);
   });

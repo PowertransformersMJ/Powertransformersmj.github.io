@@ -5,7 +5,17 @@
 // SIEMPRE así:  componer(v0, {azt?, responsable?}, {PDFLib, zonas})
 //   · v0 = el PDF original publicado (bytes verificados por huella);
 //   · cada acto trae la IMAGEN de la firma (bytes PNG de firmas/{uid}, que la
-//     regla comparó byte a byte) y el del Responsable su cierre {si, fecha};
+//     regla comparó byte a byte) y el del Responsable su cierre {si, fecha}, su
+//     `compositor` y su `nro`;
+//   · la VERSIÓN la decide el compositor del acto del Responsable (2026-11-21):
+//       'odt-afinia@1' (o sin compositor): X en SI y la FECHA CIERRE, nada más; los
+//         bytes son EXACTAMENTE los de siempre (ODT ya firmadas: su huellaVista se
+//         sigue recomponiendo igual; prueba de oro en tests/odt_afinia_componer.test.js);
+//       'odt-afinia@2': lo mismo y, además, el N.º de la ODT en «ODT GENERADA N°»,
+//         16 pt debajo de la FECHA CIERRE (zonas.fecha.y − ESTAMPA.dyGenerada; las
+//         etiquetas impresas miden 156,3 y 140,2 pt). La posición se DERIVA de
+//         zonas.fecha: la forma de odt.zonas guardada no cambia (la regla pide 4 claves).
+//     La etapa del AZT (sin Responsable) es idéntica en @1 y @2;
 //   · pdf-lib 1.17.1 llega INYECTADO (el vendorizado en el navegador, el de
 //     node_modules en las pruebas): este módulo no importa librerías ni toca el DOM.
 // Es DETERMINISTA: mismos bytes de entrada → mismos bytes de salida (misma
@@ -17,19 +27,28 @@
 // ══════════════════════════════════════════════════════════════════════════════
 
 import { tamanoFirma } from './firmas_tamano.js';
-import { TOPES } from './odt_afinia_rutas.js';
+import { TOPES, esNro } from './odt_afinia_rutas.js';
+import { versionDeComposicion, COMPOSITOR_V2 } from './odt_afinia_cierre.js';
 import { esZonas } from './odt_afinia_zonas.js';
 import { esFechaDMA } from './odt_afinia_textos.js';
 import { esPdf, huella } from './odt_afinia_partes.js';
 
-/** Medidas del estampado (pt). Firma: misma SUPERFICIE para todas (firmas_tamano.js, `99 §101`). */
+/**
+ * Medidas del estampado (pt). Firma: misma SUPERFICIE para todas (firmas_tamano.js, `99 §101`).
+ * `dyGenerada` (clave AGREGADA con @2, cambio compatible): también sirve de marca para que un
+ * consumidor nuevo sepa que este módulo ya sabe componer @2 (L-102: caché de 10 min).
+ */
 export const ESTAMPA = Object.freeze({
   areaPt2: 2400,      // superficie buscada de la firma
   altoMaxPt: 30,      // alto máximo (la casilla mide 34,5)
   margenPt: 2,        // la firma no toca los bordes de la casilla
   tamX: 8,            // «X» en SI, Helvetica 8
-  tamFecha: 7         // FECHA CIERRE, Helvetica 7
+  tamFecha: 7,        // FECHA CIERRE y (@2) el N.º de ODT GENERADA, Helvetica 7
+  dyGenerada: 16.0    // @2: el N.º va 16 pt debajo de la FECHA CIERRE (misma x)
 });
+
+/** Punto donde @2 escribe el N.º de «ODT GENERADA N°»: derivado de zonas.fecha (redondeado a 0,01 pt). */
+const puntoGenerada = (zonas) => ({ x: zonas.fecha.x, y: Math.round((zonas.fecha.y - ESTAMPA.dyGenerada) * 100) / 100 });
 
 const PNG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 /** ¿Bytes de un PNG? */
@@ -73,7 +92,8 @@ function validarActo(rol, acto) {
 /**
  * Arma el PDF firmado.
  * @param {Uint8Array} bytesV0  el PDF original (no se modifica)
- * @param {{azt?:{imagen:Uint8Array}, responsable?:{imagen:Uint8Array, cierre:{si:true, fecha:string}}}} actos
+ * @param {{azt?:{imagen:Uint8Array}, responsable?:{imagen:Uint8Array, cierre:{si:true, fecha:string}, compositor?:string, nro?:string}}} actos
+ *        responsable.compositor: 'odt-afinia@1' (o ausente) o 'odt-afinia@2' (exige responsable.nro de 8 dígitos)
  * @param {{PDFLib:{PDFDocument:any, StandardFonts:any, rgb:Function}, zonas:object}} dep
  * @returns {Promise<Uint8Array>}  sin actos: una COPIA exacta de v0 (lo que se ve es lo publicado)
  */
@@ -91,6 +111,12 @@ export async function componer(bytesV0, actos = {}, { PDFLib, zonas } = {}) {
   const cierre = a.responsable && a.responsable.cierre;
   if (a.responsable && (!cierre || cierre.si !== true || !esFechaDMA(cierre.fecha))) {
     throw new TypeError('El cierre del Responsable necesita SI y una fecha dd/mm/aaaa.');
+  }
+  // Versión: la del acto del Responsable (sin Responsable no hay pie de cierre que estampar).
+  const version = a.responsable ? versionDeComposicion(a.responsable.compositor) : null;
+  const nroGenerada = version === COMPOSITOR_V2 ? a.responsable.nro : null;
+  if (version === COMPOSITOR_V2 && !esNro(nroGenerada)) {
+    throw new TypeError('El compositor ' + COMPOSITOR_V2 + ' necesita el N.º de la ODT (8 dígitos) para «ODT GENERADA N°».');
   }
 
   // Copia: pdf-lib no debe compartir memoria con el v0 que otro módulo puede pasar a pdf.js.
@@ -110,6 +136,11 @@ export async function componer(bytesV0, actos = {}, { PDFLib, zonas } = {}) {
     const negro = PDFLib.rgb(0, 0, 0);
     pagina.drawText('X', { x: zonas.si.x, y: zonas.si.y, size: ESTAMPA.tamX, font: fuente, color: negro });
     pagina.drawText(cierre.fecha, { x: zonas.fecha.x, y: zonas.fecha.y, size: ESTAMPA.tamFecha, font: fuente, color: negro });
+    // @2: el N.º de la ODT en «ODT GENERADA N°». Con @1 no se escribe nada más (mismos bytes que siempre).
+    if (nroGenerada) {
+      const p = puntoGenerada(zonas);
+      pagina.drawText(nroGenerada, { x: p.x, y: p.y, size: ESTAMPA.tamFecha, font: fuente, color: negro });
+    }
   }
   return await doc.save();
 }

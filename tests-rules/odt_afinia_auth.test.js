@@ -72,7 +72,8 @@ function loteFirmaAzt(authTime) {
   b.set(doc(db, 'odt_afinia', ODT, 'actos', 'azt'), {
     rol: 'azt', uid: UID, correo: CORREO, correoVerificado: true, proveedor: 'password', authTime, nombre: NOMBRE, nro: NRO,
     imagen: Bytes.fromUint8Array(FIRMA), huellaImagen: sha(FIRMA), huellaBase: sha(PDF), huellaVista: 'e'.repeat(64),
-    compositor: 'odt-afinia@1', declaracionVersion: 'odt-azt-v1', declaracion: DECL_AZT(NOMBRE, CORREO, NRO), en: serverTimestamp()
+    // Compositor vigente (2026-11-21): la regla solo acepta actos nuevos con 'odt-afinia@2'.
+    compositor: 'odt-afinia@2', declaracionVersion: 'odt-azt-v1', declaracion: DECL_AZT(NOMBRE, CORREO, NRO), en: serverTimestamp()
   });
   b.update(doc(db, 'odt_afinia', ODT), { estado: 'PENDIENTE_RESPONSABLE', rev: 1 });
   return b.commit();

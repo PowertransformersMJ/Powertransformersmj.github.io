@@ -64,14 +64,22 @@ describe('fecha en la hora de Bogotá', () => {
     assert.equal(ordenDMA('05/03/2026'), 20260305);
     assert.ok(Number.isNaN(ordenDMA('xx')));
   });
-  test('errorFechaCierre: ≤ hoy (Bogotá) y ≥ fecha del trabajo', () => {
+  test('errorFechaCierre (2026-11-21): la FECHA CIERRE es la fecha PREVISTA de la orden, exacta, y no posterior a hoy (Bogotá)', () => {
     const ahora = new Date('2026-11-21T04:30:00Z'); // 20/11/2026 en Bogotá
-    assert.equal(errorFechaCierre('20/11/2026', { fechaTrabajo: '18/11/2026', ahora }), null);
+    // Pasa: la prevista, en el pasado o justo hoy.
     assert.equal(errorFechaCierre('18/11/2026', { fechaTrabajo: '18/11/2026', ahora }), null);
-    assert.match(errorFechaCierre('21/11/2026', { fechaTrabajo: '18/11/2026', ahora }), /posterior a hoy/);
-    assert.match(errorFechaCierre('17/11/2026', { fechaTrabajo: '18/11/2026', ahora }), /anterior a la fecha del trabajo/);
+    assert.equal(errorFechaCierre('20/11/2026', { fechaTrabajo: '20/11/2026', ahora }), null);
+    // Se niega: cualquier otra fecha (antes la de hoy pasaba), con un mensaje en llano que nombra la prevista.
+    assert.match(errorFechaCierre('20/11/2026', { fechaTrabajo: '18/11/2026', ahora }), /tiene que ser la fecha prevista de la orden \(18\/11\/2026\)/);
+    assert.match(errorFechaCierre('17/11/2026', { fechaTrabajo: '18/11/2026', ahora }), /fecha prevista de la orden/);
+    // La prevista todavía no llega: se dice desde cuándo se firma.
+    assert.match(errorFechaCierre('21/11/2026', { fechaTrabajo: '21/11/2026', ahora }), /posterior a hoy: el Responsable firma y cierra la ODT desde ese día/);
+    // Forma: fecha mal escrita o prevista inválida.
     assert.match(errorFechaCierre('2026-11-20', { ahora }), /dd\/mm\/aaaa/);
     assert.match(errorFechaCierre('19/11/2026', { fechaTrabajo: '2026-11-18', ahora }), /no es una fecha válida/);
+    // Sin prevista (llamada genérica): solo forma y «hoy».
+    assert.equal(errorFechaCierre('19/11/2026', { ahora }), null);
+    assert.match(errorFechaCierre('21/11/2026', { ahora }), /posterior a hoy/);
   });
   test('nombre del archivo', () => {
     assert.equal(nombreArchivo('00000001'), 'ODT_00000001_firmada.pdf');
