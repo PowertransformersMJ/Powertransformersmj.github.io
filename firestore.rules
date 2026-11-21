@@ -2028,6 +2028,332 @@ service cloud.firestore {
       allow delete: if hasProfile() && isAdmin() && resource.data.clase == 'firma';
     }
 
+    // ══════════════════════════════════════════════════════════════
+    // Firma de ODT Afinia (diseño W-11 del 2026-11-20, tras comité ×3; bloque ADITIVO)
+    // Solo se guarda el PDF ORIGINAL publicado (en partes ≤ 900 KB). Cada firma es un ACTO que solo se crea
+    // (create-only) con la imagen de firmas/{uid} DEL PROPIO firmante, verificada byte a byte aquí; el PDF
+    // firmado lo recompone el navegador con una función pura. Nadie escribe bytes de PDF después de publicar.
+    //   · odt_afinia_firmantes/{uid}: habilitación (una vez; la crea el propio uid; nadie la edita ni la borra).
+    //   · odt_afinia/{id}: la ODT; publica un admin con perfil; AZT y Responsable distintos entre sí, el AZT
+    //     distinto de quien publica, los dos habilitados, activos y en la LISTA BLANCA de su rol; estados
+    //     PENDIENTE_AZT → PENDIENTE_RESPONSABLE → LISTA, o ANULADA (admin, solo desde PENDIENTE_*: una LISTA no se
+    //     anula, D6 del 20-11). Lo leen sus dos firmantes y el admin.
+    //       /partes/{0..4}: solo en el lote de publicación; sha256 == huellasPartes[n]; la 0 empieza por %PDF-.
+    //       /actos/{azt|responsable}: el acto de firmar, en un lote atado (en las DOS direcciones) al cambio de estado.
+    //       /devoluciones/{rol_rev}: «no firmo» del firmante en su turno; id determinista ⇒ una por turno (create-only).
+    //   · odt_afinia_config/firmantes: LISTA BLANCA {azt: [uid], responsable: [uid]}; solo la consola de Firebase la
+    //     escribe (aquí write false); la lee el admin para ofrecer firmantes. Sin ella, nadie publica.
+    //   · odt_afinia_nro/{nro}: candado de unicidad del N.º; se reasigna solo si la ODT vigente está ANULADA.
+    //   · odt_afinia_descargas/{auto}: registro de cada descarga de una ODT LISTA (lo leen solo los admin).
+    // Firmar (y habilitarse) exige reautenticación con contraseña en los últimos 5 minutos (auth_time del token)
+    // y correo verificado: publicar NO la exige (D4 cubre publicar, nunca firmar). Paliativo D5 (20-11: el
+    // Responsable firma con su MISMA cuenta admin): el inicio de sesión del token que firma es POSTERIOR a la
+    // publicación, y el del Responsable además posterior al acto del AZT. Este bloque no nombra ninguna
+    // colección de firmas custodiadas ni delegadas (prueba estática: tests/odt_afinia_reglas_estatico.test.js,
+    // que también cuenta sus llamadas get/exists por operación y por lote). Los textos de acuerdo y declaración
+    // son la plantilla v1 (BORRADOR del Ingeniero) y se comparan aquí carácter a carácter.
+    // Forma de los documentos: `size() == N` y CADA uno de esos N campos se lee sin condición más abajo ⇒ están
+    // exactamente esos campos (uno que falta da error y la regla niega; uno de más cambia el tamaño). Más barato que
+    // listas de claves: el tope es de 1000 expresiones por petición (L-110) y publicar a carga máxima va cerca.
+    // ══════════════════════════════════════════════════════════════
+    function odtRuta(id) { return /databases/$(database)/documents/odt_afinia/$(id); }
+    function odtRutaParte(id, k) { return /databases/$(database)/documents/odt_afinia/$(id)/partes/$(k); }
+    function odtRutaActo(id, rol) { return /databases/$(database)/documents/odt_afinia/$(id)/actos/$(rol); }
+    function odtRutaHab(uid) { return /databases/$(database)/documents/odt_afinia_firmantes/$(uid); }
+    function odtRutaNro(nro) { return /databases/$(database)/documents/odt_afinia_nro/$(nro); }
+    function odtRutaUsuario(uid) { return /databases/$(database)/documents/usuarios/$(uid); }
+    function odtRutaFirmaPropia(uid) { return /databases/$(database)/documents/firmas/$(uid); }
+    function odtRutaConfig() { return /databases/$(database)/documents/odt_afinia_config/firmantes; }
+    function odtHex(h) { return h is string && h.matches('^[0-9a-f]{64}$'); }
+    function odtIdValido(id) { return id is string && id.matches('^[A-Za-z0-9]{20}$'); }
+    function odtTexto(v, min, max) { return v is string && v.size() >= min && v.size() <= max; }
+    // dd/mm/aaaa con un día que existe en ese mes (31/02, 30/02 y 31/04 no). El 29/02 pasa en cualquier año:
+    // el año bisiesto lo valida el dominio (aquí costaría ~10 expresiones por fecha).
+    function odtFecha(f) {
+      return f is string && f.matches('^(0[1-9]|[12][0-9]|3[01])/(0[1-9]|1[0-2])/[0-9]{4}$')
+        && int(f[0:2]) <= [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][int(f[3:5]) - 1];
+    }
+    function odtFechaNum(f) { return int(f[6:10]) * 10000 + int(f[3:5]) * 100 + int(f[0:2]); }
+    // Hoy en Bogotá (UTC-5, sin horario de verano) como aaaammdd.
+    function odtHoyBogota() {
+      let t = request.time - duration.value(5, 'h');
+      return t.year() * 10000 + t.month() * 100 + t.day();
+    }
+    // Reautenticación reciente con contraseña y correo verificado (el token lo firma Firebase Auth, no el cliente).
+    function odtReauth() {
+      let t = request.auth.token;
+      return t.get('firebase', {}).get('sign_in_provider', '') == 'password'
+        && t.get('email_verified', false) == true
+        && t.get('email', null) is string
+        && t.get('auth_time', null) is int
+        && request.time.toMillis() - t.auth_time * 1000 <= 300000;
+    }
+    // El correo de la credencial es el del perfil (sin distinguir mayúsculas).
+    function odtCorreoDelPerfil() {
+      return request.auth.token.email.lower() == profile().get('email', '').lower();
+    }
+    // Textos v1 (BORRADOR del Ingeniero). El dominio los replica; una prueba de texto los amarra.
+    function odtAcuerdo(nombre, correo) {
+      return 'Yo, ' + nombre + ', con mi cuenta personal ' + correo + ', acepto firmar electrónicamente las ODT de Afinia en SGM. Mi firma solo se estampa desde mi propia cuenta y con mi contraseña personal, que no comparto.';
+    }
+    function odtDeclaracionAzt(nombre, correo, nro) {
+      return 'Yo, ' + nombre + ', con mi cuenta personal ' + correo + ', declaro que revisé las dos páginas de la ODT N.º ' + nro + ' y, como AZT EN SITIO, la firmo. Esta firma equivale a mi firma manuscrita.';
+    }
+    function odtDeclaracionResp(nombre, correo, nro, fecha) {
+      return 'Yo, ' + nombre + ', con mi cuenta personal ' + correo + ', declaro que revisé las dos páginas de la ODT N.º ' + nro + ', verifiqué la firma del AZT y, como RESPONSABLE O.D.T., la firmo y la cierro con fecha ' + fecha + '. Esta firma equivale a mi firma manuscrita.';
+    }
+    function odtQuien() { return {'uid': request.auth.uid, 'nombre': profile().get('nombre', '')}; }
+    // Firmante publicado {uid, nombre, correo}: copia exacta de SU habilitación (que solo él pudo crear) y perfil
+    // activo que no es visitante. (Los parámetros se evalúan en cada uso: se pasan rutas cortas, L-110.)
+    function odtFirmanteHabilitado(f) {
+      let h = get(odtRutaHab(f.uid)).data;
+      let u = get(odtRutaUsuario(f.uid)).data;
+      return f.size() == 3 && h.nombre == f.nombre && h.correo == f.correo   // h.uid == id del documento (odtHabilitacion)
+        && u.get('activo', false) == true && !esRolVisitante(u.get('rol', ''));
+    }
+    // Zonas (puntos PDF, derivadas del v0 por el dominio): aquí solo la FORMA exacta; los valores los valida el
+    // dominio y cada firmante ve el PDF compuesto antes de firmar. Validar cada número costaba ~150 expresiones.
+    function odtZonas(z) {
+      return z.size() == 4
+        && z.azt.size() == 4 && z.azt.keys().hasAll(['x', 'y', 'w', 'h'])
+        && z.responsable.size() == 4 && z.responsable.keys().hasAll(['x', 'y', 'w', 'h'])
+        && z.si.size() == 2 && z.si.keys().hasAll(['x', 'y'])
+        && z.fecha.size() == 2 && z.fecha.keys().hasAll(['x', 'y']);
+    }
+
+    // ── Habilitación (una vez, desde la propia cuenta, recién autenticado y con el correo verificado) ──
+    function odtHabilitacion(uid) {
+      let d = request.resource.data;
+      return isTeamMember() && hasProfile() && request.auth.uid == uid
+        && odtReauth() && odtCorreoDelPerfil()
+        // uid, correo, correoVerificado, proveedor, authTime, acuerdoVersion, acuerdo, nombre, en: todos se leen abajo.
+        && d.size() == 9
+        && d.uid == uid
+        && d.correo == request.auth.token.email
+        && d.correoVerificado == true && d.proveedor == 'password'
+        && d.authTime == request.auth.token.auth_time
+        && odtTexto(d.nombre, 3, 120) && d.nombre.trim().size() >= 3 && d.nombre == profile().get('nombre', '')
+        && d.acuerdoVersion == 'odt-acuerdo-v1'
+        && d.acuerdo == odtAcuerdo(d.nombre, d.correo)
+        && d.en == request.time;
+    }
+    match /odt_afinia_firmantes/{uid} {
+      allow get: if isTeamMember() && hasProfile() && (request.auth.uid == uid || isAdmin());
+      allow list: if hasProfile() && isAdmin() && request.query.limit <= 50;
+      allow create: if odtHabilitacion(uid);
+      allow update, delete: if false;
+    }
+    // ── Lista blanca de firmantes por rol {azt: [uid], responsable: [uid]}: SOLO la consola de Firebase la escribe ──
+    match /odt_afinia_config/firmantes {
+      allow get: if hasProfile() && isAdmin();
+      allow list, write: if false;
+    }
+
+    // ── Publicar (lote: odt + partes + candado del N.º), solo un admin con perfil ──
+    function odtPublicacion(id) {
+      let d = request.resource.data;
+      // Lista blanca por rol (solo se escribe desde la consola): con la sesión admin no se fabrica un firmante.
+      let cfg = get(odtRutaConfig()).data;
+      return hasProfile() && isAdmin() && odtIdValido(id)
+        // nro, consignacion, subestacion, equipo, fechaTrabajo, firmantes, lectores, estado, rev, huella, bytes, partes,
+        // huellasPartes, zonas, publicadoPor, publicadoEn: todos se leen abajo (sin `anulacion` al publicar).
+        && d.size() == 16
+        && d.nro is string && d.nro.matches('^[0-9]{8}$')
+        && odtTexto(d.consignacion, 0, 60) && odtTexto(d.subestacion, 1, 120) && odtTexto(d.equipo, 1, 120)
+        && odtFecha(d.fechaTrabajo)
+        && d.firmantes.size() == 2
+        // Separación de funciones: dos personas distintas, y quien publica nunca es el AZT.
+        && d.firmantes.azt.uid != d.firmantes.responsable.uid
+        && d.firmantes.azt.uid != request.auth.uid
+        && odtFirmanteHabilitado(d.firmantes.azt) && odtFirmanteHabilitado(d.firmantes.responsable)
+        && d.firmantes.azt.uid in cfg.azt && d.firmantes.responsable.uid in cfg.responsable
+        && d.lectores == [d.firmantes.azt.uid, d.firmantes.responsable.uid]
+        && d.estado == 'PENDIENTE_AZT' && d.rev == 0
+        && d.partes is int && d.partes >= 1 && d.partes <= 5
+        && odtHex(d.huella)
+        && d.bytes is int && d.bytes >= 1 && d.bytes <= d.partes * 900 * 1024
+        && d.huellasPartes is list && d.huellasPartes.size() == d.partes
+        && (d.partes != 1 || d.huella == d.huellasPartes[0])
+        && odtZonas(d.zonas)
+        && d.publicadoPor == odtQuien() && d.publicadoEn == request.time
+        // Número exacto de partes: la última existe al terminar el lote, cada parte exige la anterior
+        // y ninguna pasa de `partes` (odtParte); el candado del N.º apunta a esta ODT en el MISMO lote.
+        && existsAfter(odtRutaParte(id, string(d.partes - 1)))
+        && getAfter(odtRutaNro(d.nro)).data.odtId == id;
+    }
+    function odtParte(id, n) {
+      let d = request.resource.data;
+      return hasProfile() && isAdmin() && n in ['0', '1', '2', '3', '4']
+        && d.size() == 1
+        && d.datos is bytes && d.datos.size() >= 1 && d.datos.size() <= 900 * 1024
+        // Solo en el lote que CREA la ODT.
+        && !exists(odtRuta(id))
+        && int(n) < getAfter(odtRuta(id)).data.partes
+        && hashing.sha256(d.datos).toHexString().lower() == getAfter(odtRuta(id)).data.huellasPartes[int(n)]
+        && (n != '0' || d.datos.toHexString()[0:10].upper() == '255044462D')
+        && (n == '0' || existsAfter(odtRutaParte(id, string(int(n) - 1))));
+    }
+
+    // ── Firmar (lote de 2: crear actos/{rol} + avanzar el estado de la ODT), atado en las dos direcciones ──
+    function odtActo(id, rol) {
+      let d = request.resource.data;
+      let o = get(odtRuta(id)).data;
+      let n = getAfter(odtRuta(id)).data;
+      let firma = get(odtRutaFirmaPropia(request.auth.uid)).data;
+      let hab = get(odtRutaHab(request.auth.uid)).data;
+      return isTeamMember() && hasProfile() && rol in ['azt', 'responsable']
+        && odtReauth() && odtCorreoDelPerfil()
+        // rol, uid, correo, correoVerificado, proveedor, authTime, nombre, nro, imagen, huellaImagen, huellaBase,
+        // huellaVista, compositor, declaracionVersion, declaracion, en (+ cierre, solo el Responsable): todos se leen abajo.
+        && d.size() == (rol == 'azt' ? 16 : 17)
+        && d.rol == rol
+        // Quien firma es el firmante de ESE rol, con su propia credencial.
+        && d.uid == request.auth.uid && o.firmantes[rol].uid == request.auth.uid
+        && d.correo == request.auth.token.email
+        && d.correoVerificado == true && d.proveedor == 'password'
+        && d.authTime == request.auth.token.auth_time
+        && d.nombre == profile().get('nombre', '')
+        // La identidad del acto es la PUBLICADA (copia de su habilitación): un perfil renombrado después no firma.
+        && d.nombre == o.firmantes[rol].nombre && d.correo == o.firmantes[rol].correo
+        // Paliativo D5: la sesión que firma se abrió DESPUÉS de publicar (una sesión vieja del admin no firma).
+        && request.auth.token.auth_time * 1000 > o.publicadoEn.toMillis()
+        && d.nro == o.nro
+        // Turno y atadura al cambio de estado del mismo lote.
+        && o.estado == (rol == 'azt' ? 'PENDIENTE_AZT' : 'PENDIENTE_RESPONSABLE')
+        && n.estado == (rol == 'azt' ? 'PENDIENTE_RESPONSABLE' : 'LISTA')
+        && n.rev == o.rev + 1
+        // La imagen es la de SU «Mi firma», subida DESPUÉS de habilitarse, y su huella sale de los bytes.
+        && d.imagen is bytes && d.imagen == firma.imagen
+        && hashing.sha256(d.imagen).toHexString().lower() == d.huellaImagen
+        && firma.huella == d.huellaImagen   // la huella guardada por «Mi firma» es la de sus bytes
+        && firma.en > hab.en
+        && d.huellaBase == o.huella && odtHex(d.huellaVista)
+        && d.compositor == 'odt-afinia@1'
+        && d.en == request.time
+        && (rol == 'azt'
+            ? (d.declaracionVersion == 'odt-azt-v1'
+               && d.declaracion == odtDeclaracionAzt(d.nombre, d.correo, o.nro))
+            : (d.declaracionVersion == 'odt-resp-v1'
+               && d.cierre is map && d.cierre.size() == 2
+               && d.cierre.si == true && odtFecha(d.cierre.fecha)
+               && odtFechaNum(d.cierre.fecha) <= odtHoyBogota()
+               && odtFechaNum(d.cierre.fecha) >= odtFechaNum(o.fechaTrabajo)
+               && d.declaracion == odtDeclaracionResp(d.nombre, d.correo, o.nro, d.cierre.fecha)
+               && get(odtRutaActo(id, 'azt')).data.uid != request.auth.uid
+               // Paliativo D5: el Responsable inició sesión DESPUÉS de la firma del AZT (misma lectura, sin costo).
+               && request.auth.token.auth_time * 1000 > get(odtRutaActo(id, 'azt')).data.en.toMillis()));
+    }
+    function odtTransicion(id) {
+      let o = resource.data;
+      let n = request.resource.data;
+      let rol = o.estado == 'PENDIENTE_AZT' ? 'azt' : 'responsable';
+      return isTeamMember() && hasProfile()
+        && o.estado in ['PENDIENTE_AZT', 'PENDIENTE_RESPONSABLE']
+        && request.auth.uid == o.firmantes[rol].uid
+        && n.diff(o).affectedKeys().hasOnly(['estado', 'rev'])
+        && n.estado == (rol == 'azt' ? 'PENDIENTE_RESPONSABLE' : 'LISTA')
+        && n.rev == o.rev + 1
+        && !exists(odtRutaActo(id, rol)) && existsAfter(odtRutaActo(id, rol));
+    }
+    // ── Anular: admin con perfil, solo desde PENDIENTE_* (D6: una LISTA ya firmada no se anula), con motivo ──
+    function odtAnulacion() {
+      let o = resource.data;
+      let n = request.resource.data;
+      return hasProfile() && isAdmin()
+        && o.estado in ['PENDIENTE_AZT', 'PENDIENTE_RESPONSABLE']
+        && n.diff(o).affectedKeys().hasOnly(['estado', 'rev', 'anulacion'])
+        && n.estado == 'ANULADA' && n.rev == o.rev + 1
+        && n.anulacion is map
+        && n.anulacion.size() == 3
+        && odtTexto(n.anulacion.motivo, 10, 500)
+        && n.anulacion.por == odtQuien()
+        && n.anulacion.en == request.time;
+    }
+    // Lector de una ODT (y de sus partes, actos y devoluciones): sus dos firmantes o un admin con perfil.
+    function odtLector(id) {
+      return isTeamMember() && hasProfile()
+        && (isAdmin() || request.auth.uid in get(odtRuta(id)).data.lectores);
+    }
+    // Id determinista «rol_rev»: una devolución por turno (la segunda sería update, que está en false).
+    function odtDevolucion(id, dv) {
+      let d = request.resource.data;
+      let o = get(odtRuta(id)).data;
+      return isTeamMember() && hasProfile()
+        && d.size() == 4   // uid, rol, motivo, en
+        && d.uid == request.auth.uid && d.rol in ['azt', 'responsable']
+        && dv == d.rol + '_' + string(o.rev)
+        && o.estado == (d.rol == 'azt' ? 'PENDIENTE_AZT' : 'PENDIENTE_RESPONSABLE')
+        && o.firmantes[d.rol].uid == request.auth.uid
+        && odtTexto(d.motivo, 10, 500)
+        && d.en == request.time;
+    }
+    match /odt_afinia/{id} {
+      allow get: if isTeamMember() && hasProfile() && (isAdmin() || request.auth.uid in resource.data.lectores);
+      // La bandeja: where('lectores', 'array-contains', uid) + limit ≤ 50 (el admin, con limit).
+      allow list: if request.query.limit <= 50 && isTeamMember() && hasProfile()
+                  && (isAdmin() || request.auth.uid in resource.data.lectores);
+      allow create: if odtPublicacion(id);
+      allow update: if odtTransicion(id) || odtAnulacion();
+      allow delete: if false;
+
+      match /partes/{n} {
+        allow get: if odtLector(id);
+        allow list: if false;
+        allow create: if odtParte(id, n);
+        allow update, delete: if false;
+      }
+      match /actos/{rol} {
+        allow get: if odtLector(id);
+        allow list: if request.query.limit <= 2 && odtLector(id);
+        allow create: if odtActo(id, rol);
+        allow update, delete: if false;
+      }
+      match /devoluciones/{dv} {
+        allow get: if odtLector(id);
+        allow list: if request.query.limit <= 20 && odtLector(id);
+        allow create: if odtDevolucion(id, dv);
+        allow update, delete: if false;
+      }
+    }
+
+    // ── Candado del N.º: {odtId}; nace con la ODT y solo se reasigna si la vigente está ANULADA ──
+    function odtCandado(nro) {
+      let d = request.resource.data;
+      return hasProfile() && isAdmin() && nro.matches('^[0-9]{8}$')
+        && d.size() == 1
+        && odtIdValido(d.odtId)
+        && !exists(odtRuta(d.odtId))
+        && getAfter(odtRuta(d.odtId)).data.nro == nro;
+    }
+    function odtCandadoLibre() {
+      return request.resource.data.odtId != resource.data.odtId
+        && get(odtRuta(resource.data.odtId)).data.estado == 'ANULADA';
+    }
+    match /odt_afinia_nro/{nro} {
+      allow get: if hasProfile() && isAdmin();
+      allow list: if false;
+      allow create: if odtCandado(nro);
+      allow update: if odtCandado(nro) && odtCandadoLibre();
+      allow delete: if false;
+    }
+
+    // ── Registro de descargas: lo crea un lector de una ODT LISTA; lo leen solo los admin ──
+    function odtDescarga() {
+      let d = request.resource.data;
+      return isTeamMember() && hasProfile()
+        && d.size() == 4   // odtId, uid, huella, en
+        && odtIdValido(d.odtId)
+        && d.uid == request.auth.uid && odtHex(d.huella) && d.en == request.time
+        && get(odtRuta(d.odtId)).data.estado == 'LISTA'
+        && (isAdmin() || request.auth.uid in get(odtRuta(d.odtId)).data.lectores);
+    }
+    match /odt_afinia_descargas/{dId} {
+      allow get: if hasProfile() && isAdmin();
+      allow list: if hasProfile() && isAdmin() && request.query.limit <= 50;
+      allow create: if odtDescarga();
+      allow update, delete: if false;
+    }
+
     // ── Resto: cerrado por defecto ──
     match /{document=**} {
       allow read, write: if false;

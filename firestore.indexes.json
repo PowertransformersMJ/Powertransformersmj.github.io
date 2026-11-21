@@ -452,6 +452,14 @@
         { "fieldPath": "emisor", "order": "ASCENDING" },
         { "fieldPath": "en",     "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "odt_afinia",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "lectores",    "arrayConfig": "CONTAINS" },
+        { "fieldPath": "publicadoEn", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [
@@ -471,6 +479,8 @@
     { "collectionGroup": "archivos", "fieldPath": "bytes", "indexes": [] },
     { "collectionGroup": "informes_brigada_bin", "fieldPath": "bytes", "indexes": [] },
     { "collectionGroup": "partes", "fieldPath": "bytes", "indexes": [] },
+    { "collectionGroup": "partes", "fieldPath": "datos", "indexes": [] },
+    { "collectionGroup": "actos", "fieldPath": "imagen", "indexes": [] },
     { "collectionGroup": "informes_brigada", "fieldPath": "contenido", "indexes": [] },
     { "collectionGroup": "versiones", "fieldPath": "contenido", "indexes": [] }
   ]

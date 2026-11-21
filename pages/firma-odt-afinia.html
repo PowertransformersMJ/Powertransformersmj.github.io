@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="es" data-aqua>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="robots" content="noindex, nofollow"/>
+  <meta name="theme-color" content="#f4f6fb"/>
+  <meta name="color-scheme" content="light"/>
+  <title>SGM · TRANSPOWER — Firma de ODT Afinia</title>
+  <link rel="icon" type="image/svg+xml" href="../assets/img/aqua/logo-aqua.svg"/>
+  <script type="module" src="../assets/js/auth/page-guard.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="../assets/css/aqua-tokens.css"/>
+  <link rel="stylesheet" href="../assets/css/aqua-components.css"/>
+  <link rel="stylesheet" href="../assets/css/odt-afinia.css"/>
+</head>
+<body class="aqua">
+<main class="app-main page-container">
+
+  <div class="page-header">
+    <div class="breadcrumb">Ejecución / Firma de ODT Afinia</div>
+    <h1 class="page-title">Firma de <em>ODT Afinia</em></h1>
+    <p class="page-subtitle">
+      El administrador publica la ODT original; el AZT EN SITIO y el RESPONSABLE O.D.T. la
+      firman, cada uno desde su propia cuenta y con su contraseña. La ODT firmada se descarga
+      con el registro de quién la bajó.
+    </p>
+  </div>
+
+  <!-- Franja de estado (vista previa: la página aún no está en el menú). La llena app.js. -->
+  <div id="odtFranja" class="odt-franja" role="status" aria-live="polite"></div>
+
+  <!-- El módulo se monta aquí: todo su marcado vive bajo el prefijo .odt- -->
+  <div id="odtApp" class="odt-raiz"><p class="odt-cargando">Cargando la firma de ODT…</p></div>
+
+  <!-- L-107: imprimir no es una salida del documento firmado. -->
+  <p class="odt-solo-impresion">Esta página no se imprime. La ODT firmada se entrega solo con «Descargar», que deja registro.</p>
+
+</main>
+
+<script type="module">
+  // ── Módulo (L-102: archivos nuevos por import(), un fallo no tumba la página) ──
+  // La sesión la confirma el guard (page-guard.js); app.js espera el evento
+  // `sgm:session-ready` antes de leer Firestore (lección ADR-054).
+  const raiz = document.getElementById('odtApp');
+  try {
+    const { montarOdtAfinia } = await import('../assets/js/ui/odt-afinia/app.js');
+    // Nada queda en window (ni repositorio ni cuenta): revisión W-11, cod.
+    await montarOdtAfinia(raiz, { franja: document.getElementById('odtFranja') });
+  } catch (err) {
+    console.error('[firma-odt-afinia] no se pudo cargar el módulo:', err);
+    raiz.textContent = 'No se pudo cargar la Firma de ODT Afinia. '
+      + 'Recargue la página con Cmd + Shift + R (Ctrl + Shift + R en Windows).';
+  }
+</script>
+
+<script src="../assets/vendor/lucide/lucide.min.js" defer></script>
+<script src="../assets/js/aqua.js" defer></script>
+<script src="../assets/js/aqua-shell.js" defer></script>
+</body>
+</html>
