@@ -15,6 +15,10 @@
 //   · Decisión del Ingeniero del 2026-11-21 («la contraseña solo al iniciar sesión»): el acto de firmar exige una sesión
 //     abierta con correo y contraseña y el correo verificado, SIN ventana de 5 min ni paliativo D5; la habilitación
 //     sigue exigiendo contraseña reciente. Quitar D5 no cambia el presupuesto: sus lecturas ya se hacían para otra cosa.
+//   · «Por subsanar · ODT Afinia» (decisión del Ingeniero del 2026-11-21) es un bloque APARTE (justo después del de la firma,
+//     que termina donde él empieza): el mismo presupuesto (≤ 10 por operación, ≤ 20 por lote: registrar con 40 puntos
+//     cuesta 11 y 12 con el candado reasignado), su aislamiento, el rastro atado, RESUELTA final, «un N.º, una obs
+//     ABIERTA» y su índice compuesto.
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -26,11 +30,22 @@ const leer = (p) => readFileSync(resolve(RAIZ, p), 'utf8');
 const REGLAS = leer('firestore.rules');
 const INICIO = '// Firma de ODT Afinia (diseño W-11';
 const FIN = '// ── Resto: cerrado por defecto ──';
+// «Por subsanar · ODT Afinia» (2026-11-21) es un bloque APARTE, entre el de la firma y el resto: se revisa abajo con
+// sus propias cuentas, y el bloque de la firma termina donde él empieza.
+const INICIO_OBS = '// Por subsanar · ODT Afinia';
 
 function bloqueDe(texto) {
   const i = texto.indexOf(INICIO);
-  const j = texto.indexOf(FIN, i);
+  let j = texto.indexOf(FIN, i);
+  const k = texto.indexOf(INICIO_OBS, i);
+  if (k > i && k < j) j = k;
   assert.ok(i > 0 && j > i, 'no encontré el bloque de ODT Afinia en firestore.rules');
+  return texto.slice(i, j);
+}
+function bloqueObsDe(texto) {
+  const i = texto.indexOf(INICIO_OBS);
+  const j = texto.indexOf(FIN, i);
+  assert.ok(i > 0 && j > i, 'no encontré el bloque «Por subsanar · ODT Afinia» en firestore.rules');
   return texto.slice(i, j);
 }
 const BLOQUE = bloqueDe(REGLAS);
@@ -452,5 +467,170 @@ describe('exenciones de índice de los binarios del módulo (firestore.indexes.j
     // Una línea por exención, con el mismo formato que las demás (L-66 §117: se inserta como texto).
     assert.match(IDX, /\n {4}\{ "collectionGroup": "partes", "fieldPath": "datos", "indexes": \[\] \},\n/);
     assert.match(IDX, /\n {4}\{ "collectionGroup": "actos", "fieldPath": "imagen", "indexes": \[\] \},\n/);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// «Por subsanar · ODT Afinia» (decisión del Ingeniero del 2026-11-21): el mismo presupuesto de lecturas (≤ 10 por
+// operación, ≤ 20 por lote, peor caso por TEXTO), su aislamiento y las condiciones clave en la regla que toca.
+describe('«Por subsanar · ODT Afinia»: presupuesto de lecturas (peor caso) y contrato', () => {
+  const BLOQUE_OBS = bloqueObsDe(REGLAS);
+  const ALLOWS_OBS = allowsDe(BLOQUE_OBS);
+  const cuerpo = (n) => norm(FNS.get(n).cuerpo);
+  // Los lotes que escribe la página (data/odt_afinia_obs_lotes.js): registrar = obs + candado + hasta 40 puntos;
+  // un cambio de punto = update del punto + update del resumen de la obs; agregar = punto nuevo + resumen; resolver = obs.
+  const PUNTOS = Array.from({ length: 40 }, (_, i) => ['odtObsPuntoNuevo(id, k)', { k: `'${i}'` }]);
+  const UPDATE_OBS = 'odtObsResumen(id) || odtObsResuelta()';
+  const UPDATE_PUNTO = 'odtObsSubsanado(id, k) || odtObsRevision(id, k)';
+  const LOTES_OBS = {
+    'registrar (obs + candado nuevo + 40 puntos)': [['odtObsNueva(id)'], ['odtObsCandado(nro)'], ...PUNTOS],
+    'registrar un N.º cuya obs está RESUELTA (obs + candado reasignado + 40 puntos)': [['odtObsNueva(id)'], ['odtObsCandado(nro) && odtObsCandadoLibre()'], ...PUNTOS],
+    'cambiar un punto (punto + resumen de la obs)': [[UPDATE_PUNTO, { k: "'3'" }], [UPDATE_OBS]],
+    'agregar un punto (punto nuevo + resumen de la obs)': [['odtObsPuntoNuevo(id, k)', { k: "'7'" }], [UPDATE_OBS]],
+    'dar por resuelta (update de la obs)': [[UPDATE_OBS]]
+  };
+  const COSTO_LOTE_OBS = {
+    'registrar (obs + candado nuevo + 40 puntos)': 11,
+    'registrar un N.º cuya obs está RESUELTA (obs + candado reasignado + 40 puntos)': 12,
+    'cambiar un punto (punto + resumen de la obs)': 6,
+    'agregar un punto (punto nuevo + resumen de la obs)': 5,
+    'dar por resuelta (update de la obs)': 4
+  };
+
+  test('se encontraron el bloque, sus reglas y sus funciones', () => {
+    assert.equal(ALLOWS_OBS.length, 15, 'allows: ' + ALLOWS_OBS.map((a) => a.ops).join(' | '));
+    for (const n of ['odtObsNueva', 'odtObsPuntoNuevo', 'odtObsCambio', 'odtObsSubsanado', 'odtObsRevision', 'odtObsResumen', 'odtObsResuelta',
+      'odtObsLector', 'odtObsCandado', 'odtObsCandadoLibre', 'odtObsRuta', 'odtObsRutaPunto', 'odtObsRutaNro', 'odtObsIdPunto', 'odtObsIds']) assert.ok(FNS.has(n), n);
+    // El bloque de la firma ya no incluye este (sus cuentas de arriba no cambian).
+    assert.ok(!BLOQUE.includes('odt_afinia_obs'), 'el bloque de la firma terminó donde empieza «Por subsanar»');
+  });
+  test('cada operación lee como máximo 10 (llamadas distintas por su texto)', () => {
+    for (const a of ALLOWS_OBS) {
+      const n = llamadas(a.expr, FNS).size;
+      assert.ok(n <= 10, `«allow ${a.ops}: if ${a.expr.slice(0, 70)}» lee ${n}: ${[...llamadas(a.expr, FNS)].join(' | ')}`);
+    }
+  });
+  test('las operaciones clave cuestan lo que dice el diseño (registrar 8, punto nuevo 4, cambio de punto 5, resumen 4)', () => {
+    const cuesta = (e) => llamadas(e, FNS).size;
+    // Registrar = perfil (3) + lista blanca + habilitación y perfil del AZT + el último punto + el candado.
+    assert.equal(cuesta('odtObsNueva(id)'), 8);
+    assert.ok(llamadas('odtObsNueva(id)', FNS).has('get(odtRutaConfig())'), 'registrar lee la lista blanca de AZT');
+    assert.equal(cuesta('odtObsPuntoNuevo(id, k)'), 4);
+    assert.equal(cuesta(UPDATE_PUNTO), 5);
+    assert.equal(cuesta(UPDATE_OBS), 4);
+    assert.equal(cuesta('odtObsCandado(nro)'), 5);
+    assert.equal(cuesta('odtObsCandado(nro) && odtObsCandadoLibre()'), 6);
+    // Leer: la obs y la lista, solo el perfil; un punto, además la obs.
+    assert.equal(cuesta('odtObsLector(id)'), 4);
+  });
+  for (const [nombre, ops] of Object.entries(LOTES_OBS)) {
+    test(`lote «${nombre}»: ≤ 20 en total (hoy ${COSTO_LOTE_OBS[nombre]})`, () => {
+      const t = llamadasDelLote(ops, FNS, ALLOWS_OBS);
+      assert.ok(t.size <= 20, `${nombre}: ${t.size} → ${[...t].join(' | ')}`);
+      assert.equal(t.size, COSTO_LOTE_OBS[nombre], `${nombre}: ${[...t].join(' | ')}`);
+    });
+  }
+  test('mutación (L-144): una lectura que dependa del id del punto haría pasar de 20 el lote de registrar', () => {
+    // Por eso la regla NO encadena cada punto con el anterior (existsAfter del punto k-1): con 40 puntos serían 40 lecturas.
+    const mut = REGLAS.replace("&& o.estado == 'ABIERTA' && o.resumen[k] == 'PENDIENTE';",
+      "&& o.estado == 'ABIERTA' && o.resumen[k] == 'PENDIENTE' && (k == '0' || existsAfter(odtObsRutaPunto(id, string(int(k) - 1))));");
+    assert.notEqual(mut, REGLAS, 'la mutación no encontró su ancla');
+    const nombre = 'registrar (obs + candado nuevo + 40 puntos)';
+    assert.ok(llamadasDelLote(LOTES_OBS[nombre], funcionesDe(mut), allowsDe(bloqueObsDe(mut))).size > 20);
+    // Y una lectura más en registrar (en el tope de 8) se ve.
+    const mut2 = REGLAS.replace('&& getAfter(odtObsRutaNro(d.nro)).data.obsId == id;', '&& getAfter(odtObsRutaNro(d.nro)).data.obsId == id && exists(odtObsRutaNro(\'m\'));');
+    assert.notEqual(mut2, REGLAS);
+    assert.equal(llamadas('odtObsNueva(id)', funcionesDe(mut2)).size, 9);
+  });
+  test('solo llama a las globales de sesión/rol, a las suyas y a unas pocas del bloque de la firma', () => {
+    const PERMITIDAS = new Set(['isSignedIn', 'hasProfile', 'profile', 'adminsBootstrapValido', 'esRolVisitante', 'isTeamMember', 'isAdmin',
+      'odtQuien', 'odtTexto', 'odtFecha', 'odtIdValido', 'odtFirmanteHabilitado', 'odtRutaConfig', 'odtRutaHab', 'odtRutaUsuario']);
+    const propias = new Set(funcionesDe(BLOQUE_OBS).keys());
+    const usadas = new Set();
+    for (const a of ALLOWS_OBS) llamadas(a.expr, FNS, usadas);
+    for (const f of usadas) assert.ok(propias.has(f) || PERMITIDAS.has(f), 'llama a ' + f);
+    for (const f of propias) assert.ok(f.startsWith('odtObs'), 'función sin prefijo odtObs: ' + f);
+  });
+  test('solo lee sus colecciones, la lista blanca, la habilitación y el perfil del AZT, el perfil propio y /admins', () => {
+    const cols = new Set();
+    for (const a of ALLOWS_OBS) {
+      for (const x of llamadas(a.expr, FNS)) {
+        const ruta = x.replace(/^\w+\(/, '');
+        const f = /^odt(Obs)?Ruta(\w*)\(/.exec(ruta);
+        if (f) { cols.add(f[0].slice(0, -1)); continue; }
+        cols.add(/documents\/(\w+)/.exec(ruta)[1]);
+      }
+    }
+    assert.deepEqual([...cols].sort(), ['admins', 'odtObsRuta', 'odtObsRutaNro', 'odtObsRutaPunto', 'odtRutaConfig', 'odtRutaHab', 'odtRutaUsuario', 'usuarios'].sort());
+    assert.ok(!/firmas_equipo|firmas_delegad|odtRutaFirmaPropia/i.test(sinComentarios(BLOQUE_OBS)), 'no toca firmas');
+  });
+  test('nada se borra y nadie lista el candado; la obs se lista con limit ≤ 50 y los puntos con ≤ 40', () => {
+    const sc = sinComentarios(BLOQUE_OBS);
+    assert.equal((sc.match(/allow delete: if false;/g) || []).length, 3);
+    assert.ok(!/allow (write|delete)[^;]*: if (?!false)/.test(sc), 'ningún delete/write abierto');
+    assert.match(sc, /match \/odt_afinia_obs_nro\/\{nro\} \{\s*allow get: if hasProfile\(\) && isAdmin\(\);\s*allow list: if false;/);
+    assert.ok(cuerpo('odtObsLector').includes(norm('(isAdmin() || request.auth.uid in get(odtObsRuta(id)).data.lectores)')));
+    assert.ok(norm(sc).includes(norm('allow list: if request.query.limit <= 50 && isTeamMember() && hasProfile() && (isAdmin() || request.auth.uid in resource.data.lectores);')));
+    assert.ok(norm(sc).includes(norm('allow list: if request.query.limit <= 40 && odtObsLector(id);')));
+  });
+  test('registrar: admin con perfil, AZT de la lista blanca y habilitado (no quien registra), resumen contiguo y PENDIENTE, candado en el MISMO lote', () => {
+    const c = cuerpo('odtObsNueva');
+    for (const x of ['hasProfile() && isAdmin()', 'd.size() == 11', 'd.azt.uid != request.auth.uid', 'odtFirmanteHabilitado(d.azt) && d.azt.uid in cfg.azt',
+      'd.lectores == [d.azt.uid]', "d.estado == 'ABIERTA' && d.rev == 0", 'd.resumen.keys().hasOnly(odtObsIds()[0:d.resumen.size()])',
+      "d.resumen.values().hasOnly(['PENDIENTE'])", 'd.creadoPor == odtQuien() && d.creadoEn == request.time',
+      'existsAfter(odtObsRutaPunto(id, string(d.resumen.size() - 1)))', 'getAfter(odtObsRutaNro(d.nro)).data.obsId == id']) assert.ok(c.includes(norm(x)), x);
+    const pn = cuerpo('odtObsPuntoNuevo');
+    for (const x of ['hasProfile() && isAdmin() && odtObsIdPunto(k)', 'd.size() == 8', 'd.orden == int(k)', "d.estado == 'PENDIENTE' && d.rev == 0",
+      'd.rastro is map && d.rastro.size() == 0', "o.estado == 'ABIERTA' && o.resumen[k] == 'PENDIENTE'"]) assert.ok(pn.includes(norm(x)), x);
+  });
+  test('un cambio de punto: solo estado, rev y UNA entrada nueva del rastro (de, a, nota, quién, hora del servidor), atado al resumen', () => {
+    const c = cuerpo('odtObsCambio');
+    for (const x of ["n.diff(o).affectedKeys().hasOnly(['estado', 'rev', 'rastro'])", 'n.rev == o.rev + 1 && n.rev <= 50', '!(r in o.rastro)',
+      'n.rastro.diff(o.rastro).affectedKeys().hasOnly([r])', 'n.rastro[r].size() == 5', 'n.rastro[r].de == o.estado && n.rastro[r].a == n.estado',
+      'n.rastro[r].por == odtQuien()', 'n.rastro[r].en == request.time']) assert.ok(c.includes(norm(x)), x);
+    const sub = cuerpo('odtObsSubsanado');
+    for (const x of ['isTeamMember() && hasProfile()', "request.auth.uid in obs.lectores && obs.estado == 'ABIERTA'",
+      "resource.data.estado == 'PENDIENTE' && request.resource.data.estado == 'SUBSANADO'", 'odtObsCambio(3)',
+      "getAfter(odtObsRuta(id)).data.resumen[k] == 'SUBSANADO'"]) assert.ok(sub.includes(norm(x)), x);
+    const rev = cuerpo('odtObsRevision');
+    for (const x of ['hasProfile() && isAdmin()', "get(odtObsRuta(id)).data.estado == 'ABIERTA'", "o.estado == 'SUBSANADO'",
+      'o.rastro[string(o.rev)].por.uid != request.auth.uid', "(n.estado == 'VERIFICADO' && odtObsCambio(0)) || (n.estado == 'PENDIENTE' && odtObsCambio(3))",
+      'getAfter(odtObsRuta(id)).data.resumen[k] == n.estado']) assert.ok(rev.includes(norm(x)), x);
+    const res = cuerpo('odtObsResumen');
+    for (const x of ["o.estado == 'ABIERTA'", "n.diff(o).affectedKeys().hasOnly(['resumen', 'ultimo'])", 'odtObsIdPunto(n.ultimo)',
+      'n.resumen.diff(o.resumen).affectedKeys().hasOnly([n.ultimo])', 'n.resumen[n.ultimo] == getAfter(odtObsRutaPunto(id, n.ultimo)).data.estado']) assert.ok(res.includes(norm(x)), x);
+  });
+  test('RESUELTA: admin con perfil, solo desde ABIERTA, con nota 3-500; no tiene salida; candado libre solo con la anterior RESUELTA', () => {
+    const r = cuerpo('odtObsResuelta');
+    for (const x of ['hasProfile() && isAdmin()', "o.estado == 'ABIERTA'", "n.diff(o).affectedKeys().hasOnly(['estado', 'rev', 'resolucion'])",
+      "n.estado == 'RESUELTA' && n.rev == o.rev + 1", 'n.resolucion.size() == 3', 'odtTexto(n.resolucion.nota, 3, 500)',
+      'n.resolucion.por == odtQuien()', 'n.resolucion.en == request.time']) assert.ok(r.includes(norm(x)), x);
+    for (const f of ['odtObsResumen', 'odtObsResuelta', 'odtObsSubsanado', 'odtObsRevision', 'odtObsPuntoNuevo']) {
+      assert.ok(!cuerpo(f).includes(norm("o.estado == 'RESUELTA'")), f + ' parte de RESUELTA');
+    }
+    assert.ok(cuerpo('odtObsCandadoLibre').includes(norm("get(odtObsRuta(resource.data.obsId)).data.estado == 'RESUELTA'")));
+    assert.match(sinComentarios(BLOQUE_OBS), /allow update: if odtObsCandado\(nro\) && odtObsCandadoLibre\(\);/);
+  });
+  test('textos en NFC, estados del contrato y ningún apellido ni correo real en el bloque', () => {
+    assert.equal(BLOQUE_OBS, BLOQUE_OBS.normalize('NFC'));
+    const literales = new Set([...sinComentarios(BLOQUE_OBS).matchAll(/'([^'\\]*)'/g)].map((m) => m[1]));
+    const estados = [...literales].filter((x) => /^[A-Z][A-Z_]+$/.test(x)).sort();
+    assert.deepEqual(estados, ['ABIERTA', 'PENDIENTE', 'RESUELTA', 'SUBSANADO', 'VERIFICADO']);
+    const fuente = /const SOSPECHOSO = \/\(([^)]*)\)\/i;/.exec(leer('scripts/guardia-firmas.mjs'));
+    const GENERICAS = new Set(['firma', 'signature', '\\bsign', 'firmas-equipo']);
+    const apellidos = fuente ? fuente[1].split('|').filter((x) => !GENERICAS.has(x)) : [];
+    assert.ok(apellidos.length >= 4);
+    const sinTildes = (t) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    for (const a of apellidos) assert.ok(!sinTildes(BLOQUE_OBS).includes(a), a);
+    assert.ok(!/@[a-z0-9-]+\.[a-z]{2,}/i.test(BLOQUE_OBS), 'un correo escrito en el bloque');
+  });
+  test('índice compuesto de la pestaña (lectores CONTAINS + creadoEn DESC) y el rastro sin índice', () => {
+    const IDX = JSON.parse(leer('firestore.indexes.json'));
+    const ix = IDX.indexes.find((x) => x.collectionGroup === 'odt_afinia_obs');
+    assert.ok(ix, 'falta el índice de odt_afinia_obs');
+    assert.equal(ix.queryScope, 'COLLECTION');
+    assert.deepEqual(ix.fields, [{ fieldPath: 'lectores', arrayConfig: 'CONTAINS' }, { fieldPath: 'creadoEn', order: 'DESCENDING' }]);
+    assert.ok(IDX.fieldOverrides.some((x) => x.collectionGroup === 'puntos' && x.fieldPath === 'rastro' && Array.isArray(x.indexes) && x.indexes.length === 0));
+    assert.match(leer('firestore.indexes.json'), /\n {4}\{ "collectionGroup": "puntos", "fieldPath": "rastro", "indexes": \[\] \},\n/);
   });
 });

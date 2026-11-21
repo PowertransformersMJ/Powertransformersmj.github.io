@@ -2415,6 +2415,195 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // ══════════════════════════════════════════════════════════════
+    // Por subsanar · ODT Afinia (decisión del Ingeniero del 2026-11-21; bloque ADITIVO, aparte del de la firma)
+    // Las ODT de Afinia con inconsistencias que hay que corregir ANTES de publicarlas para firma y cerrarlas. El AZT
+    // asignado ve SUS puntos y marca cada uno «subsanado» con una nota; el administrador lo verifica o lo devuelve.
+    // Con todos verificados la ODT queda «Lista para publicar» (se publica en el flujo de firma de arriba: aquí no).
+    //   · odt_afinia_obs/{id}: nro, subestacion, equipo, fechaPrevista, azt {uid, nombre, correo} (en la LISTA BLANCA azt,
+    //     habilitado, activo y no visitante: copia exacta de SU habilitación; nunca quien la registra), lectores [uid del
+    //     AZT], estado ABIERTA → RESUELTA (admin con perfil, con nota; final), resumen {idPunto: estado} (la lista y el
+    //     contador salen de la obs sin leer los puntos), creadoPor, creadoEn, rev. La registra un admin con perfil, en
+    //     UN lote con su candado y sus puntos (resumen contiguo desde '0', todo PENDIENTE; el último punto existe).
+    //       /puntos/{k} (k = '0'..'39'): orden (== k), texto 5-600, quien (contratista | azt | responsable: a quién le
+    //         toca), estado, rev, rastro, creadoPor, creadoEn. Lo crea solo un admin con perfil, con la obs ABIERTA y con su
+    //         entrada PENDIENTE en el resumen al terminar el lote (getAfter): al registrar, o con «Agregar punto» (punto y
+    //         resumen.<k> en el mismo lote). Por el presupuesto de lecturas, al registrar la obs exige solo que exista el
+    //         ÚLTIMO punto, no cada uno: un registro a medias escrito directo a la base (la página siempre escribe todos)
+    //         dejaría un hueco. La pantalla lo avisa («Falta el punto N») y un admin lo repara creando ese punto suelto
+    //         (su entrada PENDIENTE ya está en el resumen). Decisión del 2026-11-21: se deja esa reparación en vez de
+    //         exigir que el punto nazca en el mismo lote que su entrada, que dejaría el hueco sin arreglo (pruebas:
+    //         «hueco de un registro a medias»). Transiciones (solo con la obs ABIERTA):
+    //           AZT asignado (uid en lectores, del equipo y con perfil): PENDIENTE → SUBSANADO, nota 3-500;
+    //           admin con perfil: SUBSANADO → VERIFICADO (nota 0-500) o SUBSANADO → PENDIENTE («devolver», nota 3-500);
+    //           quien lo marcó subsanado no lo verifica ni lo devuelve (separación de funciones).
+    //         RASTRO (nada se borra): cada cambio AGREGA rastro[rev] = {de, a, nota, por, en} con rev = rev + 1, en el MISMO
+    //         documento: la regla ve el antes y el después, así que no hay cambio de estado sin su entrada y ninguna
+    //         entrada anterior se cambia ni se quita (MapDiff). Hasta 50 cambios por punto.
+    //       resumen[k] de la obs y el estado del punto k se mueven en el MISMO lote, atados en las dos direcciones
+    //       (el punto exige getAfter(obs).resumen[k] == su estado nuevo; la obs, que resumen[ultimo] == getAfter(punto)).
+    //   · odt_afinia_obs_nro/{nro}: candado «un N.º, una obs ABIERTA»: {obsId}; nace con la obs y solo se reasigna si la
+    //     obs que tiene está RESUELTA. Lo lee solo el admin.
+    // Lectura: un admin con perfil, o el AZT asignado. Visitante fuera. Nada se borra (delete false).
+    // Solo llama a las funciones globales de sesión/rol y a las del bloque de la firma (odtQuien, odtTexto, odtFecha,
+    // odtIdValido, odtFirmanteHabilitado, odtRutaConfig); sus lecturas se cuentan en tests/odt_afinia_reglas_estatico.test.js.
+    // ══════════════════════════════════════════════════════════════
+    function odtObsRuta(id) { return /databases/$(database)/documents/odt_afinia_obs/$(id); }
+    function odtObsRutaPunto(id, k) { return /databases/$(database)/documents/odt_afinia_obs/$(id)/puntos/$(k); }
+    function odtObsRutaNro(nro) { return /databases/$(database)/documents/odt_afinia_obs_nro/$(nro); }
+    function odtObsIdPunto(k) { return k is string && k.matches('^([0-9]|[1-3][0-9])$'); }
+    function odtObsIds() {
+      return ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19',
+              '20', '21', '22', '23', '24', '25', '26', '27', '28', '29', '30', '31', '32', '33', '34', '35', '36', '37', '38', '39'];
+    }
+
+    // ── Registrar (lote: obs + candado del N.º + puntos), solo un admin con perfil ──
+    function odtObsNueva(id) {
+      let d = request.resource.data;
+      // Lista blanca de AZT (la misma de la firma; solo la consola la escribe).
+      let cfg = get(odtRutaConfig()).data;
+      return hasProfile() && isAdmin() && odtIdValido(id)
+        // nro, subestacion, equipo, fechaPrevista, azt, lectores, estado, resumen, creadoPor, creadoEn, rev: todos se leen abajo.
+        && d.size() == 11
+        && d.nro is string && d.nro.matches('^[0-9]{8}$')
+        && odtTexto(d.subestacion, 2, 80) && d.subestacion.trim().size() >= 2
+        && odtTexto(d.equipo, 0, 160)
+        && odtFecha(d.fechaPrevista)
+        // Separación de funciones: quien registra nunca es el AZT asignado.
+        && d.azt.uid != request.auth.uid
+        && odtFirmanteHabilitado(d.azt) && d.azt.uid in cfg.azt
+        && d.lectores == [d.azt.uid]
+        && d.estado == 'ABIERTA' && d.rev == 0
+        // Resumen contiguo desde '0' (1 a 40 puntos), todo PENDIENTE; el último punto existe al terminar el lote.
+        && d.resumen is map && d.resumen.size() >= 1 && d.resumen.size() <= 40
+        && d.resumen.keys().hasOnly(odtObsIds()[0:d.resumen.size()])
+        && d.resumen.values().hasOnly(['PENDIENTE'])
+        && d.creadoPor == odtQuien() && d.creadoEn == request.time
+        && existsAfter(odtObsRutaPunto(id, string(d.resumen.size() - 1)))
+        // «Un N.º, una obs ABIERTA»: el candado del N.º apunta a esta obs en el MISMO lote.
+        && getAfter(odtObsRutaNro(d.nro)).data.obsId == id;
+    }
+    // ── Un punto nuevo: al registrar, con «Agregar punto» o para reparar un hueco del registro (admin con perfil, obs
+    //    ABIERTA, su entrada PENDIENTE en el resumen después del lote; ver la cabecera del bloque) ──
+    function odtObsPuntoNuevo(id, k) {
+      let d = request.resource.data;
+      let o = getAfter(odtObsRuta(id)).data;
+      return hasProfile() && isAdmin() && odtObsIdPunto(k)
+        // orden, texto, quien, estado, rev, rastro, creadoPor, creadoEn: todos se leen abajo.
+        && d.size() == 8
+        && d.orden == int(k)
+        && odtTexto(d.texto, 5, 600) && d.texto.trim().size() >= 5
+        && d.quien in ['contratista', 'azt', 'responsable']
+        && d.estado == 'PENDIENTE' && d.rev == 0
+        && d.rastro is map && d.rastro.size() == 0
+        && d.creadoPor == odtQuien() && d.creadoEn == request.time
+        && o.estado == 'ABIERTA' && o.resumen[k] == 'PENDIENTE';
+    }
+    // ── Un cambio de estado del punto: solo estado, rev y UNA entrada nueva del rastro (la de rev + 1) ──
+    function odtObsCambio(minNota) {
+      let o = resource.data;
+      let n = request.resource.data;
+      let r = string(n.rev);
+      return n.diff(o).affectedKeys().hasOnly(['estado', 'rev', 'rastro'])
+        && n.rev == o.rev + 1 && n.rev <= 50
+        && !(r in o.rastro)
+        && n.rastro.diff(o.rastro).affectedKeys().hasOnly([r])
+        // de, a, nota, por, en: todos se leen abajo.
+        && n.rastro[r].size() == 5
+        && n.rastro[r].de == o.estado && n.rastro[r].a == n.estado
+        && odtTexto(n.rastro[r].nota, minNota, 500) && n.rastro[r].nota.trim().size() >= minNota
+        && n.rastro[r].por == odtQuien()
+        && n.rastro[r].en == request.time;
+    }
+    // AZT asignado: PENDIENTE → SUBSANADO, con nota; el resumen de la obs lo dice en el MISMO lote.
+    function odtObsSubsanado(id, k) {
+      let obs = get(odtObsRuta(id)).data;
+      return isTeamMember() && hasProfile()
+        && request.auth.uid in obs.lectores && obs.estado == 'ABIERTA'
+        && resource.data.estado == 'PENDIENTE' && request.resource.data.estado == 'SUBSANADO'
+        && odtObsCambio(3)
+        && getAfter(odtObsRuta(id)).data.resumen[k] == 'SUBSANADO';
+    }
+    // Admin con perfil: SUBSANADO → VERIFICADO (nota opcional) o → PENDIENTE (devolver, con motivo).
+    function odtObsRevision(id, k) {
+      let o = resource.data;
+      let n = request.resource.data;
+      return hasProfile() && isAdmin()
+        && get(odtObsRuta(id)).data.estado == 'ABIERTA'
+        && o.estado == 'SUBSANADO'
+        // Separación de funciones: quien lo marcó subsanado (la última entrada del rastro) no lo verifica ni lo devuelve.
+        && o.rastro[string(o.rev)].por.uid != request.auth.uid
+        && ((n.estado == 'VERIFICADO' && odtObsCambio(0)) || (n.estado == 'PENDIENTE' && odtObsCambio(3)))
+        && getAfter(odtObsRuta(id)).data.resumen[k] == n.estado;
+    }
+    // ── La obs: su resumen sigue al punto `ultimo` (atado), o un admin la da por RESUELTA (final) ──
+    function odtObsResumen(id) {
+      let o = resource.data;
+      let n = request.resource.data;
+      return isTeamMember() && hasProfile() && (isAdmin() || request.auth.uid in o.lectores)
+        && o.estado == 'ABIERTA'
+        && n.diff(o).affectedKeys().hasOnly(['resumen', 'ultimo'])
+        && odtObsIdPunto(n.ultimo)
+        && n.resumen.diff(o.resumen).affectedKeys().hasOnly([n.ultimo])
+        && n.resumen[n.ultimo] == getAfter(odtObsRutaPunto(id, n.ultimo)).data.estado;
+    }
+    function odtObsResuelta() {
+      let o = resource.data;
+      let n = request.resource.data;
+      return hasProfile() && isAdmin()
+        && o.estado == 'ABIERTA'
+        && n.diff(o).affectedKeys().hasOnly(['estado', 'rev', 'resolucion'])
+        && n.estado == 'RESUELTA' && n.rev == o.rev + 1
+        && n.resolucion is map
+        && n.resolucion.size() == 3   // nota, por, en
+        && odtTexto(n.resolucion.nota, 3, 500) && n.resolucion.nota.trim().size() >= 3
+        && n.resolucion.por == odtQuien()
+        && n.resolucion.en == request.time;
+    }
+    // Lector de una obs (y de sus puntos): un admin con perfil, o el AZT asignado.
+    function odtObsLector(id) {
+      return isTeamMember() && hasProfile()
+        && (isAdmin() || request.auth.uid in get(odtObsRuta(id)).data.lectores);
+    }
+    match /odt_afinia_obs/{id} {
+      allow get: if isTeamMember() && hasProfile() && (isAdmin() || request.auth.uid in resource.data.lectores);
+      // La pestaña: where('lectores', 'array-contains', uid) + orderBy('creadoEn', 'desc') + limit ≤ 50 (el admin, sin filtro).
+      allow list: if request.query.limit <= 50 && isTeamMember() && hasProfile()
+                  && (isAdmin() || request.auth.uid in resource.data.lectores);
+      allow create: if odtObsNueva(id);
+      allow update: if odtObsResumen(id) || odtObsResuelta();
+      allow delete: if false;
+
+      match /puntos/{k} {
+        allow get: if odtObsLector(id);
+        allow list: if request.query.limit <= 40 && odtObsLector(id);
+        allow create: if odtObsPuntoNuevo(id, k);
+        allow update: if odtObsSubsanado(id, k) || odtObsRevision(id, k);
+        allow delete: if false;
+      }
+    }
+
+    // ── Candado «un N.º, una obs ABIERTA»: {obsId}; nace con la obs y solo se reasigna si la que tiene está RESUELTA ──
+    function odtObsCandado(nro) {
+      let d = request.resource.data;
+      return hasProfile() && isAdmin() && nro.matches('^[0-9]{8}$')
+        && d.size() == 1
+        && odtIdValido(d.obsId)
+        && !exists(odtObsRuta(d.obsId))
+        && getAfter(odtObsRuta(d.obsId)).data.nro == nro;
+    }
+    function odtObsCandadoLibre() {
+      return request.resource.data.obsId != resource.data.obsId
+        && get(odtObsRuta(resource.data.obsId)).data.estado == 'RESUELTA';
+    }
+    match /odt_afinia_obs_nro/{nro} {
+      allow get: if hasProfile() && isAdmin();
+      allow list: if false;
+      allow create: if odtObsCandado(nro);
+      allow update: if odtObsCandado(nro) && odtObsCandadoLibre();
+      allow delete: if false;
+    }
+
     // ── Resto: cerrado por defecto ──
     match /{document=**} {
       allow read, write: if false;

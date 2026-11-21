@@ -1,7 +1,8 @@
 // Firma de ODT Afinia · DOBLES para las pruebas de datos y pantalla (no es una prueba).
-// · crearFirestoreFalso: un Firestore en memoria con la MISMA forma de llamadas que usa
-//   data/odt_afinia.js (doc, collection, query, where, orderBy, limit, writeBatch,
-//   getDoc[FromServer], getDocs[FromServer], setDoc, serverTimestamp, Bytes). No evalúa
+// · crearFirestoreFalso: un Firestore en memoria con la MISMA forma de llamadas que usan
+//   data/odt_afinia.js y data/odt_afinia_obs.js (doc, collection, query, where, orderBy, limit, writeBatch,
+//   getDoc[FromServer], getDocs[FromServer], setDoc, serverTimestamp, Bytes). Como el SDK, un update con
+//   una clave con puntos («rastro.3») cambia solo ese campo anidado (2026-11-21, «Por subsanar»). No evalúa
 //   reglas (eso lo hacen tests-rules/odt_afinia.rules.test.js en el emulador): registra
 //   cada lote TAL COMO se envió para comparar su forma con el contrato de las reglas.
 // · crearDomFalso: un document mínimo (createElement, textContent, eventos) para armar
@@ -21,6 +22,21 @@ export const BytesFalso = {
 let _ms = Date.UTC(2026, 10, 20, 15, 0, 0);
 /** Marca de tiempo del «servidor» (crece en cada escritura). */
 function marca() { const t = (_ms += 1000); return { toMillis: () => t, toDate: () => new Date(t) }; }
+
+/**
+ * Un update como el del SDK: una clave con puntos («rastro.3», «resumen.7») es una RUTA de campo y
+ * cambia solo ese campo anidado (el resto del mapa queda); una clave sin puntos reemplaza el campo.
+ */
+function conRuta(obj, ruta, valor) {
+  const [k, ...resto] = ruta;
+  const base = (obj && typeof obj === 'object') ? obj : {};
+  return { ...base, [k]: resto.length ? conRuta(base[k], resto, valor) : valor };
+}
+function aplicarUpdate(previo, cambios) {
+  let out = { ...(previo || {}) };
+  for (const [k, v] of Object.entries(cambios)) out = k.includes('.') ? conRuta(out, k.split('.'), v) : { ...out, [k]: v };
+  return out;
+}
 
 function resolverTs(v) {
   if (v === TS) return marca();
@@ -93,7 +109,7 @@ export function crearFirestoreFalso(op = {}) {
           if (opciones.colgarLote) return new Promise(() => {});
           for (const o of ops) {
             if (o.tipo === 'set') store.set(o.ruta, resolverTs(o.datos));
-            else store.set(o.ruta, { ...store.get(o.ruta), ...resolverTs(o.datos) });
+            else store.set(o.ruta, aplicarUpdate(store.get(o.ruta), resolverTs(o.datos)));
           }
           if (opciones.escribirYColgar) return new Promise(() => {});
           return Promise.resolve();
