@@ -141,17 +141,34 @@ const { avisoSesionReciente, motivosEnLlano } = await import('../assets/js/ui/od
 const { cargarPdfLib, bloquearCopia } = await import('../assets/js/ui/odt-afinia/comun.js');
 const { PDF_LIB } = await import('../assets/js/domain/odt_afinia_rutas.js');
 
-describe('textos sin aprobar: rótulo «Borrador · pendiente del Ingeniero»', () => {
-  test('mientras TEXTOS_APROBADOS sea false, la declaración (firma y acuerdo) lleva el rótulo ENCIMA del texto', () => {
-    assert.equal(TEXTOS_APROBADOS, false);
+describe('textos aprobados por el Ingeniero (2026-11-20, 99 §231.10): sin rótulo de borrador', () => {
+  test('TEXTOS_APROBADOS es true y la declaración (firma y acuerdo) ya no lleva el rótulo', () => {
+    assert.equal(TEXTOS_APROBADOS, true);
     assert.equal(ROTULO_BORRADOR, 'Borrador · pendiente del Ingeniero');
     for (const texto of [declaracionAzt(DATOS), textoAcuerdo(DATOS)]) {
       const d = armarDeclaracion({ texto, version: 'v', alConfirmar: () => {} });
-      assert.ok(d.rotulo, 'hay rótulo');
-      assert.equal(d.rotulo.textContent, ROTULO_BORRADOR);
-      assert.ok(d.raiz.childNodes.indexOf(d.rotulo) < d.raiz.childNodes.indexOf(d.textoEl), 'antes del texto');
-      assert.equal(d.textoEl.textContent, texto, 'el rótulo no se mezcla con lo que se guarda');
+      assert.equal(d.rotulo, null, 'sin rótulo');
+      assert.ok(!d.raiz.textContent.includes(ROTULO_BORRADOR), 'el rótulo no aparece en ninguna parte');
+      assert.equal(d.textoEl.textContent, texto, 'lo que se muestra es lo que se guarda');
     }
+  });
+  test('lo aprobado es el texto v1 EXACTO: cambiar una letra exige subir la versión y volver a aprobarlo', async () => {
+    const { VERSIONES } = await import('../assets/js/domain/odt_afinia_rutas.js');
+    const { literales } = await import('../assets/js/domain/odt_afinia_textos.js');
+    assert.deepEqual(VERSIONES, { acuerdo: 'odt-acuerdo-v1', azt: 'odt-azt-v1', responsable: 'odt-resp-v1' });
+    assert.deepEqual(literales(VERSIONES.acuerdo), [
+      'Yo, ', ', con mi cuenta personal ',
+      ', acepto firmar electrónicamente las ODT de Afinia en SGM. Mi firma solo se estampa desde mi propia cuenta y con mi contraseña personal, que no comparto.'
+    ]);
+    assert.deepEqual(literales(VERSIONES.azt), [
+      'Yo, ', ', con mi cuenta personal ', ', declaro que revisé las dos páginas de la ODT N.º ',
+      ' y, como AZT EN SITIO, la firmo. Esta firma equivale a mi firma manuscrita.'
+    ]);
+    assert.deepEqual(literales(VERSIONES.responsable), [
+      'Yo, ', ', con mi cuenta personal ', ', declaro que revisé las dos páginas de la ODT N.º ',
+      ', verifiqué la firma del AZT y, como RESPONSABLE O.D.T., la firmo y la cierro con fecha ',
+      '. Esta firma equivale a mi firma manuscrita.'
+    ]);
   });
 });
 
