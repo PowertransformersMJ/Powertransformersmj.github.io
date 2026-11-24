@@ -24,7 +24,14 @@
 //     frase (SIN_GRAFICO_CONTRATISTA); con un filtro por AZT o por jefe junto con otro (o sin resultados), el resumen
 //     aclara que el número de cada persona es de todo el corte (NOTA_CONTEO_PERSONA). El título de la lista de ODT
 //     nombra los filtros activos;
-//   · historial de cortes con enlace a cada uno y «Ver cortes más antiguos» (de 50 en 50).
+//   · historial de cortes con enlace a cada uno y «Ver cortes más antiguos» (de 50 en 50);
+//   · PERIODO (pedido del 2026-11-24: «un calendario para escoger a mi voluntad periodos a lo largo del año 2026»):
+//     el bloque «Periodo (fecha prevista)» (indicadores-periodo.js), junto a los filtros, con «Periodo rápido», «Desde»
+//     y «Hasta». Filtra por la FECHA PREVISTA DE INICIO de cada ODT (la que ya guardan los cortes v1 y v2) y se combina
+//     con los demás filtros: tarjetas, tablas, gráficos, lista, resumen y comparación (el MISMO periodo en los dos
+//     cortes). Con periodo, las ODT sin fecha prevista quedan fuera y el resumen dice cuántas; la evolución mensual
+//     muestra solo sus meses (los vacíos en 0) y pulsar un mes en ella lo pone como periodo. «Quitar filtros» también
+//     lo quita. El bloque no se repinta al cambiar una fecha: el foco se queda en el campo.
 // Todo con textContent (nunca innerHTML). Archivo NUEVO a propósito (L-102): a sus vecinos de antes (comun.js)
 // solo les pide nombres que ya existían.
 // ══════════════════════════════════════════════════════════════════════════════
@@ -36,6 +43,10 @@ import {
   SGM_NO_ESTA, SGM_SIN_CONSULTAR, SIN_DATO, corteTraeAztJefe
 } from '../../domain/odt_afinia_indicadores.js';
 import { graficoPorContratista, graficoMensual } from './indicadores-graficos.js';
+import {
+  SIN_PERIODO, PERIODO_ANIO, filtrarPeriodo, contarSinPrevista, textoPeriodo, mesesDelPeriodo, periodoDeMes
+} from '../../domain/odt_afinia_indicadores_periodo.js';
+import { crearBloquePeriodo } from './indicadores-periodo.js';
 
 /** Cuántas ODT se pintan de entrada en una lista (el resto con «Mostrar todas»). */
 export const TOPE_LISTA = 200;
@@ -50,6 +61,16 @@ export const NOTA_SIN_RESULTADOS = 'Ninguna ODT cumple todos estos filtros a la 
 export const NOTA_CONTEO_PERSONA = 'El número junto a cada AZT o jefe cuenta sus ODT en todo el corte, sin los demás filtros.';
 /** En lugar del gráfico por contratista cuando ninguna ODT cumple los filtros (nunca un hueco ni un resto en pantalla). */
 export const SIN_GRAFICO_CONTRATISTA = 'Sin ODT para el gráfico por contratista con estos filtros.';
+/** En la comparación, con un periodo: se aplica a los dos cortes. */
+export const NOTA_COMPARAR_PERIODO = 'Con el periodo, en los dos cortes se cuentan solo las ODT con fecha prevista dentro de él. Si la fecha prevista de una ODT cambió entre los dos cortes, aquí puede salir como nueva o como que ya no aparece.';
+/** En el resumen, si las fechas del periodo no se pueden usar (el detalle va junto a las fechas). */
+export const NOTA_PERIODO_NO_APLICA = 'El periodo no se aplicó: revise sus fechas.';
+/** En el resumen, con un periodo: las ODT (de los demás filtros) que no traen fecha prevista (singular con 1). */
+export const textoSinPrevista = (n) => num(n) + (n === 1 ? ' ODT sin fecha prevista no entra en el periodo.' : ' ODT sin fecha prevista no entran en el periodo.');
+/** Bajo la evolución mensual, con un periodo: ODT del periodo cerradas en un mes que no está en el gráfico (singular con 1). */
+export const textoCerradasFuera = (n) => (n === 1
+  ? '1 ODT de este periodo se cerró en un mes fuera de él: cuenta en «Cerradas», pero no tiene columna en este gráfico (solo muestra los meses del periodo).'
+  : num(n) + ' ODT de este periodo se cerraron en un mes fuera de él: cuentan en «Cerradas», pero no tienen columna en este gráfico (solo muestra los meses del periodo).');
 /** Los filtros, en el orden de la pantalla: [clave, nombre en el resumen]. */
 const FILTROS = Object.freeze([['tipo', 'Tipo'], ['zona', 'Zona'], ['empresa', 'Contratista'], ['azt', 'AZT en sitio'], ['jefe', 'Jefe de trabajo']]);
 const num = (n) => Number(n || 0).toLocaleString('es-CO');
@@ -93,7 +114,7 @@ export function montarVistaCorte(contenedor, {
 }) {
   vaciar(contenedor);
   const estado = {
-    filtros: { tipo: '', zona: '', empresa: '', azt: '', jefe: '' }, orden: { col: 'total', dir: 'desc' }, sel: null, abridor: null, verTodas: false,
+    filtros: { tipo: '', zona: '', empresa: '', azt: '', jefe: '' }, periodo: { ...SIN_PERIODO }, orden: { col: 'total', dir: 'desc' }, sel: null, abridor: null, verTodas: false,
     sgm: new Map(), sgmPendientes: new Set(), sgmError: '', sgmTope: false,
     anterior: null, anteriorBuscando: true, anteriorTope: false, odtsAnterior: null, anteriorCargando: false, anteriorError: '',
     historial: [...historial], historialTope: !!historialTope, historialCargando: false, historialError: ''
@@ -140,11 +161,18 @@ export function montarVistaCorte(contenedor, {
   };
   const quitar = h('button', {
     type: 'button', class: 'odt-btn odt-btn--chico', text: 'Quitar filtros',
-    onclick: () => { for (const k of Object.keys(estado.filtros)) { estado.filtros[k] = ''; selectores[k].value = ''; } estado.sel = null; pintar(); }
+    onclick: () => {
+      for (const k of Object.keys(estado.filtros)) { estado.filtros[k] = ''; selectores[k].value = ''; }
+      bloquePeriodo.limpiar(); estado.periodo = { ...SIN_PERIODO };
+      estado.sel = null; pintar();
+    }
   });
   const resumenFiltro = h('p', { class: 'odt-mini odt-ind-resumen-filtro', role: 'status' });
   const idNota = 'odtIndNotaAztJefe';
   const persona = { deshabilitado: !conAztJefe, describe: conAztJefe ? null : idNota, clase: 'odt-ind-filtro-persona' };
+  // El periodo, junto a los filtros (antes de ellos): sus cambios recalculan todo lo de abajo, como un filtro más.
+  const bloquePeriodo = crearBloquePeriodo({ alCambiar: (p) => { estado.periodo = p; estado.sel = null; pintar(); } });
+  contenedor.appendChild(bloquePeriodo.elemento);
   contenedor.appendChild(h('section', { class: 'odt-ind-filtros', 'aria-label': 'Filtros' },
     selector('odtIndTipo', 'Tipo de trabajo', opciones.tipos, 'tipo'),
     selector('odtIndZona', 'Zona', opciones.zonas, 'zona'),
@@ -160,6 +188,16 @@ export function montarVistaCorte(contenedor, {
   const zonaLista = h('section', { class: 'odt-ind-seccion odt-ind-lista', 'aria-label': 'Lista de ODT' });
   const zonaComparar = h('section', { class: 'odt-ind-seccion', 'aria-label': 'Comparación con el corte anterior' });
   contenedor.append(zonaTarjetas, definiciones(), zonaDatos, zonaLista, zonaComparar, zonaHistorial);
+  /** Las ODT que cumplen los filtros Y el periodo (el mismo para el corte y para el anterior). */
+  const conFiltros = (xs) => filtrarPeriodo(filtrar(xs, estado.filtros), estado.periodo);
+  /** « · Periodo: del … al …» para un título (vacío sin periodo). */
+  const tituloPeriodo = () => (estado.periodo.activo ? ' · Periodo: ' + textoPeriodo(estado.periodo) : '');
+  /** Pulsar un mes en la evolución mensual: ese mes pasa a ser el periodo; el foco va al selector del periodo. */
+  function elegirMes(mes) {
+    bloquePeriodo.poner(periodoDeMes(mes));
+    llevarA(bloquePeriodo.elemento);
+    bloquePeriodo.enfocar();
+  }
 
   // ── Elegir un número: la lista de esas ODT (y su estado en SGM, por N.º) ──
   function elegir(sel, abridor) {
@@ -304,13 +342,13 @@ export function montarVistaCorte(contenedor, {
     vaciar(zonaLista);
     if (!estado.sel) return;
     const sel = estado.sel;
-    const xs = seleccionar(filtrar(odts, estado.filtros), sel);
+    const xs = seleccionar(conFiltros(odts), sel);
     const visibles = estado.verTodas ? xs : xs.slice(0, TOPE_LISTA);
     consultarSgm(visibles);
     const conContratista = !sel.empresa && !estado.filtros.empresa;
     // El título nombra también los filtros activos (p. ej. « · AZT en sitio: NOMBRE»), salvo el que ya dice el número pulsado.
-    const conFiltros = FILTROS.filter(([k]) => estado.filtros[k] && sel[k] !== estado.filtros[k]).map(([k, nombre]) => ' · ' + nombre + ': ' + estado.filtros[k]).join('');
-    zonaLista.appendChild(h('h3', { class: 'odt-subtitulo odt-ind-lista-titulo', tabindex: '-1', text: 'ODT · ' + (ETIQUETA_CLAVE[sel.clave] || sel.clave) + deDonde(sel) + conFiltros + ' (' + num(xs.length) + ')' }));
+    const conFiltrosTitulo = FILTROS.filter(([k]) => estado.filtros[k] && sel[k] !== estado.filtros[k]).map(([k, nombre]) => ' · ' + nombre + ': ' + estado.filtros[k]).join('');
+    zonaLista.appendChild(h('h3', { class: 'odt-subtitulo odt-ind-lista-titulo', tabindex: '-1', text: 'ODT · ' + (ETIQUETA_CLAVE[sel.clave] || sel.clave) + deDonde(sel) + tituloPeriodo() + conFiltrosTitulo + ' (' + num(xs.length) + ')' }));
     zonaLista.appendChild(h('div', { class: 'odt-acciones' },
       h('button', { type: 'button', class: 'odt-btn odt-btn--chico', text: 'Cerrar la lista', onclick: cerrarLista })));
     if (estado.sgmPendientes.size) zonaLista.appendChild(h('p', { class: 'odt-cargando', text: 'Consultando el estado de estas ODT en SGM…' }));
@@ -341,7 +379,7 @@ export function montarVistaCorte(contenedor, {
       zonaLista.appendChild(h('div', { class: 'odt-acciones' },
         h('button', { type: 'button', class: 'odt-btn', text: 'Mostrar todas (' + num(xs.length) + ')', onclick: () => { estado.verTodas = true; pintarLista(); } })));
     }
-    if (!xs.length) zonaLista.appendChild(h('p', { class: 'odt-vacio', text: 'No hay ODT con ese número y estos filtros.' }));
+    if (!xs.length) zonaLista.appendChild(h('p', { class: 'odt-vacio', text: 'No hay ODT con ese número y estos filtros' + (estado.periodo.activo ? ' (y este periodo).' : '.') }));
     if (teniaFoco) enfocar(zonaLista.querySelectorAll('.odt-ind-lista-titulo')[0]);
   }
 
@@ -368,7 +406,9 @@ export function montarVistaCorte(contenedor, {
     if (estado.anteriorCargando) { zonaComparar.appendChild(h('p', { class: 'odt-cargando', text: 'Leyendo el corte anterior…' })); return; }
     if (estado.anteriorError) { zonaComparar.appendChild(aviso('No se pudo leer el corte anterior: ' + estado.anteriorError, 'aviso')); return; }
     if (!estado.odtsAnterior) return;
-    const c = compararCortes(filtrar(estado.odtsAnterior, estado.filtros), filtrar(odts, estado.filtros));
+    // El MISMO periodo (y los mismos filtros) en los dos cortes.
+    const c = compararCortes(conFiltros(estado.odtsAnterior), conFiltros(odts));
+    if (estado.periodo.activo) zonaComparar.appendChild(h('p', { class: 'odt-mini odt-ind-comparar-periodo', text: 'Periodo: ' + textoPeriodo(estado.periodo) + '. ' + NOTA_COMPARAR_PERIODO }));
     // Entre dos cortes de la versión 2, se compara lo filtrado en cada uno: una ODT que cambió de persona queda en uno solo.
     if (estado.filtros.azt || estado.filtros.jefe) zonaComparar.appendChild(h('p', { class: 'odt-mini odt-ind-comparar-persona', text: NOTA_COMPARAR_PERSONA }));
     const fila = (titulo, a, b, d) => h('tr', {}, h('th', { scope: 'row', text: titulo }),
@@ -492,34 +532,51 @@ export function montarVistaCorte(contenedor, {
 
   // ── Pintar lo que depende de los filtros ──
   function pintar() {
-    const lista = filtrar(odts, estado.filtros);
+    const base = filtrar(odts, estado.filtros);
+    const lista = filtrarPeriodo(base, estado.periodo);
     const ag = agregar(lista);
-    const activos = FILTROS.map(([k, nombre]) => [nombre, estado.filtros[k]]).filter(([, v]) => v);
+    const conPeriodo = estado.periodo.activo;
+    // Con periodo, las ODT sin fecha prevista (de las que cumplen los demás filtros) quedan fuera: se dice cuántas.
+    const sinFecha = conPeriodo ? contarSinPrevista(base) : 0;
+    const activos = [...(conPeriodo ? [['Periodo', textoPeriodo(estado.periodo)]] : []),
+      ...FILTROS.map(([k, nombre]) => [nombre, estado.filtros[k]]).filter(([, v]) => v)];
     // El número junto a cada AZT o jefe es de todo el corte: se aclara si hay un filtro por persona junto con otro
     // (ahí ese número y el de las tarjetas ya no coinciden) o si ninguna ODT cumple los filtros.
     const conPersona = !!(estado.filtros.azt || estado.filtros.jefe);
-    resumenFiltro.textContent = activos.length
+    const resumen = [activos.length
       ? 'Con filtros (' + activos.map(([k, v]) => k + ': ' + v).join(' · ') + '): ' + num(lista.length) + ' de ' + num(odts.length) + ' ODT.'
-        + (lista.length ? '' : ' ' + NOTA_SIN_RESULTADOS)
-        + (conPersona && (!lista.length || activos.length > 1) ? ' ' + NOTA_CONTEO_PERSONA : '')
-      : 'Sin filtros: las ' + num(odts.length) + ' ODT del corte.';
+      : 'Sin filtros: las ' + num(odts.length) + ' ODT del corte.'];
+    if (sinFecha) resumen.push(textoSinPrevista(sinFecha));
+    if (activos.length && !lista.length) resumen.push(NOTA_SIN_RESULTADOS);
+    if (conPersona && (!lista.length || activos.length > 1)) resumen.push(NOTA_CONTEO_PERSONA);
+    if (estado.periodo.error) resumen.push(NOTA_PERIODO_NO_APLICA);
+    resumenFiltro.textContent = resumen.join(' ');
+    // La evolución mensual: con periodo, solo sus meses (los vacíos en 0, aunque ninguna ODT caiga en él: p. ej. un mes
+    // todavía sin ODT); sin periodo, los meses con datos. Un mes de 2026 se puede pulsar.
+    const mensual = mesesDelPeriodo(ag.porMes, estado.periodo);
+    const hayMeses = conPeriodo ? mensual.meses.length > 0 : ag.porMes.length > 0;
     vaciar(zonaTarjetas);
     zonaTarjetas.appendChild(tarjetas(ag.totales));
     vaciar(zonaDatos);
-    zonaDatos.append(
+    // append() del navegador pinta un null como la palabra «null»: sin ODT va una frase, y lo que es opcional (la nota
+    // de las cerradas fuera del periodo) se quita antes con filter(Boolean).
+    zonaDatos.append(...[
       h('h3', { class: 'odt-subtitulo odt-ind-h3-datos', tabindex: '-1', text: 'Por contratista' }),
       tablaContratistas(ag),
-      // append() del navegador pinta un null como la palabra «null»: sin ODT va una frase, nunca un null.
       ag.porEmpresa.length ? graficoPorContratista(ordenarFilas(ag.porEmpresa, 'total', 'desc'), { alElegir: (sel) => elegir(sel, null) }) : h('p', { class: 'odt-vacio', text: SIN_GRAFICO_CONTRATISTA }),
       h('h3', { class: 'odt-subtitulo', text: 'Evolución mensual' }),
-      ag.porMes.length ? graficoMensual(ag.porMes) : h('p', { class: 'odt-vacio', text: 'Sin fechas para la evolución mensual.' }),
+      hayMeses
+        ? graficoMensual(mensual.meses, { rellenar: !conPeriodo, alElegirMes: elegirMes, elegible: (mes) => mes.startsWith(PERIODO_ANIO + '-') })
+        : h('p', { class: 'odt-vacio', text: 'Sin fechas para la evolución mensual.' }),
+      hayMeses && mensual.cerradasFuera ? h('p', { class: 'odt-mini odt-ind-cerradas-fuera', text: textoCerradasFuera(mensual.cerradasFuera) }) : null,
       h('h3', { class: 'odt-subtitulo', text: 'Por tipo de trabajo y por zona' }),
-      h('div', { class: 'odt-ind-dos' }, tablaGrupo('Por tipo de trabajo', 'tipo', ag.porTipo, ag.totales), tablaGrupo('Por zona', 'zona', ag.porZona, ag.totales)));
+      h('div', { class: 'odt-ind-dos' }, tablaGrupo('Por tipo de trabajo', 'tipo', ag.porTipo, ag.totales), tablaGrupo('Por zona', 'zona', ag.porZona, ag.totales))
+    ].filter(Boolean));
     pintarLista();
     pintarComparacion();
   }
   pintar();
   pintarHistorial();
   const listo = buscarAnterior();
-  return { estado, elegir, pintar, anterior: listo.then(() => estado.anterior) };
+  return { estado, elegir, pintar, periodo: bloquePeriodo, anterior: listo.then(() => estado.anterior) };
 }

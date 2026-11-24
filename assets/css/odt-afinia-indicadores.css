@@ -32,6 +32,36 @@
   .odt-ind-filtros > .odt-ind-filtro-persona { grid-column: 1 / -1; }
 }
 
+/* ── Periodo (fecha prevista), antes de los filtros (2026-11-24): una caja con «Periodo rápido» y, al lado, «Desde» y
+   «Hasta»; debajo, la ayuda y, si el periodo no se aplica, la línea que dice por qué (vacía no ocupa lugar). La rejilla se
+   acomoda sola al ancho de la caja (auto-fit): ancha, el selector y las dos fechas en una fila; angosta (un celular), el
+   selector arriba y las dos fechas lado a lado; más angosta aún, una debajo de otra. SIN consultas de contenedor: con
+   container-type dentro de un fieldset, Chrome dejaba sin dibujar los campos cada vez que la línea del error aparecía o
+   se iba (medido en el arnés). El fieldset lleva min-width: 0 (por defecto no se encoge por debajo de su contenido y
+   desbordaría la página en un celular). ── */
+.odt-ind-periodo { margin: 12px 0 0; padding: 4px 14px 2px; min-width: 0; border: 1px solid var(--odt-linea, rgba(0, 40, 90, .12)); border-radius: var(--odt-r, 10px); background: var(--odt-sup-suave, #f6f8fc); }
+.odt-ind-periodo-titulo { padding: 0 6px; font-size: 14px; font-weight: 700; color: var(--odt-tinta, #0d1f38); }
+.odt-ind-periodo-campos { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(250px, 100%), 1fr)); gap: 0 14px; align-items: end; min-width: 0; }
+.odt-ind-periodo-fechas { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(128px, 100%), 1fr)); gap: 0 14px; align-items: end; min-width: 0; }
+.odt-ind-periodo .odt-campo-fila { margin: 0 0 8px; max-width: none; min-width: 0; }
+.odt-ind-fecha { min-width: 0; font-variant-numeric: tabular-nums; }
+/* El anillo de foco de «Desde» y «Hasta»: el tema (body.aqua input:focus) le quita el contorno a todo campo y su sombra
+   de foco pierde contra la regla general de los campos, así que solo se veía resaltado el día, el mes o el año. Con
+   :focus-within (el foco está dentro del campo de fecha) y más peso que la regla del tema, el anillo se ve siempre. */
+.odt-ind-periodo input.odt-ind-fecha:focus, .odt-ind-periodo input.odt-ind-fecha:focus-within { outline: 3px solid var(--odt-marca, #007aff); outline-offset: 1px; }
+.odt-ind-periodo-ayuda { margin: 0 0 8px; }
+.odt-ind-periodo-error { margin: 0 0 10px; padding: 6px 10px; border-radius: 8px; font-size: 13px; font-weight: 600; background: var(--odt-mal-fondo, #fdecea); color: var(--odt-mal, #b3140e); border: 1px solid #f3b4ae; }
+.odt-ind-periodo-error:empty { display: none; }
+/* En la evolución mensual, un mes se puede pulsar (lo pone como periodo): la columna y, para el teclado, su nombre en
+   «Ver los datos del gráfico» (un botón con aspecto de enlace). */
+.odt-ind-svg-col--elegible { cursor: pointer; }
+.odt-ind-mes-btn {
+  appearance: none; border: 0; background: none; padding: 2px 0; min-height: 28px; font: inherit; font-weight: 600; text-align: left;
+  color: var(--odt-marca-hondo, #0051d5); text-decoration: underline; cursor: pointer;
+}
+.odt-ind-mes-btn:hover { color: var(--odt-marca, #007aff); }
+.odt-ind-mes-btn:focus-visible { outline: 3px solid var(--odt-marca, #007aff); outline-offset: 2px; }
+
 /* ── Tarjetas ─────────────────────────────────────────────────────────────── */
 .odt-ind-tarjetas { list-style: none; margin: 8px 0 4px; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
 .odt-ind-tarjeta { margin: 0; }
@@ -110,7 +140,7 @@
    y ordenes-materiales.css). La entrada (indicadores.js, BARRA_FIJA_PX) cuenta como oculto lo que queda debajo de ella. */
 .odt-ind-titulo, .odt-ind-aviso-inicial, .odt-ind-seccion, .odt-ind-seccion > h3, .odt-ind-lista-titulo, .odt-ind-h3-datos,
 .odt-ind-historial-titulo, .odt-ind-previa-titulo, .odt-ind-estado, .odt-ind-num, .odt-ind-tarjeta-btn, .odt-ind-orden,
-.odt-ind-mas-historial { scroll-margin-top: 80px; }
+.odt-ind-mas-historial, .odt-ind-periodo { scroll-margin-top: 80px; }
 
 /* ── Estado en SGM (chips) ────────────────────────────────────────────────── */
 .odt-ind-sgm { white-space: nowrap; }
@@ -169,6 +199,7 @@
   .odt-ind-definiciones { grid-template-columns: 1fr; gap: 2px; }
   .odt-ind-definiciones dd { margin: 0 0 8px; }
   .odt-ind-figura { padding: 10px; }
+  .odt-ind-periodo { padding: 2px 10px 0; }
   /* En un celular, las tablas por contratista, por tipo y por zona (y la comparación por contratista) van como FICHAS:
      una por fila (su nombre arriba y sus números en tres columnas, cada uno con su nombre, de data-etq). Nada se sale
      de lado. En la tabla por contratista, los encabezados quedan como botones para ordenar; en las demás, solo para
