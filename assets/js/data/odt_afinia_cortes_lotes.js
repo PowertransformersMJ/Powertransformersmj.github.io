@@ -8,10 +8,13 @@
 //     descarga del nombre del archivo o, si no la trae, el final del día de rango.hasta; ordena los cortes y
 //     elige el anterior), filasArchivo, odtsArchivo, filasResponsable, odts (cuántas), totales {total, generada,
 //     ejecutada, noEjecutada, cerrada, inactiva, otro}, porEmpresa / porTipo / porZona [{clave, …contadores}],
-//     porMes [{mes, generadas, cerradas}] (sin huecos), nPartes, version, creadoPor {uid, nombre}, creadoEn
+//     porMes [{mes, generadas, cerradas}] (sin huecos), nPartes, version (2), creadoPor {uid, nombre}, creadoEn
 //     (hora del servidor).
 //   · odt_afinia_cortes/{id}/partes/{k}  (2 campos): {k, odts:[{nro, empresa, tipo, zona, subestacion, prevista,
-//     cerrada, estado, principal}]}, en trozos de 400 (la última, el resto): todas llenas menos la última.
+//     cerrada, estado, principal, azt, jefe}]}, en trozos de 400 (la última, el resto): todas llenas menos la última.
+//     VERSIÓN 2 (pedido del Ingeniero del 2026-11-24): cada ODT lleva además su AZT en sitio (`azt`) y su jefe de
+//     trabajo (`jefe`), textos de 0 a 200 (11 campos). Los cortes de la versión 1 (ODT de 9 campos) ya guardados se
+//     siguen leyendo: unirPartes acepta la forma de la versión de cada corte.
 // La regla no puede recorrer listas y tiene un tope de 1000 expresiones por documento: de cada lista (porEmpresa,
 // porTipo, porZona, porMes y las ODT de cada parte) solo revisa que sea lista, su tamaño máximo y la forma del PRIMER
 // elemento (por eso cada lista lleva al menos uno). TODOS los elementos los valida AQUÍ planCorte antes de escribir
@@ -45,15 +48,25 @@ function contadoresParaGuardar(c = {}) {
 }
 const grupoParaGuardar = (g) => ({ clave: limpiar(g.clave).slice(0, TOPES_CORTE.textoMax), ...contadoresParaGuardar(g) });
 const RE_MES = /^\d{4}-(0[1-9]|1[0-2])$/;
-const CAMPOS_ODT = Object.freeze(['nro', 'empresa', 'tipo', 'zona', 'subestacion', 'prevista', 'cerrada', 'estado', 'principal']);
+/** Los campos de una ODT guardada en cada versión del corte (la 2 suma el AZT en sitio y el jefe de trabajo). */
+export const CAMPOS_ODT_POR_VERSION = Object.freeze({
+  1: Object.freeze(['nro', 'empresa', 'tipo', 'zona', 'subestacion', 'prevista', 'cerrada', 'estado', 'principal']),
+  2: Object.freeze(['nro', 'empresa', 'tipo', 'zona', 'subestacion', 'prevista', 'cerrada', 'estado', 'principal', 'azt', 'jefe'])
+});
 const textoHasta = (v, min, max) => typeof v === 'string' && v.length >= min && v.length <= max;
 
-/** ¿Tiene la forma de una ODT guardada? (los 9 campos, textos acotados, fechas 'aaaa-mm-dd' o vacías, principal sí/no). */
-export function odtValida(o) {
-  return !!o && typeof o === 'object' && !Array.isArray(o) && Object.keys(o).length === CAMPOS_ODT.length
-    && CAMPOS_ODT.every((k) => k in o)
+/**
+ * ¿Tiene la forma de una ODT guardada? Los campos de su versión y nada más (versión 1: 9; versión 2: 11, con `azt` y
+ * `jefe`), textos acotados, fechas 'aaaa-mm-dd' o vacías y principal sí/no. Sin `version` (1 o 2), vale cualquiera de
+ * las dos formas.
+ */
+export function odtValida(o, version) {
+  if (!o || typeof o !== 'object' || Array.isArray(o)) return false;
+  const formas = CAMPOS_ODT_POR_VERSION[version] ? [CAMPOS_ODT_POR_VERSION[version]] : Object.values(CAMPOS_ODT_POR_VERSION);
+  const campos = formas.find((c) => Object.keys(o).length === c.length && c.every((k) => k in o));
+  return !!campos
     && textoHasta(o.nro, 1, TOPES_CORTE.nroMax)
-    && ['empresa', 'tipo', 'zona', 'subestacion', 'estado'].every((k) => textoHasta(o[k], 0, TOPES_CORTE.textoMax))
+    && campos.filter((k) => !['nro', 'prevista', 'cerrada', 'principal'].includes(k)).every((k) => textoHasta(o[k], 0, TOPES_CORTE.textoMax))
     && (o.prevista === '' || esIso(o.prevista)) && (o.cerrada === '' || esIso(o.cerrada)) && typeof o.principal === 'boolean';
 }
 
@@ -74,7 +87,7 @@ export function planCorte({ id, archivo = {}, lectura = {}, analisis = {}, por =
   exige(responsable.length >= TOPES_CORTE.responsableMin && responsable.length <= TOPES_CORTE.responsableMax, 'Elija el responsable del corte.');
   const odts = (analisis.odts || []).map(odtDeFila);
   exige(odts.length >= 1, 'El responsable elegido no tiene ODT en el archivo: no hay corte que guardar.');
-  exige(odts.every(odtValida), 'Hay ODT sin N.º o con datos de otra forma: no se puede guardar el corte.');
+  exige(odts.every((o) => odtValida(o, VERSION_CORTE)), 'Hay ODT sin N.º o con datos de otra forma: no se puede guardar el corte.');
   exige(odts.length <= TOPES_CORTE.porParte * TOPES_CORTE.partesMax, 'El corte pasa de ' + (TOPES_CORTE.porParte * TOPES_CORTE.partesMax) + ' ODT.');
   exige(new Set(odts.map((o) => o.nro)).size === odts.length, 'Hay N.º de ODT repetidos en el corte.');
   const filasArchivo = lectura.filas; const odtsArchivo = lectura.odtsArchivo; const filasResponsable = analisis.filasResponsable;
@@ -136,13 +149,14 @@ export function planCorte({ id, archivo = {}, lectura = {}, analisis = {}, por =
 
 /**
  * Las ODT de un corte desde sus partes leídas, y si el corte está COMPLETO (todas las partes 0..nPartes-1, tantas
- * ODT como dice el corte y todas con la forma de una ODT: las que no la tienen se DESCARTAN, para que un corte mal
- * formado no rompa la pestaña).
+ * ODT como dice el corte y todas con la forma de una ODT de SU versión —9 campos en la 1, 11 en la 2—: las que no la
+ * tienen se DESCARTAN, para que un corte mal formado no rompa la pestaña).
  * @param {object} corte  @param {Array<{id:string, data:object}>} partesLeidas
  * @returns {{odts:object[], completo:boolean, faltan:number[], descartadas:number}}
  */
 export function unirPartes(corte, partesLeidas) {
   const n = corte && Number.isInteger(corte.nPartes) ? corte.nPartes : 0;
+  const version = corte ? corte.version : undefined;
   const porK = new Map();
   for (const p of partesLeidas || []) {
     const k = Number(p.id);
@@ -154,7 +168,7 @@ export function unirPartes(corte, partesLeidas) {
   for (let k = 0; k < n; k++) {
     const x = porK.get(k);
     if (!x) { faltan.push(k); continue; }
-    for (const o of x) { if (odtValida(o)) odts.push(o); else descartadas++; }
+    for (const o of x) { if (odtValida(o, version)) odts.push(o); else descartadas++; }
   }
   const completo = n >= 1 && !faltan.length && !descartadas && odts.length === corte.odts;
   return { odts, completo, faltan, descartadas };

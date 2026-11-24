@@ -15,10 +15,22 @@
 .odt-ind-caption { caption-side: top; text-align: left; padding: 0 0 6px; font-size: 12.5px; color: var(--odt-tenue, #4d6485); }
 .odt-ind-resumen-filtro { margin: 0 0 10px; }
 
-/* ── Filtros: una fila sobre los datos ────────────────────────────────────── */
-.odt-ind-filtros { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0 14px; align-items: end; margin: 12px 0 0; }
-.odt-ind-filtros .odt-campo-fila { margin: 0 0 8px; }
+/* ── Filtros, sobre los datos: tipo de trabajo, zona y contratista en una fila (un tercio cada uno); el AZT en sitio
+   y el jefe de trabajo en la siguiente (la mitad cada uno: sus nombres son largos y llevan su conteo); debajo, la
+   nota de un corte de la versión 1 y «Quitar filtros» (2026-11-24). Si la caja de los filtros es angosta (un
+   portátil de 1100 px con el menú), el AZT y el jefe van a lo ancho, uno debajo del otro: así el nombre más largo
+   y su conteo se leen enteros con el filtro cerrado. Se mide la caja (no la ventana): el menú lateral cambia su ancho. ── */
+.odt-ind-filtros { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0 14px; align-items: end; margin: 12px 0 0; container-type: inline-size; container-name: odt-ind-filtros; }
+.odt-ind-filtros .odt-campo-fila { margin: 0 0 8px; max-width: none; min-width: 0; }
+.odt-ind-filtros > .odt-campo-fila { grid-column: span 2; }
+.odt-ind-filtros > .odt-ind-filtro-persona { grid-column: span 3; }
+.odt-ind-filtros > .odt-ind-nota-filtros, .odt-ind-filtros > .odt-ind-filtros-acciones { grid-column: 1 / -1; }
+.odt-ind-nota-filtros { margin: 0 0 8px; }
+.odt-ind-filtros .odt-campo:disabled { background: var(--odt-sup-suave, #f6f8fc); color: var(--odt-tenue, #4d6485); cursor: not-allowed; }
 .odt-ind-filtros-acciones { margin: 0 0 8px; }
+@container odt-ind-filtros (max-width: 819px) {
+  .odt-ind-filtros > .odt-ind-filtro-persona { grid-column: 1 / -1; }
+}
 
 /* ── Tarjetas ─────────────────────────────────────────────────────────────── */
 .odt-ind-tarjetas { list-style: none; margin: 8px 0 4px; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
@@ -73,6 +85,23 @@
 .odt-ind-dos { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(520px, 100%), 1fr)); gap: 12px 18px; }
 /* Comparación por contratista: «antes → ahora (±)» se puede partir en dos líneas (así no se sale de lado en un portátil). */
 .odt-ind-tabla-comparar td.odt-ind-n { white-space: normal; }
+
+/* ── La lista de ODT de un número: con el AZT y el jefe de trabajo son 10 columnas (2026-11-24), que con las palabras
+   del largo de las reales piden unos 975 px. Celdas más juntas y el estado en SGM en dos líneas si hace falta; si la
+   caja de la lista mide menos de 1000 px (un portátil de 1280 o de 1366 px con el menú, uno de 1100 px o un celular),
+   va como FICHAS: el N.º arriba y cada dato con su nombre (data-etq), sin salirse de lado ni esconder columnas a la
+   derecha. Como tabla, desde unos 1440 px. Se mide la caja de la lista (no la ventana): el menú lateral cambia su ancho. */
+.odt-ind-lista { container-type: inline-size; container-name: odt-ind-lista; }
+.odt-ind-tabla-odt th, .odt-ind-tabla-odt td { padding-left: 6px; padding-right: 6px; }
+.odt-ind-tabla-odt .odt-ind-sgm { white-space: normal; }
+@container odt-ind-lista (max-width: 999px) {
+  .odt-ind-tabla-odt, .odt-ind-tabla-odt thead, .odt-ind-tabla-odt tbody, .odt-ind-tabla-odt tr { display: block; width: 100%; }
+  .odt-ind-tabla-odt thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .odt-ind-tabla-odt tbody tr { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 2px 12px; padding: 10px 0; border-bottom: 1px solid var(--odt-linea, rgba(0, 40, 90, .12)); }
+  .odt-ind-tabla-odt tbody th { grid-column: 1 / -1; padding: 0 0 4px; border: 0; }
+  .odt-ind-tabla-odt td { display: block; padding: 2px 0; border: 0; overflow-wrap: anywhere; }
+  .odt-ind-tabla-odt td::before { content: attr(data-etq); display: block; font-size: 11px; font-weight: 500; color: var(--odt-tenue, #4d6485); }
+}
 
 /* ── La barra superior FIJA de la página (64 px, la del menú) ─────────────────────
    Todo lo que la pantalla lleva a la vista o recibe el foco al navegar (el título del corte, el aviso «Corte
@@ -135,6 +164,7 @@
   .odt-ind-tarjetas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .odt-ind-tarjeta-valor { font-size: 22px; }
   .odt-ind-filtros { grid-template-columns: 1fr; }
+  .odt-ind-filtros > .odt-campo-fila { grid-column: 1 / -1; }
   .odt-ind-dos { grid-template-columns: 1fr; }
   .odt-ind-definiciones { grid-template-columns: 1fr; gap: 2px; }
   .odt-ind-definiciones dd { margin: 0 0 8px; }

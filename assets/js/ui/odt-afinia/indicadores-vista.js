@@ -3,17 +3,27 @@
 // ──────────────────────────────────────────────────────────────────────────────
 // Lo que el Ingeniero ve de un corte guardado (#indicadores = el último suyo; #indicadores=<id> = uno del historial):
 //   · datos del corte (responsable, fecha de los datos y de guardado, archivo y su huella, rango de fechas previstas);
-//   · filtros por tipo de trabajo, zona y contratista: TODO lo de abajo se recalcula sobre las ODT del corte;
+//   · filtros por tipo de trabajo, zona, contratista, AZT en sitio y jefe de trabajo (estos dos, con cuántas ODT tiene
+//     cada persona en el corte; pedido del 2026-11-24): se combinan y TODO lo de abajo se recalcula sobre las ODT del
+//     corte. Un corte de la versión 1 no guardó el AZT ni el jefe: esos dos filtros salen deshabilitados, con la nota
+//     NOTA_SIN_AZT_JEFE;
 //   · tarjetas con los totales (Generadas, Por ejecutar, Ejecutadas sin cerrar, Cerradas, No ejecutadas /
 //     inactivas, % de cierre) y, justo debajo, qué es cada una;
 //   · tabla por contratista, ordenable, con fila de total; cada número abre la lista de esas ODT;
 //   · gráfico de barras apiladas por contratista y evolución mensual (generadas vs cerradas, meses sin huecos);
 //   · por tipo de trabajo y por zona (sus columnas suman el total; cada número abre su lista);
-//   · la lista de ODT de un número (N.º, contratista si la lista los mezcla, subestación, tipo, fecha prevista,
-//     estado en Afinia, fecha de cierre y su estado en SGM, consultado POR N.º y de solo lectura: Por subsanar /
-//     Publicada en firma / Lista / Cerrada en SGM / No está en SGM);
+//   · la lista de ODT de un número (N.º, contratista si la lista los mezcla, subestación, tipo, AZT y jefe de trabajo
+//     si el corte los trae, fecha prevista, estado en Afinia, fecha de cierre y su estado en SGM, consultado POR N.º y
+//     de solo lectura: Por subsanar / Publicada en firma / Lista / Cerrada en SGM / No está en SGM);
 //   · comparación con el corte ANTERIOR del mismo responsable (buscado con su propia consulta, no en el historial):
-//     ± por estado y por contratista (también el % de cierre) y las ODT que cambiaron de estado o aparecieron;
+//     ± por estado y por contratista (también el % de cierre) y las ODT que cambiaron de estado o aparecieron. Si el
+//     anterior es de la versión 1 y hay un filtro por AZT o por jefe, no se compara (NOTA_COMPARAR_SIN_AZT_JEFE):
+//     sus ODT no traen con qué filtrar y los números engañarían; entre dos de la versión 2, con ese filtro, una línea
+//     avisa que una ODT que cambió de AZT o de jefe sale como nueva o como que ya no aparece (NOTA_COMPARAR_PERSONA);
+//   · si ninguna ODT cumple los filtros, el resumen lo dice (NOTA_SIN_RESULTADOS) y el gráfico por contratista deja una
+//     frase (SIN_GRAFICO_CONTRATISTA); con un filtro por AZT o por jefe junto con otro (o sin resultados), el resumen
+//     aclara que el número de cada persona es de todo el corte (NOTA_CONTEO_PERSONA). El título de la lista de ODT
+//     nombra los filtros activos;
 //   · historial de cortes con enlace a cada uno y «Ver cortes más antiguos» (de 50 en 50).
 // Todo con textContent (nunca innerHTML). Archivo NUEVO a propósito (L-102): a sus vecinos de antes (comun.js)
 // solo les pide nombres que ya existían.
@@ -23,12 +33,25 @@ import { h, vaciar, aviso, mensajeDe, fechaHora } from './comun.js';
 import {
   INDICADORES, DEFINICION_OTRO, ETIQUETA_CLAVE, ESTADO_DE_CLAVE, agregar, filtrar, opcionesFiltro, seleccionar, ordenarFilas,
   textoCierre, deltaCierre, valorIndicador, compararCortes, textoDelta, corteAnterior, fechaDMA, textoFechaDatos,
-  SGM_NO_ESTA, SGM_SIN_CONSULTAR
+  SGM_NO_ESTA, SGM_SIN_CONSULTAR, SIN_DATO, corteTraeAztJefe
 } from '../../domain/odt_afinia_indicadores.js';
 import { graficoPorContratista, graficoMensual } from './indicadores-graficos.js';
 
 /** Cuántas ODT se pintan de entrada en una lista (el resto con «Mostrar todas»). */
 export const TOPE_LISTA = 200;
+/** Junto a los filtros del AZT y del jefe, deshabilitados, en un corte de la versión 1 (no los guardó). */
+export const NOTA_SIN_AZT_JEFE = 'Este corte se guardó antes de que se guardaran el AZT y el jefe de trabajo. Para filtrar por ellos, cargue un corte nuevo.';
+/** En la comparación, si el corte anterior es de la versión 1 y hay un filtro por AZT o por jefe de trabajo. */
+export const NOTA_COMPARAR_SIN_AZT_JEFE = 'El corte anterior se guardó sin el AZT y el jefe de trabajo: con el filtro por AZT en sitio o por jefe de trabajo no se puede comparar. Quite esos dos filtros para ver la comparación.';
+/** En la comparación entre dos cortes que sí traen el AZT y el jefe, con un filtro por uno de ellos. */
+export const NOTA_COMPARAR_PERSONA = 'Con el filtro por AZT en sitio o por jefe de trabajo: si una ODT cambió de AZT o de jefe entre los dos cortes, aquí sale como nueva o como que ya no aparece.';
+/** Bajo los filtros, cuando ninguna ODT los cumple todos a la vez (y, si hay filtro por persona, de dónde sale su número). */
+export const NOTA_SIN_RESULTADOS = 'Ninguna ODT cumple todos estos filtros a la vez: cambie alguno o pulse «Quitar filtros».';
+export const NOTA_CONTEO_PERSONA = 'El número junto a cada AZT o jefe cuenta sus ODT en todo el corte, sin los demás filtros.';
+/** En lugar del gráfico por contratista cuando ninguna ODT cumple los filtros (nunca un hueco ni un resto en pantalla). */
+export const SIN_GRAFICO_CONTRATISTA = 'Sin ODT para el gráfico por contratista con estos filtros.';
+/** Los filtros, en el orden de la pantalla: [clave, nombre en el resumen]. */
+const FILTROS = Object.freeze([['tipo', 'Tipo'], ['zona', 'Zona'], ['empresa', 'Contratista'], ['azt', 'AZT en sitio'], ['jefe', 'Jefe de trabajo']]);
 const num = (n) => Number(n || 0).toLocaleString('es-CO');
 /** Las columnas de la tabla por contratista (Otro estado solo si hay). */
 const COLUMNAS = Object.freeze(['total', 'generada', 'ejecutada', 'noEjecutada', 'cerrada', 'inactiva']);
@@ -70,7 +93,7 @@ export function montarVistaCorte(contenedor, {
 }) {
   vaciar(contenedor);
   const estado = {
-    filtros: { tipo: '', zona: '', empresa: '' }, orden: { col: 'total', dir: 'desc' }, sel: null, abridor: null, verTodas: false,
+    filtros: { tipo: '', zona: '', empresa: '', azt: '', jefe: '' }, orden: { col: 'total', dir: 'desc' }, sel: null, abridor: null, verTodas: false,
     sgm: new Map(), sgmPendientes: new Set(), sgmError: '', sgmTope: false,
     anterior: null, anteriorBuscando: true, anteriorTope: false, odtsAnterior: null, anteriorCargando: false, anteriorError: '',
     historial: [...historial], historialTope: !!historialTope, historialCargando: false, historialError: ''
@@ -103,22 +126,32 @@ export function montarVistaCorte(contenedor, {
 
   // ── Filtros ──
   const opciones = opcionesFiltro(odts);
+  /** ¿El corte guardó el AZT y el jefe de cada ODT? (versión 2; en uno de la versión 1 sus filtros se deshabilitan) */
+  const conAztJefe = corteTraeAztJefe(corte);
   const selectores = {};
-  const selector = (id, etiqueta, valores, clave) => {
-    const el = h('select', { id, class: 'odt-campo' }, h('option', { value: '', text: 'Todos' }), valores.map((v) => h('option', { value: v, text: v })));
+  /** Un filtro: `valores` son textos o, con su conteo, [{valor, n}] («NOMBRE · 12 ODT»). */
+  const selector = (id, etiqueta, valores, clave, { deshabilitado = false, describe = null, clase = '' } = {}) => {
+    const opcion = (v) => (typeof v === 'string' ? h('option', { value: v, text: v }) : h('option', { value: v.valor, text: v.valor + ' · ' + num(v.n) + ' ODT' }));
+    const el = h('select', { id, class: 'odt-campo', disabled: deshabilitado, 'aria-describedby': describe },
+      h('option', { value: '', text: 'Todos' }), deshabilitado ? [] : valores.map(opcion));
     el.addEventListener('change', () => { estado.filtros[clave] = el.value; estado.sel = null; pintar(); });
     selectores[clave] = el;
-    return h('div', { class: 'odt-campo-fila' }, h('label', { htmlFor: id, text: etiqueta }), el);
+    return h('div', { class: 'odt-campo-fila' + (clase ? ' ' + clase : '') }, h('label', { htmlFor: id, text: etiqueta }), el);
   };
   const quitar = h('button', {
     type: 'button', class: 'odt-btn odt-btn--chico', text: 'Quitar filtros',
     onclick: () => { for (const k of Object.keys(estado.filtros)) { estado.filtros[k] = ''; selectores[k].value = ''; } estado.sel = null; pintar(); }
   });
   const resumenFiltro = h('p', { class: 'odt-mini odt-ind-resumen-filtro', role: 'status' });
+  const idNota = 'odtIndNotaAztJefe';
+  const persona = { deshabilitado: !conAztJefe, describe: conAztJefe ? null : idNota, clase: 'odt-ind-filtro-persona' };
   contenedor.appendChild(h('section', { class: 'odt-ind-filtros', 'aria-label': 'Filtros' },
     selector('odtIndTipo', 'Tipo de trabajo', opciones.tipos, 'tipo'),
     selector('odtIndZona', 'Zona', opciones.zonas, 'zona'),
     selector('odtIndEmpresa', 'Contratista', opciones.empresas, 'empresa'),
+    selector('odtIndAzt', 'AZT en sitio', opciones.azts, 'azt', persona),
+    selector('odtIndJefe', 'Jefe de trabajo', opciones.jefes, 'jefe', persona),
+    conAztJefe ? null : h('p', { id: idNota, class: 'odt-mini odt-ind-nota-filtros', text: NOTA_SIN_AZT_JEFE }),
     h('div', { class: 'odt-acciones odt-ind-filtros-acciones' }, quitar)));
   contenedor.appendChild(resumenFiltro);
 
@@ -252,14 +285,17 @@ export function montarVistaCorte(contenedor, {
   }
 
   // ── Lista de ODT de un número ──
+  // Cada celda lleva el nombre de su columna (data-etq): si la caja de la lista mide menos de 1000 px (un portátil de
+  // 1280 o de 1100 px con el menú, o un celular), el CSS la muestra como fichas y lo pinta encima de cada dato.
+  const ETQ_SGM = 'Estado en SGM';
   function celdaSgm(o) {
     if (estado.sgm.has(o.nro)) {
       const x = estado.sgm.get(o.nro);
-      if (x === 'tope') return h('td', { title: 'Solo se consultaron las publicaciones más recientes de «Firma» y de «Por subsanar».', text: SGM_SIN_CONSULTAR });
-      return h('td', {}, x ? h('span', { class: 'odt-chip odt-ind-sgm odt-ind-sgm--' + x.clave, text: x.etiqueta }) : SGM_NO_ESTA);
+      if (x === 'tope') return h('td', { 'data-etq': ETQ_SGM, title: 'Solo se consultaron las publicaciones más recientes de «Firma» y de «Por subsanar».', text: SGM_SIN_CONSULTAR });
+      return h('td', { 'data-etq': ETQ_SGM }, x ? h('span', { class: 'odt-chip odt-ind-sgm odt-ind-sgm--' + x.clave, text: x.etiqueta }) : SGM_NO_ESTA);
     }
-    if (estado.sgmPendientes.has(o.nro)) return h('td', { 'aria-label': 'Consultando', text: '…' });
-    return h('td', { text: SGM_SIN_CONSULTAR });
+    if (estado.sgmPendientes.has(o.nro)) return h('td', { 'data-etq': ETQ_SGM, 'aria-label': 'Consultando', text: '…' });
+    return h('td', { 'data-etq': ETQ_SGM, text: SGM_SIN_CONSULTAR });
   }
   function pintarLista() {
     // Si el foco estaba en la lista (su título o un botón), vuelve a su título al repintar (p. ej., al llegar el estado en SGM).
@@ -272,7 +308,9 @@ export function montarVistaCorte(contenedor, {
     const visibles = estado.verTodas ? xs : xs.slice(0, TOPE_LISTA);
     consultarSgm(visibles);
     const conContratista = !sel.empresa && !estado.filtros.empresa;
-    zonaLista.appendChild(h('h3', { class: 'odt-subtitulo odt-ind-lista-titulo', tabindex: '-1', text: 'ODT · ' + (ETIQUETA_CLAVE[sel.clave] || sel.clave) + deDonde(sel) + ' (' + num(xs.length) + ')' }));
+    // El título nombra también los filtros activos (p. ej. « · AZT en sitio: NOMBRE»), salvo el que ya dice el número pulsado.
+    const conFiltros = FILTROS.filter(([k]) => estado.filtros[k] && sel[k] !== estado.filtros[k]).map(([k, nombre]) => ' · ' + nombre + ': ' + estado.filtros[k]).join('');
+    zonaLista.appendChild(h('h3', { class: 'odt-subtitulo odt-ind-lista-titulo', tabindex: '-1', text: 'ODT · ' + (ETIQUETA_CLAVE[sel.clave] || sel.clave) + deDonde(sel) + conFiltros + ' (' + num(xs.length) + ')' }));
     zonaLista.appendChild(h('div', { class: 'odt-acciones' },
       h('button', { type: 'button', class: 'odt-btn odt-btn--chico', text: 'Cerrar la lista', onclick: cerrarLista })));
     if (estado.sgmPendientes.size) zonaLista.appendChild(h('p', { class: 'odt-cargando', text: 'Consultando el estado de estas ODT en SGM…' }));
@@ -282,18 +320,22 @@ export function montarVistaCorte(contenedor, {
         h('button', { type: 'button', class: 'odt-btn odt-btn--chico', text: 'Reintentar la consulta en SGM', onclick: () => { estado.sgmError = ''; consultarSgm(visibles, true); pintarLista(); } })));
     }
     if (estado.sgmTope) zonaLista.appendChild(h('p', { class: 'odt-mini', text: '«' + SGM_SIN_CONSULTAR + '»: solo se pudieron consultar las publicaciones más recientes de «Firma» y de «Por subsanar» (hasta 50 de cada una).' }));
-    const columnas = ['N.º', ...(conContratista ? ['Contratista'] : []), 'Subestación', 'Tipo de trabajo', 'Fecha prevista', 'Estado en Afinia', 'Fecha de cierre', 'Estado en SGM'];
+    // El AZT y el jefe de trabajo, solo si el corte los guardó (versión 2): en uno de la versión 1 serían columnas vacías.
+    const columnas = ['N.º', ...(conContratista ? ['Contratista'] : []), 'Subestación', 'Tipo de trabajo', ...(conAztJefe ? ['AZT', 'Jefe de trabajo'] : []),
+      'Fecha prevista', 'Estado en Afinia', 'Fecha de cierre', 'Estado en SGM'];
     zonaLista.appendChild(h('div', { class: 'odt-tabla-caja' }, h('table', { class: 'odt-tabla odt-ind-tabla odt-ind-tabla-odt' },
       h('caption', { class: 'odt-oculto', text: 'Lista de ODT' }),
       h('thead', {}, h('tr', {}, columnas.map((t) => h('th', { scope: 'col', text: t })))),
       h('tbody', {}, visibles.map((o) => h('tr', {},
         h('th', { scope: 'row', class: 'odt-mono', text: o.nro }),
-        conContratista ? h('td', { text: o.empresa || '—' }) : null,
-        h('td', { text: o.subestacion || '—' }),
-        h('td', { text: o.tipo || '—' }),
-        h('td', { text: fechaDMA(o.prevista) }),
-        h('td', { text: o.estado || '(sin estado)' }),
-        h('td', { text: fechaDMA(o.cerrada) }),
+        conContratista ? h('td', { 'data-etq': 'Contratista', text: o.empresa || '—' }) : null,
+        h('td', { 'data-etq': 'Subestación', text: o.subestacion || '—' }),
+        h('td', { 'data-etq': 'Tipo de trabajo', text: o.tipo || '—' }),
+        conAztJefe ? h('td', { 'data-etq': 'AZT', text: o.azt || SIN_DATO }) : null,
+        conAztJefe ? h('td', { 'data-etq': 'Jefe de trabajo', text: o.jefe || SIN_DATO }) : null,
+        h('td', { 'data-etq': 'Fecha prevista', text: fechaDMA(o.prevista) }),
+        h('td', { 'data-etq': 'Estado en Afinia', text: o.estado || '(sin estado)' }),
+        h('td', { 'data-etq': 'Fecha de cierre', text: fechaDMA(o.cerrada) }),
         celdaSgm(o)))))));
     if (xs.length > visibles.length) {
       zonaLista.appendChild(h('div', { class: 'odt-acciones' },
@@ -318,10 +360,17 @@ export function montarVistaCorte(contenedor, {
     zonaComparar.appendChild(h('p', { class: 'odt-mini' },
       'Corte anterior: datos del ' + textoFechaDatos(anterior) + ' (guardado el ' + fechaHora(anterior.creadoEnMs) + ') · ' + ((anterior.archivo && anterior.archivo.nombre) || '—') + ' · ',
       h('a', { class: 'odt-enlace', href: '#indicadores=' + anterior.id, text: 'ver ese corte' })));
+    // Un anterior de la versión 1 no guardó el AZT ni el jefe: con esos filtros, sus números engañarían (todo «sin dato»).
+    if ((estado.filtros.azt || estado.filtros.jefe) && !corteTraeAztJefe(anterior)) {
+      zonaComparar.appendChild(h('p', { class: 'odt-vacio odt-ind-comparar-no-aplica', text: NOTA_COMPARAR_SIN_AZT_JEFE }));
+      return;
+    }
     if (estado.anteriorCargando) { zonaComparar.appendChild(h('p', { class: 'odt-cargando', text: 'Leyendo el corte anterior…' })); return; }
     if (estado.anteriorError) { zonaComparar.appendChild(aviso('No se pudo leer el corte anterior: ' + estado.anteriorError, 'aviso')); return; }
     if (!estado.odtsAnterior) return;
     const c = compararCortes(filtrar(estado.odtsAnterior, estado.filtros), filtrar(odts, estado.filtros));
+    // Entre dos cortes de la versión 2, se compara lo filtrado en cada uno: una ODT que cambió de persona queda en uno solo.
+    if (estado.filtros.azt || estado.filtros.jefe) zonaComparar.appendChild(h('p', { class: 'odt-mini odt-ind-comparar-persona', text: NOTA_COMPARAR_PERSONA }));
     const fila = (titulo, a, b, d) => h('tr', {}, h('th', { scope: 'row', text: titulo }),
       h('td', { class: 'odt-ind-n', text: a }), h('td', { class: 'odt-ind-n', text: b }),
       h('td', { class: 'odt-ind-n odt-ind-delta', text: d }));
@@ -445,9 +494,14 @@ export function montarVistaCorte(contenedor, {
   function pintar() {
     const lista = filtrar(odts, estado.filtros);
     const ag = agregar(lista);
-    const activos = [['Tipo', estado.filtros.tipo], ['Zona', estado.filtros.zona], ['Contratista', estado.filtros.empresa]].filter(([, v]) => v);
+    const activos = FILTROS.map(([k, nombre]) => [nombre, estado.filtros[k]]).filter(([, v]) => v);
+    // El número junto a cada AZT o jefe es de todo el corte: se aclara si hay un filtro por persona junto con otro
+    // (ahí ese número y el de las tarjetas ya no coinciden) o si ninguna ODT cumple los filtros.
+    const conPersona = !!(estado.filtros.azt || estado.filtros.jefe);
     resumenFiltro.textContent = activos.length
       ? 'Con filtros (' + activos.map(([k, v]) => k + ': ' + v).join(' · ') + '): ' + num(lista.length) + ' de ' + num(odts.length) + ' ODT.'
+        + (lista.length ? '' : ' ' + NOTA_SIN_RESULTADOS)
+        + (conPersona && (!lista.length || activos.length > 1) ? ' ' + NOTA_CONTEO_PERSONA : '')
       : 'Sin filtros: las ' + num(odts.length) + ' ODT del corte.';
     vaciar(zonaTarjetas);
     zonaTarjetas.appendChild(tarjetas(ag.totales));
@@ -455,7 +509,8 @@ export function montarVistaCorte(contenedor, {
     zonaDatos.append(
       h('h3', { class: 'odt-subtitulo odt-ind-h3-datos', tabindex: '-1', text: 'Por contratista' }),
       tablaContratistas(ag),
-      ag.porEmpresa.length ? graficoPorContratista(ordenarFilas(ag.porEmpresa, 'total', 'desc'), { alElegir: (sel) => elegir(sel, null) }) : null,
+      // append() del navegador pinta un null como la palabra «null»: sin ODT va una frase, nunca un null.
+      ag.porEmpresa.length ? graficoPorContratista(ordenarFilas(ag.porEmpresa, 'total', 'desc'), { alElegir: (sel) => elegir(sel, null) }) : h('p', { class: 'odt-vacio', text: SIN_GRAFICO_CONTRATISTA }),
       h('h3', { class: 'odt-subtitulo', text: 'Evolución mensual' }),
       ag.porMes.length ? graficoMensual(ag.porMes) : h('p', { class: 'odt-vacio', text: 'Sin fechas para la evolución mensual.' }),
       h('h3', { class: 'odt-subtitulo', text: 'Por tipo de trabajo y por zona' }),

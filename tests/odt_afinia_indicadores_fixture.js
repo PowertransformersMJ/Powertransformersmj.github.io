@@ -10,6 +10,12 @@ export const RESP_B = 'OTRA PERSONA INVENTADA';
 export const ALFA = 'CONTRATISTA ALFA S.A.S.';
 export const BETA = 'CONSORCIO BETA';
 export const GAMMA = 'UNION TEMPORAL GAMMA - DELTA';
+// AZT en sitio y jefes de trabajo (personas inventadas).
+export const AZT_1 = 'AZT FICTICIO UNO';
+export const AZT_2 = 'AZT INVENTADO DOS';
+export const JEFE_1 = 'JEFE FICTICIO UNO';
+export const JEFE_2 = 'JEFE INVENTADO DOS';
+export const JEFE_3 = 'JEFE DE PRUEBA TRES';
 
 /** Una fila de 48 campos: valores por defecto y lo que se pida por encabezado. */
 export function fila(campos = {}) {
@@ -19,17 +25,23 @@ export function fila(campos = {}) {
     ZONA: 'ZONA NORTE', DEPARTAMENTO: 'DEPARTAMENTO FICTICIO', MUNICIPIO: 'MUNICIPIO FICTICIO', SUBESTACION: 'S/E PRUEBA UNO',
     'ELEMENTO / BAHÍA / LN': 'BAHÍA DE PRUEBA', EQUIPO: 'EQUIPO DE PRUEBA', 'LUGAR DE TRABAJO': 'PATIO',
     'DESCRIPCIÓN DE LA PLANIFICACIÓN DEL TRABAJO / DAÑO': 'Revisión de prueba', OBSERVACIONES: 'Sin novedad',
+    'JEFE DE TRABAJO': JEFE_1, 'AZT EN SITIO': AZT_1, 'JEFE DE TRABAJO EN SITIO': JEFE_1,
     'RESPONSABLE O.D.T.': RESP_A, 'FECHA ODT CERRADA': '', 'ESTADO FINAL DE LA ODT': 'GENERADA', 'FUENTE DE ORIGEN': 'FUENTE FICTICIA'
   };
   const v = { ...base, ...campos };
   return ENCABEZADOS_AFINIA.map((h) => (v[h] == null ? '' : String(v[h])));
 }
-/** Atajo: una ODT con N.º, contratista, estado y fechas. */
-export function odt(nro, { empresa = ALFA, estado = 'GENERADA', prevista = '15/03/2026 07:00', cerrada = '', resp = RESP_A, tipo, zona, sub, extra = {} } = {}) {
+/**
+ * Atajo: una ODT con N.º, contratista, estado y fechas; `azt`, `jefe` (en sitio) y `jefePlan` (el asignado, «JEFE DE
+ * TRABAJO»): si no se piden, los de la fila base (AZT_1 y JEFE_1); '' los deja vacíos.
+ */
+export function odt(nro, { empresa = ALFA, estado = 'GENERADA', prevista = '15/03/2026 07:00', cerrada = '', resp = RESP_A, tipo, zona, sub, azt, jefe, jefePlan, extra = {} } = {}) {
   return fila({
     'NRO. ODT': nro, EMPRESA: empresa, 'ESTADO FINAL DE LA ODT': estado, 'FECHA Y HORA PREVISTA DE INICIO': prevista,
     'FECHA ODT CERRADA': cerrada, 'RESPONSABLE O.D.T.': resp,
-    ...(tipo ? { 'TIPO DE TRABAJO': tipo } : {}), ...(zona ? { ZONA: zona } : {}), ...(sub ? { SUBESTACION: sub } : {}), ...extra
+    ...(tipo ? { 'TIPO DE TRABAJO': tipo } : {}), ...(zona ? { ZONA: zona } : {}), ...(sub ? { SUBESTACION: sub } : {}),
+    ...(azt != null ? { 'AZT EN SITIO': azt } : {}), ...(jefe != null ? { 'JEFE DE TRABAJO EN SITIO': jefe } : {}),
+    ...(jefePlan != null ? { 'JEFE DE TRABAJO': jefePlan } : {}), ...extra
   });
 }
 /** El texto del CSV: encabezados + filas (arreglos o líneas ya armadas), con su fin de línea. */
@@ -100,18 +112,21 @@ export function conConsultas(fs) {
  *     BETA: 90000005 NO EJECUTADA · 90000006 CERRADA · 90000007 INACTIVA
  *     GAMMA: 90000008 «SUSPENDIDA» (estado que la página no conoce → Otro)
  *   RESP_B: 2 filas → 2 ODT (ALFA 90000009 CERRADA, BETA 90000010 GENERADA)
+ * AZT en sitio y jefe de trabajo de RESP_A (la 90000005 trae vacío el jefe EN SITIO: se toma el asignado):
+ *   AZT_1: 90000001, 90000002, 90000005, 90000007, 90000008 (5) · AZT_2: 90000003, 90000004, 90000006 (3)
+ *   JEFE_1: 90000001, 90000004, 90000007 (3) · JEFE_2: 90000002, 90000003, 90000008 (3) · JEFE_3: 90000005, 90000006 (2)
  */
 export function archivoBase() {
   const filas = [
     odt('90000001', { estado: 'GENERADA', prevista: '05/01/2026 07:00', tipo: 'TIPO UNO', zona: 'ZONA NORTE' }),
-    odt('90000002', { estado: 'CERRADA', prevista: '10/02/2026 08:00', cerrada: '20/03/2026 10:00', tipo: 'TIPO UNO', zona: 'ZONA SUR' }),
-    odt('90000002', { estado: 'CERRADA', prevista: '11/02/2026 08:00', cerrada: '20/03/2026 10:00', tipo: 'TIPO UNO', zona: 'ZONA SUR', extra: { 'ELEMENTO / BAHÍA / LN': 'OTRA BAHÍA' } }),
-    odt('90000003', { estado: 'EJECUTADA', prevista: '12/02/2026 08:00', tipo: 'TIPO DOS', zona: 'ZONA NORTE' }),
-    odt('90000004', { estado: 'CERRADA', prevista: '01/03/2026 08:00', cerrada: '02/03/2026 09:00', tipo: 'TIPO DOS', zona: 'ZONA NORTE' }),
-    odt('90000005', { empresa: BETA, estado: 'NO EJECUTADA', prevista: '03/03/2026 08:00', tipo: 'TIPO UNO', zona: 'ZONA SUR' }),
-    odt('90000006', { empresa: BETA, estado: 'CERRADA', prevista: '04/03/2026 08:00', cerrada: '30/04/2026 08:00', tipo: 'TIPO UNO', zona: 'ZONA SUR' }),
+    odt('90000002', { estado: 'CERRADA', prevista: '10/02/2026 08:00', cerrada: '20/03/2026 10:00', tipo: 'TIPO UNO', zona: 'ZONA SUR', jefe: JEFE_2, jefePlan: JEFE_2 }),
+    odt('90000002', { estado: 'CERRADA', prevista: '11/02/2026 08:00', cerrada: '20/03/2026 10:00', tipo: 'TIPO UNO', zona: 'ZONA SUR', jefe: JEFE_2, jefePlan: JEFE_2, extra: { 'ELEMENTO / BAHÍA / LN': 'OTRA BAHÍA' } }),
+    odt('90000003', { estado: 'EJECUTADA', prevista: '12/02/2026 08:00', tipo: 'TIPO DOS', zona: 'ZONA NORTE', azt: AZT_2, jefe: JEFE_2, jefePlan: JEFE_2 }),
+    odt('90000004', { estado: 'CERRADA', prevista: '01/03/2026 08:00', cerrada: '02/03/2026 09:00', tipo: 'TIPO DOS', zona: 'ZONA NORTE', azt: AZT_2 }),
+    odt('90000005', { empresa: BETA, estado: 'NO EJECUTADA', prevista: '03/03/2026 08:00', tipo: 'TIPO UNO', zona: 'ZONA SUR', jefe: '', jefePlan: JEFE_3 }),
+    odt('90000006', { empresa: BETA, estado: 'CERRADA', prevista: '04/03/2026 08:00', cerrada: '30/04/2026 08:00', tipo: 'TIPO UNO', zona: 'ZONA SUR', azt: AZT_2, jefe: JEFE_3, jefePlan: JEFE_3 }),
     odt('90000007', { empresa: BETA, estado: 'INACTIVA', prevista: '05/03/2026 08:00', tipo: 'TIPO DOS', zona: 'ZONA NORTE' }),
-    odt('90000008', { empresa: GAMMA, estado: 'SUSPENDIDA', prevista: '06/04/2026 08:00', tipo: 'TIPO DOS', zona: 'ZONA NORTE' }),
+    odt('90000008', { empresa: GAMMA, estado: 'SUSPENDIDA', prevista: '06/04/2026 08:00', tipo: 'TIPO DOS', zona: 'ZONA NORTE', jefe: JEFE_2, jefePlan: JEFE_2 }),
     odt('90000009', { resp: RESP_B, estado: 'CERRADA', prevista: '07/04/2026 08:00', cerrada: '08/04/2026 08:00' }),
     odt('90000010', { resp: RESP_B, empresa: BETA, estado: 'GENERADA', prevista: '08/04/2026 08:00' })
   ];

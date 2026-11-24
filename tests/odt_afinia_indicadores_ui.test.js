@@ -25,7 +25,7 @@ import { createHash } from 'node:crypto';
 import { crearDomFalso, crearFirestoreFalso } from './odt_afinia_ui_dobles.js';
 import { crearRepositorioCortes } from '../assets/js/data/odt_afinia_cortes.js';
 import { leerCsv, analizarResponsable, ENCABEZADOS_AFINIA, MSG_OTRO_ARCHIVO, SGM_NO_ESTA, SGM_SIN_CONSULTAR } from '../assets/js/domain/odt_afinia_indicadores.js';
-import { RESP_A, RESP_A_PERFIL, RESP_B, ALFA, BETA, GAMMA, archivoBase, csv, odt, fila, latin1, conConsultas } from './odt_afinia_indicadores_fixture.js';
+import { RESP_A, RESP_A_PERFIL, RESP_B, ALFA, BETA, GAMMA, AZT_1, AZT_2, JEFE_1, JEFE_2, JEFE_3, archivoBase, csv, odt, fila, latin1, conConsultas } from './odt_afinia_indicadores_fixture.js';
 
 let guardado; let dom; let proto; const originales = {};
 before(() => {
@@ -218,10 +218,11 @@ describe('vista de un corte', () => {
     await hasta(() => lista().textContent.includes('Cerrada en SGM'));
     assert.ok(activo().className.includes('odt-ind-lista-titulo'), 'y sigue ahí al llegar el estado en SGM');
     const filas = lista().todos().filter((x) => x.tagName === 'TR').slice(1).map((tr) => tr.childNodes.map((td) => td.textContent));
+    // Con el AZT y el jefe de trabajo de cada ODT (corte de la versión 2).
     assert.deepEqual(filas, [
-      ['90000002', ALFA, 'S/E PRUEBA UNO', 'TIPO UNO', '10/02/2026', 'CERRADA', '20/03/2026', 'Lista'],
-      ['90000004', ALFA, 'S/E PRUEBA UNO', 'TIPO DOS', '01/03/2026', 'CERRADA', '02/03/2026', 'Cerrada en SGM'],
-      ['90000006', BETA, 'S/E PRUEBA UNO', 'TIPO UNO', '04/03/2026', 'CERRADA', '30/04/2026', 'Por subsanar']
+      ['90000002', ALFA, 'S/E PRUEBA UNO', 'TIPO UNO', AZT_1, JEFE_2, '10/02/2026', 'CERRADA', '20/03/2026', 'Lista'],
+      ['90000004', ALFA, 'S/E PRUEBA UNO', 'TIPO DOS', AZT_2, JEFE_1, '01/03/2026', 'CERRADA', '02/03/2026', 'Cerrada en SGM'],
+      ['90000006', BETA, 'S/E PRUEBA UNO', 'TIPO UNO', AZT_2, JEFE_3, '04/03/2026', 'CERRADA', '30/04/2026', 'Por subsanar']
     ]);
     const nuevas = fs.consultas.slice(antes);
     assert.deepEqual([...new Set(nuevas.map((q) => q.col))].sort(), ['odt_afinia', 'odt_afinia_obs'], 'solo lee la firma y «Por subsanar»');
@@ -627,8 +628,9 @@ describe('cargar un corte', () => {
   test('el mismo archivo ya guardado para ese responsable: se avisa (del historial o, si no está en él, del servidor por su huella)', async () => {
     const texto = archivoBase();
     const sha = createHash('sha256').update(Buffer.from(latin1(texto))).digest('hex');
-    const { c } = await cargar(ADMIN, texto, { historial: [{ id: 'X'.repeat(20), responsable: RESP_A, archivo: { sha256: sha }, creadoEnMs: Date.UTC(2026, 10, 20, 15) }] });
+    const { c } = await cargar(ADMIN, texto, { historial: [{ id: 'X'.repeat(20), responsable: RESP_A, archivo: { sha256: sha }, creadoEnMs: Date.UTC(2026, 10, 20, 15), version: 2 }] });
     assert.ok(c.textContent.includes('Este mismo archivo ya se guardó como corte de este responsable'));
+    assert.ok(c.textContent.includes('quedan dos cortes iguales en el historial'));
     // Fuera del historial (p. ej. más allá de los 50): lo encuentra la consulta por huella.
     const fs = nuevoFs();
     await guardarCorte(fs, texto, { nombre: NOMBRE, sha });
