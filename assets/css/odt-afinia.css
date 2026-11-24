@@ -224,6 +224,10 @@ textarea.odt-campo { resize: vertical; }
    (allí la pestaña pone el texto en blanco: la píldora pasa a fondo blanco y número azul). */
 .odt-nav-btn .odt-cuenta { margin-left: 6px; color: var(--odt-tinta-2, #1f3656); }
 .odt-nav-btn[aria-current="page"] .odt-cuenta { background: #fff; color: var(--odt-marca, #007aff); }
+/* «Descargar Excel» de la lista (2026-11-24): botón, casilla «Incluir las ya resueltas» y el avance. */
+.odt-obs-excel { margin: 10px 0 14px; padding: 10px 14px; border-radius: var(--odt-r, 10px); background: #fff; border: 1px solid var(--odt-linea, rgba(0, 40, 90, .12)); }
+.odt-obs-excel .odt-acciones { margin: 0; }
+.odt-obs-excel-opcion { display: inline-flex; gap: 8px; align-items: center; font-size: 14px; cursor: pointer; }
 
 /* ── Celular ──────────────────────────────────────────────────────────────── */
 @media (max-width: 720px) {

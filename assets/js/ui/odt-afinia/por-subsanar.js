@@ -10,6 +10,8 @@
 //   · Detalle (#subsanar=<id>): subsanar-detalle.js.
 //   · Registrar (#subsanar-nueva, solo admin): subsanar-registrar.js.
 // La lista y el contador de la pestaña salen de las obs (su `resumen`), sin leer los puntos.
+// «Descargar Excel» (pedido del Ingeniero del 2026-11-24): sobre la lista (si hay alguna ODT), para quien
+// ve la pestaña; vive en subsanar-excel.js, que entra con import() (L-102): si no carga, la lista sigue igual.
 // app.js carga este archivo con import() y pregunta si existe montarPorSubsanar (L-102): si no
 // carga, el resto de la página sigue. Archivo NUEVO a propósito (L-102): a sus vecinos de antes
 // (comun.js) solo les pide nombres que ya existían.
@@ -28,6 +30,17 @@ export const INTRO_AZT = 'Las ODT de Afinia que tienen puntos por corregir antes
 export const INTRO_ADMIN = 'Las ODT de Afinia con inconsistencias por corregir antes de publicarlas para firma. Cuando todos sus puntos estén verificados, quedan «Lista para publicar»: se publican en «Publicar ODT».';
 export const VACIO_AZT = 'No tiene ODT por subsanar.';
 export const VACIO_ADMIN = 'Todavía no hay ODT por subsanar registradas.';
+
+/** «Descargar Excel» vive en un archivo NUEVO: se carga con import() y se pregunta si trae lo que se usa (L-102). */
+let _excel = null;
+function cargarExcel() {
+  if (!_excel) {
+    _excel = import('./subsanar-excel.js')
+      .then((m) => (m && typeof m.bloqueDescargaExcel === 'function' ? m : null))
+      .catch(() => null);
+  }
+  return _excel;
+}
 
 /**
  * Cuántas obs ve la sesión y cuántos puntos le tocan «de su lado» (para la pestaña).
@@ -87,6 +100,9 @@ export async function montarListaObs(contenedor, { repoObs, sesion, mensaje, alI
     contenedor.appendChild(h('p', { class: 'odt-vacio', text: sesion.esAdmin ? VACIO_ADMIN : VACIO_AZT }));
     return { lista };
   }
+  // «Descargar Excel»: el lugar se reserva ya (sobre la lista); el bloque llega cuando carga su archivo.
+  const zonaExcel = h('div', {});
+  contenedor.appendChild(zonaExcel);
   contenedor.appendChild(h('ul', { class: 'odt-filas' }, lista.map((o) => {
     const chip = chipObs(o);
     const meta = [o.subestacion, o.equipo, o.fechaPrevista ? 'prevista ' + o.fechaPrevista : '', o.azt && o.azt.nombre ? 'AZT: ' + o.azt.nombre : '']
@@ -99,5 +115,9 @@ export async function montarListaObs(contenedor, { repoObs, sesion, mensaje, alI
         h('span', { class: 'odt-fila-meta odt-obs-conteo', text: textoConteo(o) })));
   })));
   if (datos.tope) contenedor.appendChild(aviso('Se muestran las ' + TOPES_OBS.listado + ' más recientes.', 'info'));
+  const mx = await cargarExcel();
+  if (mx) {
+    try { zonaExcel.appendChild(mx.bloqueDescargaExcel({ repoObs })); } catch (_) { /* sin el bloque: la lista sigue */ }
+  }
   return { lista };
 }
