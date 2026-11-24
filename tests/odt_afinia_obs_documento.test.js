@@ -168,6 +168,14 @@ describe('aclaración del AZT, sistema / decisión del Responsable y aviso', () 
       assert.equal(r.etiqueta, 'Aclaración del AZT');
     }
   });
+  test('casos de producción (2026-11-24): «Reemitir el control previo…», «Cargar en Afinia la ODT…», AZT «Confirmar… para completarla en el sistema»', () => {
+    assert.equal(etiqueta('Reemitir el control previo con el N.º de PT/OT 90000009: hoy dice 90000008, que es de otra S/E.'), 'Control previo');
+    assert.equal(etiqueta('Reemitir el control previo con fecha 02/02/2099: hoy dice 01/02/2099.'), 'Control previo');
+    assert.equal(etiqueta('Cargar en Afinia la ODT corregida, firmada solo por el jefe de trabajo.'), 'ODT');
+    assert.equal(etiqueta('Confirmar el nombre de la Persona 1 (¿Nombre Ficticio?) para completarla en el sistema.', 'azt'), 'Aclaración del AZT');
+    // Un contratista que «confirma» sin documento sigue en «Otro» (la regla nueva es solo para el AZT).
+    assert.equal(etiqueta('Confirmar el nombre de la Persona 1 para completarla en el sistema.', 'contratista'), 'Otro');
+  });
   test('AZT que SÍ pide corregir un documento → ese documento; un contratista que «aclara» no es aclaración del AZT', () => {
     assert.equal(etiqueta('Confirmar la hora y corregir el control previo si hace falta.', 'azt'), 'Control previo');
     assert.equal(etiqueta('Aclarar por qué la cuadrilla llegó tarde.', 'contratista'), 'Otro');
