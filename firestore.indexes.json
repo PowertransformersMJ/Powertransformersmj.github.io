@@ -468,6 +468,15 @@
         { "fieldPath": "lectores",  "arrayConfig": "CONTAINS" },
         { "fieldPath": "creadoEn",  "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "odt_afinia_cortes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "responsable", "order": "ASCENDING" },
+        { "fieldPath": "fechaDatos",  "order": "DESCENDING" },
+        { "fieldPath": "creadoEn",    "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [
@@ -490,6 +499,7 @@
     { "collectionGroup": "partes", "fieldPath": "datos", "indexes": [] },
     { "collectionGroup": "actos", "fieldPath": "imagen", "indexes": [] },
     { "collectionGroup": "puntos", "fieldPath": "rastro", "indexes": [] },
+    { "collectionGroup": "partes", "fieldPath": "odts", "indexes": [] },
     { "collectionGroup": "informes_brigada", "fieldPath": "contenido", "indexes": [] },
     { "collectionGroup": "versiones", "fieldPath": "contenido", "indexes": [] }
   ]

@@ -1,0 +1,165 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   SGM · TRANSPOWER — FIRMA DE ODT AFINIA · pestaña «Indicadores» (prefijo .odt-)
+   ---------------------------------------------------------------------------
+   Archivo NUEVO (L-102): la pestaña «Indicadores» (2026-11-23) trae su piel aparte
+   de `odt-afinia.css`; se apoya en sus tokens (--odt-*, definidos en .odt-raiz) y en
+   sus clases (.odt-tabla, .odt-btn, .odt-chip…). Toda regla vive bajo `.odt-`.
+   RENDIMIENTO (CLAUDE.md §3.1): sin `transition` general; solo color y fondo, con
+   sus propiedades nombradas; sin animar el layout y sin `backdrop-filter`.
+   El módulo no se imprime (L-107): lo cubre el @media print de `odt-afinia.css`.
+═══════════════════════════════════════════════════════════════════════════ */
+
+.odt-ind-titulo { font-size: 18px; }
+.odt-ind-seccion { margin: 22px 0 0; }
+.odt-ind-h4 { margin: 14px 0 6px; font-size: 14.5px; color: var(--odt-tinta, #0d1f38); }
+.odt-ind-caption { caption-side: top; text-align: left; padding: 0 0 6px; font-size: 12.5px; color: var(--odt-tenue, #4d6485); }
+.odt-ind-resumen-filtro { margin: 0 0 10px; }
+
+/* ── Filtros: una fila sobre los datos ────────────────────────────────────── */
+.odt-ind-filtros { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0 14px; align-items: end; margin: 12px 0 0; }
+.odt-ind-filtros .odt-campo-fila { margin: 0 0 8px; }
+.odt-ind-filtros-acciones { margin: 0 0 8px; }
+
+/* ── Tarjetas ─────────────────────────────────────────────────────────────── */
+.odt-ind-tarjetas { list-style: none; margin: 8px 0 4px; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.odt-ind-tarjeta { margin: 0; }
+.odt-ind-tarjeta-btn {
+  width: 100%; height: 100%; display: grid; gap: 2px; align-content: start; text-align: left; padding: 12px 14px; font: inherit; color: inherit;
+  background: #fff; border: 1px solid var(--odt-linea, rgba(0, 40, 90, .12)); border-left: 4px solid var(--odt-linea-fuerte, rgba(0, 40, 90, .22));
+  border-radius: var(--odt-r, 10px); cursor: pointer;
+  transition: border-color var(--odt-dur, 180ms) ease, background-color var(--odt-dur, 180ms) ease;
+}
+.odt-ind-tarjeta-btn:hover:not(.odt-ind-tarjeta-fija) { background: var(--odt-sup-suave, #f6f8fc); border-color: var(--odt-marca, #007aff); }
+.odt-ind-tarjeta-fija { cursor: default; }
+.odt-ind-tarjeta-valor { font-size: 26px; font-weight: 700; line-height: 1.15; color: var(--odt-tinta, #0d1f38); font-variant-numeric: tabular-nums; }
+.odt-ind-tarjeta-titulo { font-size: 13px; font-weight: 600; color: var(--odt-tinta-2, #1f3656); }
+.odt-ind-tarjeta-nota { font-size: 12px; color: var(--odt-tenue, #4d6485); }
+/* El color de la franja izquierda es el del estado en los gráficos (la identidad no va solo en el color: lleva su nombre). */
+.odt-ind-tarjeta--generada .odt-ind-tarjeta-btn { border-left-color: #1baf7a; }
+.odt-ind-tarjeta--ejecutada .odt-ind-tarjeta-btn { border-left-color: #eb6834; }
+.odt-ind-tarjeta--cerrada .odt-ind-tarjeta-btn { border-left-color: #2a78d6; }
+.odt-ind-tarjeta--noEjecutadaInactiva .odt-ind-tarjeta-btn { border-left-color: #eda100; }
+.odt-ind-tarjeta--otro .odt-ind-tarjeta-btn { border-left-color: #008300; }
+.odt-ind-tarjeta--pctCierre .odt-ind-tarjeta-btn { border-left-color: var(--odt-marca, #007aff); background: var(--odt-info-fondo, #eaf2ff); }
+
+/* ── Tablas ───────────────────────────────────────────────────────────────── */
+.odt-ind-tabla { margin: 6px 0 4px; }
+.odt-ind-tabla .odt-ind-n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Los encabezados numéricos se parten en varias líneas (así la tabla cabe en un portátil): el nombre arriba y, debajo y
+   en chico, el estado de Afinia que cuenta. */
+.odt-ind-tabla thead th.odt-ind-n { white-space: normal; min-width: 64px; }
+.odt-ind-sub { display: block; font-size: 10.5px; font-weight: 500; letter-spacing: .02em; color: var(--odt-tenue, #4d6485); }
+.odt-ind-tabla-contratistas tbody th, .odt-ind-tabla-contratistas tfoot th { min-width: 170px; }
+.odt-ind-tabla tbody th { font-weight: 600; color: var(--odt-tinta, #0d1f38); }
+.odt-ind-total th, .odt-ind-total td { font-weight: 700; border-top: 2px solid var(--odt-linea-fuerte, rgba(0, 40, 90, .22)); color: var(--odt-tinta, #0d1f38); }
+.odt-ind-actual th, .odt-ind-actual td { background: var(--odt-info-fondo, #eaf2ff); }
+.odt-ind-orden {
+  appearance: none; border: 0; background: none; padding: 2px 0; font: inherit; font-weight: 600; color: inherit; cursor: pointer;
+  text-align: inherit; min-height: 28px;
+}
+.odt-ind-orden:hover { color: var(--odt-marca-hondo, #0051d5); text-decoration: underline; }
+.odt-ind-num {
+  appearance: none; min-width: 36px; min-height: 30px; padding: 2px 8px; border-radius: 6px; font: inherit; font-variant-numeric: tabular-nums;
+  color: var(--odt-marca-hondo, #0051d5); background: transparent; border: 1px solid transparent; cursor: pointer; text-decoration: underline;
+  transition: background-color var(--odt-dur, 180ms) ease, border-color var(--odt-dur, 180ms) ease;
+}
+.odt-ind-num:hover { background: var(--odt-info-fondo, #eaf2ff); border-color: #b8d0f5; }
+.odt-ind-orden:focus-visible, .odt-ind-num:focus-visible, .odt-ind-tarjeta-btn:focus-visible { outline: 3px solid var(--odt-marca, #007aff); outline-offset: 2px; }
+.odt-ind-lista-titulo:focus-visible, .odt-ind-titulo:focus-visible, .odt-ind-aviso-inicial:focus-visible { outline: 3px solid var(--odt-marca, #007aff); outline-offset: 2px; }
+/* Un título que recibe el foco al navegar (tabindex -1) no muestra el marco al pulsar con el ratón. */
+.odt-ind-titulo:focus:not(:focus-visible), .odt-ind-aviso-inicial:focus:not(:focus-visible) { outline: none; }
+.odt-ind-delta { font-weight: 600; }
+/* Por tipo y por zona: lado a lado solo si cada una tiene al menos 520 px (si no, una debajo de la otra). */
+.odt-ind-dos { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(520px, 100%), 1fr)); gap: 12px 18px; }
+/* Comparación por contratista: «antes → ahora (±)» se puede partir en dos líneas (así no se sale de lado en un portátil). */
+.odt-ind-tabla-comparar td.odt-ind-n { white-space: normal; }
+
+/* ── La barra superior FIJA de la página (64 px, la del menú) ─────────────────────
+   Todo lo que la pantalla lleva a la vista o recibe el foco al navegar (el título del corte, el aviso «Corte
+   guardado», el título de una lista y su sección, el historial, la vista previa, el estado de la carga y los botones
+   a los que vuelve el foco) queda 80 px por debajo del borde: así no lo tapa la barra (como en pruebas-electricas.css
+   y ordenes-materiales.css). La entrada (indicadores.js, BARRA_FIJA_PX) cuenta como oculto lo que queda debajo de ella. */
+.odt-ind-titulo, .odt-ind-aviso-inicial, .odt-ind-seccion, .odt-ind-seccion > h3, .odt-ind-lista-titulo, .odt-ind-h3-datos,
+.odt-ind-historial-titulo, .odt-ind-previa-titulo, .odt-ind-estado, .odt-ind-num, .odt-ind-tarjeta-btn, .odt-ind-orden,
+.odt-ind-mas-historial { scroll-margin-top: 80px; }
+
+/* ── Estado en SGM (chips) ────────────────────────────────────────────────── */
+.odt-ind-sgm { white-space: nowrap; }
+.odt-ind-sgm--subsanar { background: var(--odt-aviso-fondo, #fff4e0); color: var(--odt-aviso, #7a4200); }
+.odt-ind-sgm--firma { background: var(--odt-info-fondo, #eaf2ff); color: var(--odt-info, #0b3d91); }
+.odt-ind-sgm--lista { background: var(--odt-ok-fondo, #e6f7ee); color: var(--odt-ok, #00733b); }
+.odt-ind-sgm--cerrada { background: var(--odt-sup-suave, #f6f8fc); color: var(--odt-tinta, #0d1f38); border-color: var(--odt-linea-fuerte, rgba(0, 40, 90, .22)); }
+
+/* ── Gráficos (SVG propio) ────────────────────────────────────────────────── */
+.odt-ind-figura { margin: 12px 0; padding: 12px 14px; background: #fff; border: 1px solid var(--odt-linea, rgba(0, 40, 90, .12)); border-radius: var(--odt-r, 10px); }
+.odt-ind-figura-titulo { margin: 0 0 6px; font-weight: 700; color: var(--odt-tinta, #0d1f38); }
+.odt-ind-svg-caja { width: 100%; }
+/* Sin viewBox: el ancho es el de la caja y el alto, el del atributo height (los textos no se encogen en un celular). */
+.odt-ind-svg { display: block; width: 100%; overflow: visible; }
+.odt-ind-svg-etq { font-size: 12.5px; fill: var(--odt-tinta-2, #1f3656); font-weight: 600; }
+.odt-ind-svg-valor { font-size: 12.5px; fill: var(--odt-tinta, #0d1f38); font-weight: 700; }
+.odt-ind-svg-eje { font-size: 11.5px; fill: var(--odt-tenue, #4d6485); }
+.odt-ind-svg-anio { font-weight: 700; }
+.odt-ind-svg-rejilla { stroke: rgba(0, 40, 90, .10); stroke-width: 1; }
+.odt-ind-svg-tramo { cursor: pointer; }
+.odt-ind-svg-tramo:hover, .odt-ind-svg-col:hover { opacity: .8; }
+.odt-ind-leyenda { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--odt-tinta-2, #1f3656); }
+.odt-ind-leyenda-item { display: inline-flex; align-items: center; gap: 6px; }
+.odt-ind-muestra { display: inline-block; width: 12px; height: 12px; border-radius: 3px; flex: 0 0 auto; }
+/* Colores de la leyenda: los mismos de COLOR_ESTADO y COLOR_MES (ui/odt-afinia/indicadores-graficos.js; una prueba los amarra). */
+.odt-ind-muestra--cerrada { background: #2a78d6; }
+.odt-ind-muestra--ejecutada { background: #eb6834; }
+.odt-ind-muestra--generada { background: #1baf7a; }
+.odt-ind-muestra--noEjecutada { background: #eda100; }
+.odt-ind-muestra--inactiva { background: #e87ba4; }
+.odt-ind-muestra--otro { background: #008300; }
+.odt-ind-muestra--generadas { background: #e34948; }
+.odt-ind-muestra--cerradasMes { background: #2a78d6; }
+
+/* ── Portátil angosto (o con zoom): la columna Contratista y los márgenes de las celdas ceden un poco para que la
+   tabla por contratista quepa entera, también con «Otro estado» ── */
+@media (min-width: 721px) and (max-width: 1200px) {
+  .odt-ind-tabla-contratistas tbody th, .odt-ind-tabla-contratistas tfoot th { min-width: 128px; }
+  .odt-ind-tabla-contratistas th, .odt-ind-tabla-contratistas td { padding-left: 6px; padding-right: 6px; }
+}
+
+/* ── Cargar un corte ──────────────────────────────────────────────────────── */
+.odt-ind-previa { margin: 8px 0; }
+.odt-ind-avisos { margin: 6px 0 0; padding-left: 20px; display: grid; gap: 4px; }
+.odt-ind-definiciones { margin: 6px 0; display: grid; grid-template-columns: minmax(160px, max-content) 1fr; gap: 6px 14px; }
+.odt-ind-definiciones dt { font-weight: 700; color: var(--odt-tinta, #0d1f38); }
+.odt-ind-definiciones dd { margin: 0; }
+
+/* ── Celular (después de las reglas base: L-121) ──────────────────────────── */
+@media (max-width: 720px) {
+  .odt-ind-tarjetas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .odt-ind-tarjeta-valor { font-size: 22px; }
+  .odt-ind-filtros { grid-template-columns: 1fr; }
+  .odt-ind-dos { grid-template-columns: 1fr; }
+  .odt-ind-definiciones { grid-template-columns: 1fr; gap: 2px; }
+  .odt-ind-definiciones dd { margin: 0 0 8px; }
+  .odt-ind-figura { padding: 10px; }
+  /* En un celular, las tablas por contratista, por tipo y por zona (y la comparación por contratista) van como FICHAS:
+     una por fila (su nombre arriba y sus números en tres columnas, cada uno con su nombre, de data-etq). Nada se sale
+     de lado. En la tabla por contratista, los encabezados quedan como botones para ordenar; en las demás, solo para
+     lectores de pantalla. */
+  .odt-ind-fichas, .odt-ind-fichas thead, .odt-ind-fichas tbody, .odt-ind-fichas tfoot, .odt-ind-fichas tr { display: block; width: 100%; }
+  .odt-ind-fichas caption { display: block; }
+  .odt-ind-fichas thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .odt-ind-tabla-contratistas thead { position: static; width: 100%; height: auto; overflow: visible; clip: auto; white-space: normal; }
+  .odt-ind-tabla-contratistas thead tr { display: flex; flex-wrap: wrap; gap: 2px 12px; padding: 0 0 6px; border-bottom: 1px solid var(--odt-linea-fuerte, rgba(0, 40, 90, .22)); }
+  .odt-ind-tabla-contratistas thead th, .odt-ind-tabla-contratistas thead th.odt-ind-n { display: block; min-width: 0; padding: 0; border: 0; text-align: left; }
+  .odt-ind-tabla-contratistas thead .odt-ind-sub { display: none; }
+  .odt-ind-fichas tbody tr, .odt-ind-fichas tfoot tr { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px 10px; padding: 10px 0; border-bottom: 1px solid var(--odt-linea, rgba(0, 40, 90, .12)); }
+  .odt-ind-fichas tfoot tr { border-bottom: 0; border-top: 2px solid var(--odt-linea-fuerte, rgba(0, 40, 90, .22)); }
+  .odt-ind-fichas tbody th, .odt-ind-fichas tfoot th, .odt-ind-tabla-contratistas tbody th, .odt-ind-tabla-contratistas tfoot th { grid-column: 1 / -1; min-width: 0; padding: 0 0 4px; border: 0; overflow-wrap: anywhere; }
+  .odt-ind-fichas td, .odt-ind-fichas td.odt-ind-n { display: block; padding: 2px 0; border: 0; text-align: left; white-space: normal; }
+  .odt-ind-fichas td::before { content: attr(data-etq); display: block; font-size: 11px; font-weight: 500; color: var(--odt-tenue, #4d6485); }
+  .odt-ind-fichas .odt-ind-num { padding: 2px 6px 2px 0; text-align: left; }
+  /* El historial, como fichas de cuatro columnas: «Datos del» arriba; guardado y responsable; ODT, cerradas, % y
+     «Ver». El nombre del archivo no va en el celular (lo dice el corte al abrirlo; la fecha de los datos sale de él). */
+  .odt-ind-tabla-historial tbody tr { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .odt-ind-tabla-historial tbody th::before { content: attr(data-etq); display: block; font-size: 11px; font-weight: 500; color: var(--odt-tenue, #4d6485); }
+  .odt-ind-tabla-historial .odt-ind-guardado, .odt-ind-tabla-historial .odt-ind-resp { grid-column: span 2; overflow-wrap: anywhere; }
+  .odt-ind-tabla-historial .odt-ind-archivo { display: none; }
+}

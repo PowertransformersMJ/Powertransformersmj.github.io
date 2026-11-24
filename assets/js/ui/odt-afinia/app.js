@@ -14,6 +14,9 @@
 // contador de los puntos que le tocan: al AZT, los pendientes; al administrador, los subsanados
 // por verificar. Vive en archivos NUEVOS que entran con import() (L-102): si no cargan, la firma
 // sigue igual y la pestaña dice que se recargue.
+// Pestaña «Indicadores» (pedido del Ingeniero del 2026-11-23), SOLO para administradores: #indicadores (el
+// último corte), #indicadores=<id> (un corte del historial) y #indicadores-cargar (cargar el CSV de Afinia).
+// También en archivos NUEVOS por import() (indicadores*.js); si no cargan, el resto de la página sigue.
 // Un mensaje («firma registrada», «anulada», «publicada») es de UNA ODT: se muestra en
 // su vista si la persona sigue en ella; si ya se fue a otra, va al aviso general de
 // arriba, nunca a la vista de otra ODT ni se pierde en la bandeja.
@@ -56,7 +59,8 @@ export function mensajeEsDeLaVista(hash, odtId) {
 
 /**
  * Lee la vista pedida en el ancla: {vista:'bandeja'|'habilitarme'|'publicar'|'odt', odtId?}
- * o, la pestaña «Por subsanar», {vista:'subsanar', sub:'lista'|'detalle'|'nueva', obsId?}.
+ * o, la pestaña «Por subsanar», {vista:'subsanar', sub:'lista'|'detalle'|'nueva', obsId?},
+ * o, la pestaña «Indicadores», {vista:'indicadores', sub:'ultimo'|'corte'|'cargar', corteId?}.
  */
 export function leerAncla(hash) {
   const s = String(hash || '').replace(/^#/, '');
@@ -67,8 +71,25 @@ export function leerAncla(hash) {
   if (ms && esIdOdt(ms[1])) return { vista: 'subsanar', sub: 'detalle', obsId: ms[1] };
   if (s === 'subsanar') return { vista: 'subsanar', sub: 'lista' };
   if (s === 'subsanar-nueva') return { vista: 'subsanar', sub: 'nueva' };
+  const mi = /^indicadores=([A-Za-z0-9]{20})$/.exec(s);
+  if (mi && esIdOdt(mi[1])) return { vista: 'indicadores', sub: 'corte', corteId: mi[1] };
+  if (s === 'indicadores') return { vista: 'indicadores', sub: 'ultimo' };
+  if (s === 'indicadores-cargar') return { vista: 'indicadores', sub: 'cargar' };
   return { vista: 'bandeja' };
 }
+
+/** La pestaña «Indicadores» vive en archivos NUEVOS: se carga con import() y se pregunta si trae lo que se usa (L-102). */
+let _indicadores = null;
+function cargarIndicadores() {
+  if (!_indicadores) {
+    _indicadores = import('./indicadores.js')
+      .then((m) => (m && typeof m.montarIndicadores === 'function' && typeof m.crearRepositorioCortes === 'function' ? m : null))
+      .catch(() => null);
+  }
+  return _indicadores;
+}
+/** Si la pestaña no cargó: se recarga (como en el resto del módulo, L-102). */
+export const MSG_INDICADORES_NO_CARGO = 'No se pudo cargar «Indicadores». Recargue la página con Cmd + Shift + R (Ctrl + Shift + R en Windows).';
 
 /** La pestaña «Por subsanar» vive en un archivo NUEVO: se carga con import() y se pregunta si trae lo que se usa (L-102). */
 let _subsanar = null;
@@ -85,9 +106,10 @@ export const MSG_SUBSANAR_NO_CARGO = 'No se pudo cargar «Por subsanar». Recarg
 
 /**
  * @param {HTMLElement} raiz
- * @param {{franja?:HTMLElement, repoObs?:object}} [op]  repoObs: inyectable (pruebas); la página no lo pasa
+ * @param {{franja?:HTMLElement, repoObs?:object, repoCortes?:object}} [op]  repoObs y repoCortes: inyectables (pruebas);
+ *   la página no los pasa
  */
-export async function montarOdtAfinia(raiz, { franja, repoObs: repoObsInyectado } = {}) {
+export async function montarOdtAfinia(raiz, { franja, repoObs: repoObsInyectado, repoCortes: repoCortesInyectado } = {}) {
   vaciar(raiz);
   raiz.appendChild(h('p', { class: 'odt-cargando', text: 'Verificando su sesión…' }));
   await esperarSesion();
@@ -110,7 +132,7 @@ export async function montarOdtAfinia(raiz, { franja, repoObs: repoObsInyectado 
   const vistas = [
     { clave: 'bandeja', titulo: 'Bandeja' },
     { clave: 'habilitarme', titulo: 'Habilitarme y Mi firma' },
-    ...(sesion.esAdmin ? [{ clave: 'publicar', titulo: 'Publicar ODT' }] : [])
+    ...(sesion.esAdmin ? [{ clave: 'publicar', titulo: 'Publicar ODT' }, { clave: 'indicadores', titulo: 'Indicadores' }] : [])
   ];
   const nav = h('nav', { class: 'odt-nav', 'aria-label': 'Firma de ODT Afinia' },
     vistas.map((v) => h('a', { class: 'odt-nav-btn', href: '#' + v.clave, dataset: { clave: v.clave }, text: v.titulo })));
@@ -153,6 +175,9 @@ export async function montarOdtAfinia(raiz, { franja, repoObs: repoObsInyectado 
   let pendiente = null;
   /** Mensaje para la próxima vista de «Por subsanar»: {ancla, texto}. */
   let pendienteSubsanar = null;
+  /** «Indicadores»: su repositorio (se crea al entrar) y el mensaje para su próxima vista ({ancla, texto}). */
+  let repoCortes = repoCortesInyectado || null;
+  let pendienteIndicadores = null;
   const avisoGeneral = (texto) => { vaciar(zonaAviso); if (texto) zonaAviso.appendChild(aviso(texto, 'ok')); };
   /** El aviso de una vista de ODT: a su vista si sigue abierta; si no, al aviso general. */
   const avisarDe = (odtId, texto) => {
@@ -168,6 +193,11 @@ export async function montarOdtAfinia(raiz, { franja, repoObs: repoObsInyectado 
     if (pendienteSubsanar) {
       if ('#' + pendienteSubsanar.ancla === location.hash || pendienteSubsanar.ancla === location.hash) mensajeSubsanar = pendienteSubsanar.texto;
       pendienteSubsanar = null;
+    }
+    let mensajeIndicadores = '';
+    if (pendienteIndicadores) {
+      if ('#' + pendienteIndicadores.ancla === location.hash || pendienteIndicadores.ancla === location.hash) mensajeIndicadores = pendienteIndicadores.texto;
+      pendienteIndicadores = null;
     }
     vaciar(zonaAviso);
     let mensaje = '';
@@ -191,6 +221,19 @@ export async function montarOdtAfinia(raiz, { franja, repoObs: repoObsInyectado 
           if ('#' + ancla === location.hash) ir(); else location.hash = ancla;
         },
         alContar: (datos) => { ponerContador(datos); }
+      });
+    }
+    if (a.vista === 'indicadores') {
+      if (!sesion.esAdmin) { zona.appendChild(aviso('Los indicadores son solo para administradores.', 'aviso')); return null; }
+      const m = await cargarIndicadores();
+      if (!m) { zona.appendChild(aviso(MSG_INDICADORES_NO_CARGO, 'aviso')); return null; }
+      if (!repoCortes) repoCortes = m.crearRepositorioCortes();
+      return m.montarIndicadores(zona, {
+        vista: a.sub, corteId: a.corteId, repoCortes, sesion, mensaje: mensajeIndicadores,
+        alIr: (ancla, texto) => {
+          pendienteIndicadores = texto ? { ancla, texto } : null;
+          if ('#' + ancla === location.hash) ir(); else location.hash = ancla;
+        }
       });
     }
     if (a.vista === 'publicar' && sesion.esAdmin) {

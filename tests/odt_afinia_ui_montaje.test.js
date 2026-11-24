@@ -235,10 +235,10 @@ describe('Arranque (app.js)', () => {
     assert.deepEqual(nav, ['Bandeja', 'Habilitarme y Mi firma']);
     assert.ok(escuchas.includes('hashchange'));
   });
-  test('administrador: cuatro vistas (con «Publicar ODT» y, desde el 2026-11-21, «Por subsanar»)', async () => {
+  test('administrador: cinco vistas (con «Publicar ODT», desde el 2026-11-21 «Por subsanar» y desde el 2026-11-23 «Indicadores»)', async () => {
     const { raiz } = await arrancar(ADMIN);
     // Sin Firestore (Node) el contador no llega: la pestaña sale sin número. Con datos: tests/odt_afinia_obs_ui.test.js.
-    assert.deepEqual(raiz.querySelectorAll('.odt-nav-btn').map((b) => b.textContent), ['Bandeja', 'Habilitarme y Mi firma', 'Publicar ODT', 'Por subsanar']);
+    assert.deepEqual(raiz.querySelectorAll('.odt-nav-btn').map((b) => b.textContent), ['Bandeja', 'Habilitarme y Mi firma', 'Publicar ODT', 'Indicadores', 'Por subsanar']);
   });
 });
 

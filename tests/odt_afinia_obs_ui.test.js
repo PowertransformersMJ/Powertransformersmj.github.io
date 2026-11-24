@@ -125,7 +125,8 @@ describe('arranque: la pestaña «Por subsanar» y su contador', () => {
   });
   test('el admin la ve siempre; su contador son los subsanados por verificar', async () => {
     const { repoObs, id } = await conObs();
-    assert.deepEqual(nav(await arrancar(ADMIN, repoObs(ADMIN))), ['Bandeja', 'Habilitarme y Mi firma', 'Publicar ODT', 'Por subsanar0']);
+    // 2026-11-23: el admin ve además «Indicadores» (después de «Publicar ODT»); «Por subsanar» sigue al final.
+    assert.deepEqual(nav(await arrancar(ADMIN, repoObs(ADMIN))), ['Bandeja', 'Habilitarme y Mi firma', 'Publicar ODT', 'Indicadores', 'Por subsanar0']);
     await repoObs(AZT).cambiarPunto(id, '0', 'subsanar', 'Se subió la foto');
     assert.deepEqual(nav(await arrancar(ADMIN, repoObs(ADMIN))).at(-1), 'Por subsanar1');
     assert.deepEqual(await contarDeMiLado({ repoObs: repoObs(AZT), sesion: AZT }), { total: 1, deMiLado: 1 });
