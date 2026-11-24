@@ -35,6 +35,36 @@ const nros = (xs) => xs.map((o) => o.nro);
 const cuenta = (c) => [c.total, c.generada, c.ejecutada, c.noEjecutada, c.cerrada, c.inactiva, c.otro];
 
 // ═════════════════════════════════════════════════════════════════════════════
+// Va ANTES de cualquier describe: en Node 20 (el del CI) un before() de raíz registrado después de otros describe
+// y de un await de nivel superior no llega a correr para los describe de pantalla («document is not defined»).
+// ═════════════════════════════════════════════════════════════════════════════
+// Pantalla, con el doble de DOM (estricto como el navegador al agregar hijos) y el doble de Firestore con consultas.
+let guardadoDoc; let dom; let proto; const originales = {};
+before(() => {
+  guardadoDoc = globalThis.document;
+  dom = crearDomFalso();
+  dom.createElementNS = (_ns, tag) => dom.createElement(tag);
+  dom.activeElement = dom.body;
+  proto = Object.getPrototypeOf(dom.createElement('div'));
+  for (const k of ['appendChild', 'focus', 'scrollIntoView', 'getBoundingClientRect']) originales[k] = proto[k];
+  proto.appendChild = function (c) {
+    if (!c || (c.nodeType !== 1 && c.nodeType !== 3)) throw new TypeError('appendChild: no es un nodo (' + Object.prototype.toString.call(c) + ')');
+    return originales.appendChild.call(this, c);
+  };
+  proto.focus = function () { dom.activeElement = this; };
+  proto.scrollIntoView = function () { this.desplazado = (this.desplazado || 0) + 1; };
+  proto.getBoundingClientRect = function () { return { top: 5000 }; };
+  globalThis.document = dom;
+});
+after(() => {
+  if (proto) for (const [k, v] of Object.entries(originales)) { if (v === undefined) delete proto[k]; else proto[k] = v; }
+  if (guardadoDoc === undefined) delete globalThis.document; else globalThis.document = guardadoDoc;
+});
+
+const { montarIndicadores } = await import('../assets/js/ui/odt-afinia/indicadores.js');
+const { NOTA_SIN_AZT_JEFE, NOTA_COMPARAR_SIN_AZT_JEFE, NOTA_COMPARAR_PERSONA, NOTA_SIN_RESULTADOS, NOTA_CONTEO_PERSONA, SIN_GRAFICO_CONTRATISTA } = await import('../assets/js/ui/odt-afinia/indicadores-vista.js');
+const { montarCargar, textoPersonas } = await import('../assets/js/ui/odt-afinia/indicadores-cargar.js');
+
 describe('dominio: lectura del AZT en sitio y del jefe de trabajo', () => {
   const L = D.leerCsv(archivoBase());
   const A = D.analizarResponsable(L, RESP_A);
@@ -229,33 +259,6 @@ function aVersion1(fs, id) {
   }
 }
 
-// ═════════════════════════════════════════════════════════════════════════════
-// Pantalla, con el doble de DOM (estricto como el navegador al agregar hijos) y el doble de Firestore con consultas.
-let guardadoDoc; let dom; let proto; const originales = {};
-before(() => {
-  guardadoDoc = globalThis.document;
-  dom = crearDomFalso();
-  dom.createElementNS = (_ns, tag) => dom.createElement(tag);
-  dom.activeElement = dom.body;
-  proto = Object.getPrototypeOf(dom.createElement('div'));
-  for (const k of ['appendChild', 'focus', 'scrollIntoView', 'getBoundingClientRect']) originales[k] = proto[k];
-  proto.appendChild = function (c) {
-    if (!c || (c.nodeType !== 1 && c.nodeType !== 3)) throw new TypeError('appendChild: no es un nodo (' + Object.prototype.toString.call(c) + ')');
-    return originales.appendChild.call(this, c);
-  };
-  proto.focus = function () { dom.activeElement = this; };
-  proto.scrollIntoView = function () { this.desplazado = (this.desplazado || 0) + 1; };
-  proto.getBoundingClientRect = function () { return { top: 5000 }; };
-  globalThis.document = dom;
-});
-after(() => {
-  if (proto) for (const [k, v] of Object.entries(originales)) { if (v === undefined) delete proto[k]; else proto[k] = v; }
-  if (guardadoDoc === undefined) delete globalThis.document; else globalThis.document = guardadoDoc;
-});
-
-const { montarIndicadores } = await import('../assets/js/ui/odt-afinia/indicadores.js');
-const { NOTA_SIN_AZT_JEFE, NOTA_COMPARAR_SIN_AZT_JEFE, NOTA_COMPARAR_PERSONA, NOTA_SIN_RESULTADOS, NOTA_CONTEO_PERSONA, SIN_GRAFICO_CONTRATISTA } = await import('../assets/js/ui/odt-afinia/indicadores-vista.js');
-const { montarCargar, textoPersonas } = await import('../assets/js/ui/odt-afinia/indicadores-cargar.js');
 
 const caja = () => document.createElement('div');
 const botones = (el) => el.todos().filter((x) => x.tagName === 'BUTTON');
