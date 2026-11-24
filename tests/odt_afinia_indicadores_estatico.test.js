@@ -31,7 +31,8 @@ const NUEVOS = [
   'assets/js/ui/odt-afinia/indicadores-graficos.js'
 ];
 const PRUEBAS = ['tests/odt_afinia_indicadores.test.js', 'tests/odt_afinia_indicadores_datos.test.js', 'tests/odt_afinia_indicadores_ui.test.js',
-  'tests/odt_afinia_indicadores_fixture.js', 'tests/odt_afinia_indicadores_estatico.test.js', 'tests-rules/odt_afinia_cortes.rules.test.js'];
+  'tests/odt_afinia_indicadores_fixture.js', 'tests/odt_afinia_indicadores_estatico.test.js', 'tests-rules/odt_afinia_cortes.rules.test.js',
+  'tests/odt_afinia_indicadores_azt_jefe.test.js'];
 const CSS_NUEVO = 'assets/css/odt-afinia-indicadores.css';
 const FUENTE = Object.fromEntries(NUEVOS.map((p) => [p, leer(p)]));
 /** Lo que los archivos nuevos pueden pedir a cada vecino de ANTES (nombres que ya exportaban antes de esta entrega). */
@@ -285,6 +286,10 @@ describe('reglas: bloque «Indicadores · ODT Afinia» de firestore.rules', () =
     const o = cuerpo('odtIndOdt');
     iguales(hasOnly(o)[0], Object.keys(p.partes[0].odts[0]), 'una ODT');
     assert.ok(o.includes('o.size() == ' + Object.keys(p.partes[0].odts[0]).length));
+    // La ODT de la versión que se crea (la 2: con azt y jefe), la misma del armado del lote.
+    const { CAMPOS_ODT_POR_VERSION } = await import('../assets/js/data/odt_afinia_cortes_lotes.js');
+    iguales(hasOnly(o)[0], CAMPOS_ODT_POR_VERSION[VERSION_CORTE], 'una ODT de la versión ' + VERSION_CORTE);
+    assert.equal(VERSION_CORTE, 2);
     iguales(hasOnly(cuerpo('odtIndParte'))[0], Object.keys(p.operaciones[1].datos), 'una parte');
     const t = cuerpo('odtIndTotales');
     assert.ok(t.includes('t.size() == ' + CLAVES.length));
@@ -312,6 +317,11 @@ describe('reglas: bloque «Indicadores · ODT Afinia» de firestore.rules', () =
     assert.ok(clave.test('x'.repeat(T.textoMax)) && !clave.test('x'.repeat(T.textoMax + 1)) && !clave.test(''));
     const nro = patron(cuerpo('odtIndOdt'), 'o.nro');
     assert.ok(nro.test('9'.repeat(T.nroMax)) && !nro.test('9'.repeat(T.nroMax + 1)) && !nro.test(''));
+    // Versión 2: el AZT en sitio y el jefe de trabajo, textos de 0 al tope de los textos del dominio.
+    for (const campo of ['o.azt', 'o.jefe']) {
+      const p = patron(cuerpo('odtIndOdt'), campo);
+      assert.ok(p.test('') && p.test('x'.repeat(T.textoMax)) && !p.test('x'.repeat(T.textoMax + 1)), campo);
+    }
     const k = patron(cuerpo('odtIndParte'), 'k');
     for (let i = 0; i < T.partesMax; i++) assert.ok(k.test(String(i)), 'parte ' + i);
     for (const s of [String(T.partesMax), '00', '-1', 'x', '']) assert.ok(!k.test(s), 'parte ' + s);

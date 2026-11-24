@@ -42,6 +42,18 @@
 // El «corte anterior» es el del mismo responsable con datos anteriores (a igualdad, el guardado antes): así un
 // archivo viejo cargado hoy no invierte la comparación.
 //
+// AZT Y JEFE DE TRABAJO (pedido del Ingeniero del 2026-11-24: «un filtro para buscar por AZT y JEFE DE TRABAJO»):
+//   · AZT = «AZT EN SITIO»; jefe de trabajo = «JEFE DE TRABAJO EN SITIO» y, si viene vacío, «JEFE DE TRABAJO» (el
+//     asignado). Si los dos vienen vacíos, en los filtros sale «(sin dato)». Se leen por su NOMBRE y NO son de los 10
+//     encabezados mínimos: si el archivo no los trae, quedan vacíos y la vista previa lo avisa. Las columnas de FIRMA
+//     y FECHA Y HORA del AZT y del jefe no se usan.
+//   · Se guardan con espacios simples y sin espacios a los lados (así se agrupan) y se muestran tal cual vienen.
+//   · Como el estado y el contratista, se toman de la PRIMERA fila de la ODT (si otra fila trae otro, se avisa).
+//   · «JEFE DE TRABAJO» queda entre los textos libres: en una fila con «|» de más se lee de izquierda a derecha y
+//     podría correrse; esa fila ya se avisa (y solo se usa cuando «JEFE DE TRABAJO EN SITIO» viene vacío).
+//   · Los cortes guardados desde ese día son la VERSIÓN 2 (VERSION_CORTE): cada ODT guardada lleva además `azt` y
+//     `jefe` (11 campos). Los de la versión 1 (9 campos) se siguen leyendo, pero no traen con qué filtrar por ellos.
+//
 // Sin Firebase, sin DOM, sin red. Archivo NUEVO a propósito (L-102): ninguna pieza vieja de la caché lo nombra.
 // ══════════════════════════════════════════════════════════════════════════════
 
@@ -50,7 +62,8 @@ export const COL_CORTES = Object.freeze({
   cortes: 'odt_afinia_cortes',    // odt_afinia_cortes/{id}  (id aleatorio de 20)
   partes: 'partes'                // odt_afinia_cortes/{id}/partes/{0..59}  {k, odts:[…]}
 });
-export const VERSION_CORTE = 1;
+/** 1: los primeros cortes (ODT de 9 campos). 2: desde el 2026-11-24, cada ODT con su AZT y su jefe (11 campos). */
+export const VERSION_CORTE = 2;
 export const TOPES_CORTE = Object.freeze({
   porParte: 400,              // ODT por parte (≈ 110 KB: lejos del 1 MB de un documento)
   partesMax: 60,              // 24.000 ODT por corte
@@ -99,6 +112,17 @@ export const CAMPOS = Object.freeze({
   estado: 'ESTADO FINAL DE LA ODT'
 });
 export const ENCABEZADOS_MINIMOS = Object.freeze(Object.values(CAMPOS));
+/**
+ * Lo que se lee si el archivo lo trae (NO es de los mínimos): el AZT en sitio y el jefe de trabajo en sitio; si este
+ * viene vacío, el jefe de trabajo asignado (`jefeRespaldo`).
+ */
+export const CAMPOS_OPCIONALES = Object.freeze({
+  azt: 'AZT EN SITIO',
+  jefe: 'JEFE DE TRABAJO EN SITIO',
+  jefeRespaldo: 'JEFE DE TRABAJO'
+});
+/** Lo que muestran los filtros (y la lista) cuando una ODT no trae el AZT o el jefe de trabajo. */
+export const SIN_DATO = '(sin dato)';
 
 /** Columnas de texto libre (donde puede colarse una «|» o un salto de línea): marcan la zona sin ancla. */
 const RE_TEXTO_LIBRE = /^(ELEMENTO|EQUIPO$|LUGAR DE TRABAJO|DESCRIPCION|CONDICIONES|INCIDENCIA|OBSERVACIONES)/;
@@ -284,6 +308,7 @@ export function crearLector(contenido) {
   const norm = encabezados.map(normalizarTexto);
   const indice = {};
   for (const [campo, enc] of Object.entries(CAMPOS)) indice[campo] = norm.indexOf(normalizarTexto(enc));
+  for (const [campo, enc] of Object.entries(CAMPOS_OPCIONALES)) indice[campo] = norm.indexOf(normalizarTexto(enc));
   const faltan = ENCABEZADOS_MINIMOS.filter((enc) => !norm.includes(normalizarTexto(enc)));
   const libres = norm.map((x, i) => (RE_TEXTO_LIBRE.test(x) ? i : -1)).filter((i) => i >= 0);
   const iniLibre = libres.length ? libres[0] : n;
@@ -412,7 +437,9 @@ export function crearLector(contenido) {
         responsable,
         rc: normalizarNombre(responsable),
         cerrada: fechaIso(leer(indice.cerrada)),
-        estado
+        estado,
+        azt: recortar(leer(indice.azt)),
+        jefe: recortar(leer(indice.jefe)) || recortar(leer(indice.jefeRespaldo))
       });
     }
     return i >= fin;
@@ -440,6 +467,8 @@ export function crearLector(contenido) {
     return {
       ok: faltan.length === 0 && n > 0,
       encabezados, columnas: n, faltan, distintosAfinia,
+      // ¿Trae el archivo las columnas del AZT y del jefe de trabajo? (no son de los mínimos)
+      traeAzt: indice.azt >= 0, traeJefe: indice.jefe >= 0 || indice.jefeRespaldo >= 0,
       registros, filas: registros.length, odtsArchivo: todos.size,
       responsables, estadosFila, raras, sinNro, vacias, compartidos
     };
@@ -480,6 +509,9 @@ export function esOtroArchivo(lectura) {
   return !(lectura.columnas > 1) || lectura.faltan.length >= ENCABEZADOS_MINIMOS.length;
 }
 export const MSG_OTRO_ARCHIVO = 'Este archivo no es el «Informe Seguimiento de Órdenes de Trabajo» de Afinia en CSV. Si lo abrió y lo guardó en Excel, descárguelo otra vez de Afinia y cárguelo sin abrirlo.';
+// El corte se guarda igual (versión 2) y su filtro queda con una sola opción, «(sin dato)», con todas sus ODT.
+export const MSG_SIN_COLUMNA_AZT = 'El archivo no trae la columna «AZT EN SITIO»: el corte se guarda sin el AZT y, en su filtro, todas las ODT saldrán como «' + SIN_DATO + '».';
+export const MSG_SIN_COLUMNA_JEFE = 'El archivo no trae las columnas «JEFE DE TRABAJO EN SITIO» ni «JEFE DE TRABAJO»: el corte se guarda sin el jefe de trabajo y, en su filtro, todas las ODT saldrán como «' + SIN_DATO + '».';
 
 // ── Responsable, deduplicación y agregados ─────────────────────────────────────
 /** La entrada de la lista de responsables que corresponde a `nombre` (comparado normalizado), o null. */
@@ -495,20 +527,23 @@ export function filtrarPorResponsable(registros, nombre) {
   return (registros || []).filter((r) => (r.rc ?? normalizarNombre(r.responsable)) === c);
 }
 
-/** La ODT que se guarda (9 campos), desde su primera fila. */
+/** La ODT que se guarda (versión 2: 11 campos, con su AZT en sitio y su jefe de trabajo), desde su primera fila. */
 export function odtDeFila(r) {
   return {
     nro: recortar(r.nro, TOPES_CORTE.nroMax), empresa: recortar(r.empresa), tipo: recortar(r.tipo), zona: recortar(r.zona),
     subestacion: recortar(r.subestacion), prevista: esIso(r.prevista) ? r.prevista : '', cerrada: esIso(r.cerrada) ? r.cerrada : '',
-    estado: recortar(normalizarTexto(r.estado)), principal: r.principal === true
+    estado: recortar(normalizarTexto(r.estado)), principal: r.principal === true,
+    azt: recortar(r.azt), jefe: recortar(r.jefe)
   };
 }
 
+/** Lo que se compara entre las filas de una misma ODT (además del estado): se toma el de la primera y se avisa. */
+const CAMPOS_PRIMERA_FILA = Object.freeze(['empresa', 'azt', 'jefe']);
 /**
- * Una ODT por N.º: el estado y el contratista de su PRIMERA fila (avisa si otra fila trae otro) y la fecha prevista
- * MÁS TEMPRANA de sus filas (no depende del orden del archivo; avisa cuántas traían fechas distintas).
- * @returns {{odts:object[], conflictos:Array<{nro, campo:'estado'|'empresa', primero, otro, linea}>, repetidas:number,
- *            previstasDistintas:number}}
+ * Una ODT por N.º: el estado, el contratista, el AZT y el jefe de su PRIMERA fila (avisa si otra fila trae otro) y la
+ * fecha prevista MÁS TEMPRANA de sus filas (no depende del orden del archivo; avisa cuántas traían fechas distintas).
+ * @returns {{odts:object[], conflictos:Array<{nro, campo:'estado'|'empresa'|'azt'|'jefe', primero, otro, linea}>,
+ *            repetidas:number, previstasDistintas:number}}
  */
 export function deduplicar(filas) {
   const porNro = new Map();
@@ -524,8 +559,10 @@ export function deduplicar(filas) {
     }
     const est = recortar(normalizarTexto(r.estado));
     if (est !== previo.odt.estado) conflictos.push({ nro: r.nro, campo: 'estado', primero: previo.odt.estado, otro: est, linea: r.linea });
-    const emp = recortar(r.empresa);
-    if (emp !== previo.odt.empresa) conflictos.push({ nro: r.nro, campo: 'empresa', primero: previo.odt.empresa, otro: emp, linea: r.linea });
+    for (const campo of CAMPOS_PRIMERA_FILA) {
+      const v = recortar(r[campo]);
+      if (v !== previo.odt[campo]) conflictos.push({ nro: r.nro, campo, primero: previo.odt[campo], otro: v, linea: r.linea });
+    }
   }
   const xs = [...porNro.values()];
   return { odts: xs.map((x) => x.odt), conflictos, repetidas, previstasDistintas: xs.filter((x) => x.previstas.size > 1).length };
@@ -665,6 +702,9 @@ export function analizarResponsable(lectura, nombre) {
     odts,
     conflictos,
     fechasIlegibles,
+    // ODT sin AZT en sitio / sin jefe de trabajo (en los filtros salen como «(sin dato)»).
+    sinAzt: odts.filter((o) => !o.azt).length,
+    sinJefe: odts.filter((o) => !o.jefe).length,
     ...ag
   };
 }
@@ -673,6 +713,9 @@ export function analizarResponsable(lectura, nombre) {
 export function avisosDeLectura(lectura, analisis) {
   const out = [];
   if (!lectura) return out;
+  // Sin las columnas del AZT o del jefe de trabajo (no son de las mínimas): el corte se guarda igual, sin ellas.
+  if (lectura.ok && lectura.traeAzt === false) out.push(MSG_SIN_COLUMNA_AZT);
+  if (lectura.ok && lectura.traeJefe === false) out.push(MSG_SIN_COLUMNA_JEFE);
   if (lectura.distintosAfinia && lectura.ok) out.push('Los encabezados no son exactamente los 48 del informe de Afinia (' + lectura.columnas + ' columnas): se leyeron por su nombre. Revise que sea el «Informe Seguimiento de Órdenes de Trabajo».');
   const raras = lectura.raras || [];
   const por = (t) => raras.filter((r) => r.tipo === t);
@@ -698,6 +741,12 @@ export function avisosDeLectura(lectura, analisis) {
   if (est.length) out.push(frase(est.length + ' ODT vienen con estados distintos en sus filas; se tomó el de la primera: ' + primeros(est, 6, (c) => c.nro + ' (' + (c.primero || 'vacío') + ' / ' + (c.otro || 'vacío') + ')')));
   const emp = analisis.conflictos.filter((c) => c.campo === 'empresa');
   if (emp.length) out.push(frase(emp.length + ' ODT vienen con contratistas distintos en sus filas; se tomó el de la primera: ' + primeros(emp, 6, (c) => c.nro)));
+  const azt = analisis.conflictos.filter((c) => c.campo === 'azt');
+  if (azt.length) out.push(frase(azt.length + ' ODT vienen con AZT en sitio distintos en sus filas; se tomó el de la primera: ' + primeros(azt, 6, (c) => c.nro)));
+  const jefe = analisis.conflictos.filter((c) => c.campo === 'jefe');
+  if (jefe.length) out.push(frase(jefe.length + ' ODT vienen con jefes de trabajo distintos en sus filas; se tomó el de la primera: ' + primeros(jefe, 6, (c) => c.nro)));
+  if (lectura.traeAzt !== false && analisis.sinAzt) out.push(analisis.sinAzt + ' ODT no traen AZT en sitio: en su filtro salen como «' + SIN_DATO + '».');
+  if (lectura.traeJefe !== false && analisis.sinJefe) out.push(analisis.sinJefe + ' ODT no traen jefe de trabajo (ni en sitio ni asignado): en su filtro salen como «' + SIN_DATO + '».');
   if (analisis.previstasDistintas) out.push(analisis.previstasDistintas + ' ODT traen fechas previstas distintas en sus filas: se tomó la más temprana.');
   const a = analisis.avisos || {};
   if (a.antesDelPeriodo) out.push(a.antesDelPeriodo + ' ODT tienen fecha prevista anterior al 01/01/2026 (el periodo acordado empieza ese día): revise el rango de fechas de la descarga.');
@@ -708,18 +757,39 @@ export function avisosDeLectura(lectura, analisis) {
 }
 
 // ── Filtros, selección y orden (sobre las ODT del corte) ───────────────────────
-/** Las ODT que cumplen los filtros ('' o ausente = todos). */
-export function filtrar(odts, { tipo = '', zona = '', empresa = '' } = {}) {
+/** El AZT o el jefe de una ODT como lo agrupan los filtros: con espacios simples; «(sin dato)» si no trae. */
+export const personaDe = (o, campo) => limpiar(o && o[campo]) || SIN_DATO;
+/**
+ * Las ODT que cumplen los filtros ('' o ausente = todos). Se combinan: tipo de trabajo, zona, contratista, AZT en
+ * sitio y jefe de trabajo.
+ */
+export function filtrar(odts, { tipo = '', zona = '', empresa = '', azt = '', jefe = '' } = {}) {
   return (odts || []).filter((o) => (!tipo || (o.tipo || SIN.tipo) === tipo)
-    && (!zona || (o.zona || SIN.zona) === zona) && (!empresa || (o.empresa || SIN.empresa) === empresa));
+    && (!zona || (o.zona || SIN.zona) === zona) && (!empresa || (o.empresa || SIN.empresa) === empresa)
+    && (!azt || personaDe(o, 'azt') === azt) && (!jefe || personaDe(o, 'jefe') === jefe));
 }
-/** Valores distintos para los filtros (ordenados). */
+/**
+ * Las personas de un campo ('azt' o 'jefe') con cuántas ODT tiene cada una: [{valor, n}], por nombre y con
+ * «(sin dato)» al final (solo si alguna ODT no lo trae).
+ */
+export function opcionesConConteo(odts, campo) {
+  const m = new Map();
+  for (const o of odts || []) { const k = personaDe(o, campo); m.set(k, (m.get(k) || 0) + 1); }
+  return [...m.entries()].map(([valor, n]) => ({ valor, n }))
+    .sort((a, b) => (a.valor === SIN_DATO) - (b.valor === SIN_DATO) || a.valor.localeCompare(b.valor, 'es'));
+}
+/**
+ * Valores distintos para los filtros (ordenados): tipos, zonas y contratistas (textos) y, con su conteo, los AZT en
+ * sitio y los jefes de trabajo ([{valor, n}]).
+ */
 export function opcionesFiltro(odts) {
   const s = { tipos: new Set(), zonas: new Set(), empresas: new Set() };
   for (const o of odts || []) { s.tipos.add(o.tipo || SIN.tipo); s.zonas.add(o.zona || SIN.zona); s.empresas.add(o.empresa || SIN.empresa); }
   const ord = (x) => [...x].sort((a, b) => a.localeCompare(b, 'es'));
-  return { tipos: ord(s.tipos), zonas: ord(s.zonas), empresas: ord(s.empresas) };
+  return { tipos: ord(s.tipos), zonas: ord(s.zonas), empresas: ord(s.empresas), azts: opcionesConConteo(odts, 'azt'), jefes: opcionesConConteo(odts, 'jefe') };
 }
+/** ¿El corte guardó el AZT y el jefe de cada ODT? (versión 2 en adelante; los de la versión 1 no los traen) */
+export const corteTraeAztJefe = (c) => Number(c && c.version) >= 2;
 /** ¿La ODT cuenta en el indicador `clave`? */
 export function cuentaEn(o, clave) {
   if (clave === 'total' || clave === 'pctCierre') return true;
@@ -727,9 +797,9 @@ export function cuentaEn(o, clave) {
   if (clave === 'noEjecutadaInactiva') return k === 'noEjecutada' || k === 'inactiva';
   return k === clave;
 }
-/** Las ODT detrás de un número (un contratista, tipo o zona opcional y un indicador), por fecha prevista y N.º. */
-export function seleccionar(odts, { empresa = '', tipo = '', zona = '', clave = 'total' } = {}) {
-  return filtrar(odts, { empresa, tipo, zona }).filter((o) => cuentaEn(o, clave))
+/** Las ODT detrás de un número (contratista, tipo, zona, AZT o jefe opcionales y un indicador), por fecha prevista y N.º. */
+export function seleccionar(odts, { empresa = '', tipo = '', zona = '', azt = '', jefe = '', clave = 'total' } = {}) {
+  return filtrar(odts, { empresa, tipo, zona, azt, jefe }).filter((o) => cuentaEn(o, clave))
     .sort((a, b) => (a.prevista || '9999').localeCompare(b.prevista || '9999') || a.nro.localeCompare(b.nro));
 }
 /**

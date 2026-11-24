@@ -2037,13 +2037,17 @@ service cloud.firestore {
     //   · odt_afinia_cortes/{id} (17 campos exactos): responsable, archivo {nombre, bytes, sha256}, rango {desde, hasta}
     //     ('aaaa-mm-dd'), fechaDatos ('aaaa-mm-ddThh:mm:ss': la hora de descarga del archivo; ordena los cortes),
     //     filasArchivo, odtsArchivo, filasResponsable, odts, totales (7 contadores enteros ≥ 0 que suman el total),
-    //     porEmpresa, porTipo, porZona, porMes (listas), nPartes (las que caben a 400 ODT por parte), version 1,
+    //     porEmpresa, porTipo, porZona, porMes (listas), nPartes (las que caben a 400 ODT por parte), version 2,
     //     creadoPor {uid, nombre del perfil}, creadoEn (hora del servidor). Lo crea solo un admin con perfil, en UN
     //     lote con sus partes.
     //       /partes/{k} (k = '0'..'59'): {k, odts:[…]}; solo en el lote que CREA el corte (antes no existe; después,
     //       sí); k < nPartes; todas llenas (400) menos la última, que lleva el resto: así suman `odts`. CADENA: cada
     //       parte exige la ANTERIOR en el mismo lote y el corte exige la ÚLTIMA, así que el lote trae TODAS, de la 0 a
     //       la nPartes − 1 (un lote con un hueco, o sin partes, se niega). Después no se le pueden agregar partes.
+    //     VERSIÓN 2 (pedido del Ingeniero del 2026-11-24, filtros por AZT y por jefe de trabajo): cada ODT de las partes
+    //     lleva además su AZT en sitio (`azt`) y su jefe de trabajo (`jefe`), textos de 0 a 200: 11 campos. Los cortes
+    //     nuevos se crean SOLO con version == 2. Los de la versión 1 (ODT de 9 campos) ya guardados se siguen leyendo
+    //     igual (get/list no miran la versión) y, como todos, nunca cambian.
     // PRESUPUESTO: Firestore evalúa como mucho 1000 expresiones por documento (en un lote, cada documento evalúa su
     // propia regla). Por eso los campos sueltos se revisan completos, pero DENTRO de las listas (porEmpresa, porTipo,
     // porZona, porMes y las ODT de cada parte) solo se revisa que sean listas, su tamaño máximo y la forma del PRIMER
@@ -2051,7 +2055,8 @@ service cloud.firestore {
     // (assets/js/data/odt_afinia_cortes_lotes.js) revisa CADA elemento antes de escribir y, al leer, unirPartes
     // descarta lo que no tenga la forma de una ODT. Medido en el emulador con relleno calibrado (la prueba
     // «presupuesto» de tests-rules/odt_afinia_cortes.rules.test.js lo vigila): el corte gasta ≈ 61 % del tope y cada
-    // parte ≈ 23 %. Lo que se agregue aquí debe dejar ese margen (la prueba exige ≥ 30 % libre).
+    // parte ≈ 25 % (≈ 23 % antes del AZT y el jefe de la versión 2). Lo que se agregue aquí debe dejar ese margen (la
+    // prueba exige ≥ 30 % libre).
     // Accesos a documentos: por escritura, el corte ≤ 4 y cada parte ≤ 6 (tope: 10). Fuera del lote solo se leen el
     // perfil, /admins (solo si no hay perfil) y el corte ANTES del lote: 3 documentos como mucho, tenga las partes que
     // tenga; los existsAfter/getAfter a documentos del MISMO lote no cuentan para el tope de 20 por lote (medido en el
@@ -2087,11 +2092,13 @@ service cloud.firestore {
         && l[0].keys().hasOnly(['mes', 'generadas', 'cerradas'])
         && l[0].mes.matches('^[0-9]{4}-(0[1-9]|1[0-2])$');
     }
-    // La PRIMERA ODT de una parte: los 9 campos y nada más, con su N.º (1..40).
+    // La PRIMERA ODT de una parte (versión 2): los 11 campos y nada más, con su N.º (1..40), su AZT en sitio y su
+    // jefe de trabajo como textos de 0 a 200 (un número, un nulo o un texto más largo niegan).
     function odtIndOdt(o) {
-      return o.size() == 9
-        && o.keys().hasOnly(['nro', 'empresa', 'tipo', 'zona', 'subestacion', 'prevista', 'cerrada', 'estado', 'principal'])
-        && o.nro.matches('^.{1,40}$');
+      return o.size() == 11
+        && o.keys().hasOnly(['nro', 'empresa', 'tipo', 'zona', 'subestacion', 'prevista', 'cerrada', 'estado', 'principal', 'azt', 'jefe'])
+        && o.nro.matches('^.{1,40}$')
+        && o.azt.matches('^.{0,200}$') && o.jefe.matches('^.{0,200}$');
     }
     // ── Guardar un corte (lote: el corte + sus partes), solo un admin con perfil ──
     function odtIndCorte(id) {
@@ -2121,7 +2128,7 @@ service cloud.firestore {
         // nPartes coherente con las ODT, sin divisiones: (nPartes − 1) · 400 < odts ≤ nPartes · 400.
         && odtIndEntero(d.nPartes, 1, 60)
         && (d.nPartes - 1) * 400 < d.odts && d.odts <= d.nPartes * 400
-        && d.version == 1
+        && d.version == 2
         && d.creadoPor == {'uid': request.auth.uid, 'nombre': profile().get('nombre', '')}
         && d.creadoEn == request.time
         // La ÚLTIMA parte existe al terminar el MISMO lote (y, por la cadena, todas las de antes).

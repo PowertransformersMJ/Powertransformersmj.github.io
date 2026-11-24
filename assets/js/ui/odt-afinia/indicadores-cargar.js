@@ -6,8 +6,10 @@
 //    y su avance, para no congelar la pantalla con archivos grandes (decenas de MB).
 // 2) Vista previa: filas, ODT distintas, responsables con su conteo, el responsable del corte (por defecto el del
 //    perfil del administrador si aparece en el archivo), la fecha de sus datos, su rango de fechas previstas, sus
-//    totales y su tabla por contratista, la huella SHA-256 del archivo y los avisos de filas raras (columnas de más
-//    o de menos, filas partidas, N.º con estados distintos o con dos responsables, estados desconocidos…).
+//    totales y su tabla por contratista, cuántos AZT en sitio y jefes de trabajo distintos trae (pedido del
+//    2026-11-24: se guardan para filtrar por ellos), la huella SHA-256 del archivo y los avisos de filas raras
+//    (columnas de más o de menos, filas partidas, N.º con estados, contratistas, AZT o jefes distintos entre sus filas
+//    o con dos responsables, estados desconocidos, archivo sin las columnas del AZT o del jefe…).
 //    Con el servidor se revisa además si ESE archivo ya se guardó para ese responsable (por su huella, en todos los
 //    cortes, no solo en los 50 del historial) y si trae datos más viejos que el último corte de ese responsable.
 //    Un archivo que no es el informe de Afinia (p. ej. abierto y guardado en Excel, que cambia la «|» por «;») se
@@ -28,10 +30,21 @@ import { huella } from '../../domain/odt_afinia_partes.js';
 import {
   decodificar, leerCsvPorPasos, analizarResponsable, buscarResponsable, avisosDeLectura, normalizarNombre,
   textoCierre, fechaDMA, ETIQUETA_CLAVE, TOPES_CORTE, esOtroArchivo, MSG_OTRO_ARCHIVO, fechaDatosDe, fechaDatosDeCorte,
-  textoFechaDatos, corteMasReciente
+  textoFechaDatos, corteMasReciente, opcionesConConteo, SIN_DATO, corteTraeAztJefe
 } from '../../domain/odt_afinia_indicadores.js';
 
 const num = (n) => Number(n || 0).toLocaleString('es-CO');
+/**
+ * Cuántas personas distintas trae el responsable en el AZT o en el jefe ('azt' | 'jefe'): p. ej. «4 personas»,
+ * «12 personas · 3 ODT sin dato» o, si el archivo no trae la columna, «No viene en el archivo».
+ */
+export function textoPersonas(odts, campo, trae) {
+  if (trae === false) return 'No viene en el archivo';
+  const xs = opcionesConConteo(odts, campo);
+  const sin = (xs.find((x) => x.valor === SIN_DATO) || { n: 0 }).n;
+  const n = xs.length - (sin ? 1 : 0);
+  return num(n) + (n === 1 ? ' persona' : ' personas') + (sin ? ' · ' + num(sin) + ' ODT sin dato' : '');
+}
 const mb = (n) => (Number(n || 0) / 1048576).toFixed(1).replace('.', ',') + ' MB';
 /** Deja respirar al navegador entre pasos de la lectura. */
 const pausaNavegador = () => new Promise((r) => setTimeout(r, 0));
@@ -230,7 +243,9 @@ export function montarCargar(contenedor, { repoCortes, sesion, historial = [], a
         dato(ETIQUETA_CLAVE.cerrada, num(t.cerrada)),
         dato(ETIQUETA_CLAVE.noEjecutadaInactiva, num(t.noEjecutada + t.inactiva)),
         t.otro ? dato(ETIQUETA_CLAVE.otro, num(t.otro)) : null,
-        dato('% de cierre', textoCierre(t))));
+        dato('% de cierre', textoCierre(t)),
+        dato('AZT en sitio', textoPersonas(analisis.odts, 'azt', lectura.traeAzt)),
+        dato('Jefes de trabajo', textoPersonas(analisis.odts, 'jefe', lectura.traeJefe))));
       zonaAnalisis.appendChild(h('div', { class: 'odt-tabla-caja' }, h('table', { class: 'odt-tabla odt-ind-tabla odt-ind-fichas' },
         h('caption', { class: 'odt-ind-caption', text: 'Por contratista' }),
         h('thead', {}, h('tr', {}, h('th', { scope: 'col', text: 'Contratista' }),
@@ -270,8 +285,13 @@ export function montarCargar(contenedor, { repoCortes, sesion, historial = [], a
     const a = analisisActual;
     const { archivo } = leido;
     const conocidos = [...(yaGuardados || []), ...(historial || [])].filter((x) => x && x.archivo);
-    const repetido = conocidos.find((x) => x.archivo.sha256 === archivo.sha256 && normalizarNombre(x.responsable) === a.clave);
-    if (repetido) zonaServidor.appendChild(aviso('Este mismo archivo ya se guardó como corte de este responsable el ' + fechaHora(repetido.creadoEnMs) + '. Si lo guarda otra vez, quedan dos cortes iguales en el historial.', 'aviso'));
+    const repetidos = conocidos.filter((x) => x.archivo.sha256 === archivo.sha256 && normalizarNombre(x.responsable) === a.clave);
+    // Un corte de la versión 1 de ESTE archivo no guardó el AZT ni el jefe: guardarlo de nuevo NO deja dos iguales
+    // (el nuevo sí los trae), salvo que el archivo tampoco traiga esas columnas.
+    const traeAztJefe = leido.lectura.traeAzt !== false || leido.lectura.traeJefe !== false;
+    const igual = repetidos.find((x) => corteTraeAztJefe(x) || !traeAztJefe);
+    if (igual) zonaServidor.appendChild(aviso('Este mismo archivo ya se guardó como corte de este responsable el ' + fechaHora(igual.creadoEnMs) + '. Si lo guarda otra vez, quedan dos cortes iguales en el historial.', 'aviso'));
+    else if (repetidos.length) zonaServidor.appendChild(aviso('Este mismo archivo ya se guardó como corte de este responsable el ' + fechaHora(repetidos[0].creadoEnMs) + ', pero sin el AZT en sitio y el jefe de trabajo. Este corte nuevo sí los trae: guárdelo para poder filtrar por ellos.', 'aviso'));
     const ultimo = corteMasReciente([ultimos.get(a.clave), ...(historial || [])].filter(Boolean), a.responsable);
     const fdArchivo = fechaDatosDe(archivo.nombre, a.rango).valor;
     const fdUltimo = ultimo ? fechaDatosDeCorte(ultimo) : '';

@@ -10,6 +10,9 @@
 //   · TRAZABILIDAD: un corte y sus partes NUNCA cambian ni se borran, ni por el admin que los creó.
 //   · PRESUPUESTO: Firestore evalúa ≤ 1000 expresiones por documento. Un corte de forma real debe entrar dejando
 //     ≥ 30 % libre (relleno calibrado: ver la prueba «presupuesto»).
+//   · VERSIÓN 2 (2026-11-24, filtros por AZT y por jefe de trabajo): los cortes nuevos se crean con version == 2 y la
+//     PRIMERA ODT de cada parte con sus 11 campos (azt y jefe, textos de 0 a 200); un corte nuevo de la versión 1 se
+//     niega, y los de la versión 1 ya guardados se siguen leyendo (y nunca cambian).
 // Cada caso en las DOS direcciones (L-73/L-78): lo que se niega tiene su control que pasa. Incluye SABOTAJES: lo que
 // alguien con la sesión admin intentaría escribir a mano y la regla debe rechazar.
 // Prefijo `ic_` (ids `iccorte…`); nunca clearFirestore() (el emulador se comparte con las demás pruebas de reglas).
@@ -53,9 +56,12 @@ const odtDe = (i) => {
   return {
     nro: String(90000000 + i), empresa: 'CONTRATISTA FICTICIO ' + (i % 6), tipo: 'TIPO DE TRABAJO FICTICIO ' + (i % 6),
     zona: 'ZONA FICTICIA ' + (i % 4), subestacion: 'S/E PRUEBA ' + (i % 9), prevista: '2026-' + mm(i) + '-15',
-    cerrada: estado === 'CERRADA' ? '2026-' + mm(i) + '-20' : '', estado, principal: i % 5 !== 0
+    cerrada: estado === 'CERRADA' ? '2026-' + mm(i) + '-20' : '', estado, principal: i % 5 !== 0,
+    azt: 'AZT FICTICIO DE PRUEBA ' + (i % 7), jefe: 'JEFE DE TRABAJO FICTICIO DE PRUEBA ' + (i % 11)
   };
 };
+/** Una ODT como las guardaba la VERSIÓN 1 (9 campos, sin azt ni jefe). */
+const odtV1 = (i) => { const { azt, jefe, ...resto } = odtDe(i); return resto; };
 const odtsDe = (n) => Array.from({ length: n }, (_, i) => odtDe(i));
 const nombreDe = (u) => (P[u] ? P[u].nombre : '');
 /** El corte como lo arma la página (los agregados salen del dominio: agregar). */
@@ -68,7 +74,7 @@ function corteDe(uid, n, extra = {}) {
     fechaDatos: '2026-01-01T00:00:00',
     filasArchivo: n + 10, odtsArchivo: n + 5, filasResponsable: n + 2, odts: n,
     totales: ag.totales, porEmpresa: ag.porEmpresa, porTipo: ag.porTipo, porZona: ag.porZona, porMes: ag.porMes,
-    nPartes: Math.ceil(n / 400), version: 1,
+    nPartes: Math.ceil(n / 400), version: 2,
     creadoPor: { uid, nombre: nombreDe(uid) }, creadoEn: serverTimestamp(),
     ...extra
   };
@@ -150,7 +156,9 @@ describe('guardar un corte — solo un admin con perfil, en UN lote con todas su
     await assertFails(mal(27, { archivo: { nombre: 'x.csv', bytes: 10, sha256: HEX, ruta: '/tmp' } }));
     await assertFails(mal(28, { rango: { desde: '2026-11-20', hasta: '2026-01-02' } }));                  // al revés
     await assertFails(mal(29, { rango: { desde: '02/01/2026', hasta: '2026-11-20' } }));                  // no es aaaa-mm-dd
-    await assertFails(mal(30, { version: 2 }));
+    await assertFails(mal(30, { version: 1 }));                                                          // la versión vieja
+    await assertFails(mal(34, { version: 3 }));
+    await assertFails(mal(35, { version: '2' }));
     await assertFails(mal(31, { creadoPor: { uid: 'ic_admin', nombre: 'Otro Nombre' } }));
     await assertFails(mal(32, { creadoPor: { uid: 'ic_admin2', nombre: nombreDe('ic_admin2') } }));
     // Una hora puesta por el cliente (un minuto atrás: con «ahora» podría caer en el mismo milisegundo que el servidor).
@@ -222,6 +230,60 @@ describe('listas: que sean listas, su tamaño y la forma del PRIMER elemento (el
     await assertFails(mal(134, () => 'no es un mapa'));
     // Control.
     await assertSucceeds(mal(135, (o) => ({ ...o, nro: '9'.repeat(40) })));
+  });
+});
+
+describe('versión 2 — cada ODT con su AZT en sitio y su jefe de trabajo (2026-11-24)', () => {
+  /** Las partes como las escribía la versión 1 (ODT de 9 campos). */
+  const partesV1 = (n) => partesDe(n).map(([k, d]) => [k, { k: d.k, odts: d.odts.map((_, j) => odtV1(Number(k) * 400 + j)) }]);
+  test('entra la versión 2; un corte NUEVO de la versión 1 se niega (con sus ODT de 9 campos, o con las de 11)', async () => {
+    assert.deepEqual(Object.keys(partesDe(5)[0][1].odts[0]).sort(), ['azt', 'cerrada', 'empresa', 'estado', 'jefe', 'nro', 'prevista', 'principal', 'subestacion', 'tipo', 'zona']);
+    await assertFails(guardar('ic_admin', ID(140), 5, { corte: corteDe('ic_admin', 5, { version: 1 }), partes: partesV1(5) }));   // la forma vieja entera
+    await assertFails(guardar('ic_admin', ID(141), 5, { partes: partesV1(5) }));                                                 // versión 2 con ODT de 9
+    await assertFails(guardar('ic_admin', ID(142), 5, { corte: corteDe('ic_admin', 5, { version: 1 }) }));                       // versión 1 con ODT de 11
+    await assertFails(guardar('ic_admin', ID(144), 803, { partes: partesV1(803) }));                                             // 3 partes viejas
+    // Control: la versión 2 entera pasa (1 y 3 partes).
+    await assertSucceeds(guardar('ic_admin', ID(143), 5));
+    await assertSucceeds(guardar('ic_admin', ID(145), 803));
+    assert.equal((await leer('odt_afinia_cortes/' + ID(145) + '/partes/2')).odts[0].azt, odtDe(800).azt);
+  });
+  test('SABOTAJE: la primera ODT sin azt o sin jefe, con otro tipo, más larga o con otra clave', async () => {
+    const mal = (k, cambio) => guardar('ic_admin', ID(k), 5, { partes: conPrimera(5, cambio) });
+    await assertFails(mal(150, (o) => { delete o.azt; return o; }));
+    await assertFails(mal(151, (o) => { delete o.jefe; return o; }));
+    await assertFails(mal(152, (o) => { delete o.azt; delete o.jefe; return o; }));          // 9 campos: la forma vieja
+    await assertFails(mal(153, (o) => ({ ...o, azt: 7 })));
+    await assertFails(mal(154, (o) => ({ ...o, azt: null })));
+    await assertFails(mal(155, (o) => ({ ...o, jefe: 'J'.repeat(201) })));
+    await assertFails(mal(163, (o) => ({ ...o, azt: 'A'.repeat(201) })));
+    await assertFails(mal(156, (o) => ({ ...o, azt: ['AZT FICTICIO'] })));
+    await assertFails(mal(157, (o) => ({ ...o, jefe: { nombre: 'JEFE FICTICIO' } })));
+    await assertFails(mal(158, (o) => { const x = { ...o, aztt: o.azt }; delete x.azt; return x; }));   // 11 campos, otra clave
+    await assertFails(mal(159, (o) => ({ ...o, extra: '' })));                                   // 12 campos
+    // 9 campos CON azt y jefe, pero sin estado ni principal: solo `size() == 11` la niega (claves y textos están bien).
+    await assertFails(mal(162, (o) => { delete o.estado; delete o.principal; return o; }));
+    // Control: vacíos y de 200 letras pasan.
+    await assertSucceeds(mal(160, (o) => ({ ...o, azt: '', jefe: 'J'.repeat(200) })));
+    await assertSucceeds(mal(161, (o) => ({ ...o, azt: 'A'.repeat(200), jefe: '' })));
+  });
+  test('los cortes de la versión 1 ya guardados se siguen leyendo (también con el repositorio) y nunca cambian', async () => {
+    const id = ID(170);
+    await sembrar(async (d) => {
+      await setDoc(doc(d, 'odt_afinia_cortes', id), { ...corteDe('ic_admin', 5, { version: 1 }), creadoEn: new Date(Date.UTC(2026, 3, 15, 14, 0)) });
+      for (const [k, datos] of partesV1(5)) await setDoc(doc(d, 'odt_afinia_cortes', id, 'partes', k), datos);
+    });
+    await assertSucceeds(getDoc(doc(plano('ic_admin2'), 'odt_afinia_cortes', id)));
+    await assertSucceeds(getDocs(query(collection(plano('ic_admin'), 'odt_afinia_cortes', id, 'partes'), limit(60))));
+    await assertFails(getDoc(doc(plano('ic_tecnico'), 'odt_afinia_cortes', id)));
+    const repo = crearRepositorioCortes({ sdk: SDK, db: plano('ic_admin'), sesion: () => ({ uid: 'ic_admin', nombre: nombreDe('ic_admin'), esAdmin: true, legacy: false }) });
+    const l = await repo.leer(id);
+    assert.equal(l.corte.version, 1);
+    assert.equal(l.completo, true);
+    assert.ok(l.odts.length === 5 && l.odts.every((o) => Object.keys(o).length === 9));
+    // Ni «pasarlo» a la versión 2, ni agregarle el AZT, ni borrarlo.
+    await assertFails(updateDoc(doc(plano('ic_admin'), 'odt_afinia_cortes', id), { version: 2 }));
+    await assertFails(setDoc(doc(plano('ic_admin'), 'odt_afinia_cortes', id, 'partes', '0'), partesDe(5)[0][1]));
+    await assertFails(deleteDoc(doc(plano('ic_admin'), 'odt_afinia_cortes', id)));
   });
 });
 
