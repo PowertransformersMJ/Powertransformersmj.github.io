@@ -8,7 +8,9 @@
 //     al total; el total va en la punta. Pulsar un tramo abre la lista de esas ODT.
 //   · graficoMensual: columnas por mes, Generadas (mes de la fecha prevista) junto a Cerradas (mes de la
 //     FECHA ODT CERRADA), con un solo eje y SIN HUECOS: los meses sin datos van en 0 (rellenarMeses del dominio),
-//     también en «Ver los datos del gráfico»; así un filtro no junta meses que no son seguidos.
+//     también en «Ver los datos del gráfico»; así un filtro no junta meses que no son seguidos. Con un PERIODO
+//     (2026-11-24) la vista le pasa ya sus meses (`rellenar: false`) y `alElegirMes`: pulsar una columna, o el mes en
+//     «Ver los datos del gráfico» (un botón, para el teclado), pone ese mes como periodo.
 // Colores: la paleta categórica validada (orden fijo, el color sigue al estado y no a su puesto; separación
 // para daltonismo comprobada); como tres tonos quedan por debajo de 3:1 sobre blanco, los datos también van en
 // tablas (la tabla por contratista y «Ver los datos del gráfico»). Cada tramo y cada columna lleva su <title>
@@ -113,10 +115,14 @@ export function graficoPorContratista(filas, { alElegir } = {}) {
  * Evolución mensual: Generadas (por mes de la fecha prevista) y Cerradas (por mes de la fecha de cierre), un solo eje.
  * Lo horizontal en % del ancho, lo vertical en píxeles (sin viewBox: el texto no se encoge en un celular).
  * @param {Array<{mes:string, generadas:number, cerradas:number}>} porMes  (se ordena y se rellenan los meses vacíos)
+ * @param {{rellenar?:boolean, alElegirMes?:(mes:string)=>void, elegible?:(mes:string)=>boolean}} [op]
+ *   rellenar: false = los meses ya vienen sin huecos (los de un periodo); alElegirMes: pulsar un mes (si es elegible).
  * @returns {HTMLElement} figure (leyenda + svg + tabla de datos)
  */
-export function graficoMensual(porMes) {
-  const meses = rellenarMeses(porMes);
+export function graficoMensual(porMes, { rellenar = true, alElegirMes = null, elegible = () => true } = {}) {
+  const meses = rellenar ? rellenarMeses(porMes) : [...(porMes || [])].sort((a, b) => (a.mes < b.mes ? -1 : a.mes > b.mes ? 1 : 0));
+  const sePuede = (m) => typeof alElegirMes === 'function' && elegible(m.mes) === true;
+  const algunoElegible = meses.some(sePuede);
   const ALTO = 250; const ABAJO = 40; const ARRIBA = 16; const IZQ = 9;   // IZQ en % (las cifras del eje van encima de su línea)
   const n = Math.max(1, meses.length);
   const banda = (100 - IZQ) / n;
@@ -141,10 +147,12 @@ export function graficoMensual(porMes) {
     for (const [serie, x] of [['generadas', centro - col - 0.15], ['cerradas', centro + 0.15]]) {
       const v = m[serie] || 0;
       const y = yDe(v);
+      const elegir = sePuede(m);
       svg.appendChild(s('rect', {
         x: pct(x), y: y.toFixed(1), width: pct(col), height: Math.max(0, ARRIBA + altoUtil - y).toFixed(1),
-        fill: COLOR_MES[serie], class: 'odt-ind-svg-col'
-      }, s('title', { text: nombreMes(m.mes, true) + ': ' + num(v) + ' ' + serie })));
+        fill: COLOR_MES[serie], class: 'odt-ind-svg-col' + (elegir ? ' odt-ind-svg-col--elegible' : ''),
+        onclick: elegir ? () => alElegirMes(m.mes) : null
+      }, s('title', { text: nombreMes(m.mes, true) + ': ' + num(v) + ' ' + serie + (elegir ? ' (pulse para ver solo este mes)' : '') })));
     }
     if (i % saltar === 0) {
       // Solo el mes («mar»): con el año al lado se montaban en un celular. El año va debajo, en el primero y en cada enero.
@@ -157,10 +165,17 @@ export function graficoMensual(porMes) {
     h('caption', { class: 'odt-oculto', text: 'Generadas y cerradas por mes' }),
     h('thead', {}, h('tr', {}, h('th', { scope: 'col', text: 'Mes' }), h('th', { scope: 'col', class: 'odt-ind-n', text: 'Generadas' }), h('th', { scope: 'col', class: 'odt-ind-n', text: 'Cerradas' }))),
     h('tbody', {}, meses.map((m) => h('tr', {},
-      h('th', { scope: 'row', text: nombreMes(m.mes, true) }), h('td', { class: 'odt-ind-n', text: num(m.generadas) }), h('td', { class: 'odt-ind-n', text: num(m.cerradas) }))))));
+      sePuede(m)
+        ? h('th', { scope: 'row' }, h('button', {
+          type: 'button', class: 'odt-ind-mes-btn', text: nombreMes(m.mes, true),
+          'aria-label': 'Ver solo ' + nombreMes(m.mes, true) + ' (lo pone como periodo)', onclick: () => alElegirMes(m.mes)
+        }))
+        : h('th', { scope: 'row', text: nombreMes(m.mes, true) }),
+      h('td', { class: 'odt-ind-n', text: num(m.generadas) }), h('td', { class: 'odt-ind-n', text: num(m.cerradas) }))))));
   return h('figure', { class: 'odt-ind-figura' },
     h('figcaption', { class: 'odt-ind-figura-titulo', text: 'Evolución mensual: generadas y cerradas' }),
     leyenda([{ clave: 'generadas', texto: 'Generadas (mes de la fecha prevista)' }, { clave: 'cerradasMes', texto: 'Cerradas (mes de la fecha de cierre)' }]),
     h('div', { class: 'odt-ind-svg-caja' }, svg),
+    algunoElegible ? h('p', { class: 'odt-mini', text: 'Pulse una columna (o un mes en «Ver los datos del gráfico») para ver solo ese mes.' }) : null,
     h('details', { class: 'odt-detalles' }, h('summary', { text: 'Ver los datos del gráfico' }), tabla));
 }

@@ -9,7 +9,9 @@
 //   · el bloque de reglas «Indicadores · ODT Afinia»: aparte, ANTES del de la firma (así las revisiones de los otros dos
 //     bloques no cambian), crear solo admin con perfil, update y delete prohibidos SIEMPRE, lecturas solo de admin, pocas
 //     lecturas de documentos (≤ 10 por operación, ≤ 20 por lote) y las mismas constantes que el dominio;
-//   · repo público: sin correos, sin apellidos del equipo, y en las pruebas solo N.º de ODT inventados (empiezan por 9).
+//   · repo público: sin correos, sin apellidos del equipo, y en las pruebas solo N.º de ODT inventados (empiezan por 9);
+//   · el PERIODO (2026-11-24) vive en dos archivos NUEVOS (su dominio puro y su bloque de pantalla): al dominio de antes
+//     solo le pide nombres que ya existían, y el dominio de antes no cambia.
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
@@ -28,11 +30,14 @@ const NUEVOS = [
   'assets/js/ui/odt-afinia/indicadores.js',
   'assets/js/ui/odt-afinia/indicadores-vista.js',
   'assets/js/ui/odt-afinia/indicadores-cargar.js',
-  'assets/js/ui/odt-afinia/indicadores-graficos.js'
+  'assets/js/ui/odt-afinia/indicadores-graficos.js',
+  // El periodo (2026-11-24): sus exportaciones son nuevas, así que van en archivos nuevos (L-102 (3)).
+  'assets/js/domain/odt_afinia_indicadores_periodo.js',
+  'assets/js/ui/odt-afinia/indicadores-periodo.js'
 ];
 const PRUEBAS = ['tests/odt_afinia_indicadores.test.js', 'tests/odt_afinia_indicadores_datos.test.js', 'tests/odt_afinia_indicadores_ui.test.js',
   'tests/odt_afinia_indicadores_fixture.js', 'tests/odt_afinia_indicadores_estatico.test.js', 'tests-rules/odt_afinia_cortes.rules.test.js',
-  'tests/odt_afinia_indicadores_azt_jefe.test.js'];
+  'tests/odt_afinia_indicadores_azt_jefe.test.js', 'tests/odt_afinia_indicadores_periodo.test.js'];
 const CSS_NUEVO = 'assets/css/odt-afinia-indicadores.css';
 const FUENTE = Object.fromEntries(NUEVOS.map((p) => [p, leer(p)]));
 /** Lo que los archivos nuevos pueden pedir a cada vecino de ANTES (nombres que ya exportaban antes de esta entrega). */
@@ -42,7 +47,9 @@ const YA_EXISTIAN = {
   'assets/js/domain/odt_afinia_partes.js': ['huella'],
   // Los nombres de las colecciones de la firma y de «Por subsanar» (el estado en SGM se consulta por N.º en ellas).
   'assets/js/domain/odt_afinia_rutas.js': ['COL'],
-  'assets/js/domain/odt_afinia_obs.js': ['COL_OBS']
+  'assets/js/domain/odt_afinia_obs.js': ['COL_OBS'],
+  // «Hoy» en la hora de Colombia, para «Este mes» y «Mes pasado» del periodo.
+  'assets/js/domain/odt_afinia_textos.js': ['fechaBogota']
 };
 function importsDe(ruta, texto) {
   return [...codigo(texto).matchAll(/import\s*\{([^}]*)\}\s*from\s*'([^']+)'/g)].map((m) => [
@@ -116,7 +123,7 @@ describe('L-102: lo nuevo en archivos NUEVOS; a los vecinos de antes, solo lo qu
 });
 
 describe('dominio y armado del lote: puros', () => {
-  for (const p of ['assets/js/domain/odt_afinia_indicadores.js', 'assets/js/data/odt_afinia_cortes_lotes.js']) {
+  for (const p of ['assets/js/domain/odt_afinia_indicadores.js', 'assets/js/data/odt_afinia_cortes_lotes.js', 'assets/js/domain/odt_afinia_indicadores_periodo.js']) {
     test(p + ': sin Firebase, sin DOM, sin red', () => {
       const c = codigo(FUENTE[p]);
       assert.ok(!/firebasejs|gstatic|firebase-init|session-guard/.test(c), 'Firebase');
@@ -125,6 +132,21 @@ describe('dominio y armado del lote: puros', () => {
   }
   test('el dominio solo importa módulos hermanos (aquí: ninguno)', () => {
     assert.deepEqual(importsDe('assets/js/domain/odt_afinia_indicadores.js', FUENTE['assets/js/domain/odt_afinia_indicadores.js']), []);
+  });
+  test('el dominio del periodo solo le pide a su hermano de antes nombres que ya exportaba (L-102: puede seguir viejo en caché)', async () => {
+    const dom = 'assets/js/domain/odt_afinia_indicadores.js';
+    const PEDIDOS_PERIODO = ['esIso', 'fechaDMA', 'filtrar'];
+    assert.deepEqual(importsDe('assets/js/domain/odt_afinia_indicadores_periodo.js', FUENTE['assets/js/domain/odt_afinia_indicadores_periodo.js']), [[dom, PEDIDOS_PERIODO]]);
+    const m = await import('../' + dom);
+    for (const n of PEDIDOS_PERIODO) assert.equal(typeof m[n], 'function', n);
+    // Lo del periodo NO se agregó al dominio de antes: ninguna de sus exportaciones vive allí.
+    const per = await import('../assets/js/domain/odt_afinia_indicadores_periodo.js');
+    assert.ok(Object.keys(per).length >= 10);
+    for (const n of Object.keys(per)) assert.ok(!(n in m), 'exportación nueva en el dominio de antes: ' + n);
+    // Lo que la vista y el bloque nuevo le piden al dominio de antes también existía antes del periodo.
+    for (const p of ['assets/js/ui/odt-afinia/indicadores-vista.js', 'assets/js/ui/odt-afinia/indicadores-periodo.js', 'assets/js/ui/odt-afinia/indicadores-graficos.js']) {
+      for (const [mod, nombres] of importsDe(p, FUENTE[p])) if (mod === dom) for (const n of nombres) assert.ok(n in m, p + ' · ' + n);
+    }
   });
 });
 
