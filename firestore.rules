@@ -2029,6 +2029,136 @@ service cloud.firestore {
     }
 
     // ══════════════════════════════════════════════════════════════
+    // Indicadores · ODT Afinia (pedido del Ingeniero del 2026-11-23; bloque ADITIVO, aparte de la firma y de «Por subsanar»)
+    // Cortes de trazabilidad: cuántas ODT hay generadas, ejecutadas y cerradas por contratista, solo de las ODT de UN
+    // responsable O.D.T., leídas del CSV del «Informe Seguimiento de Órdenes de Trabajo» de Afinia. Cada corte se hace
+    // a pedido y queda guardado con su fecha: el historial ES la trazabilidad, así que un corte NUNCA cambia ni se
+    // borra (update y delete en false, siempre).
+    //   · odt_afinia_cortes/{id} (17 campos exactos): responsable, archivo {nombre, bytes, sha256}, rango {desde, hasta}
+    //     ('aaaa-mm-dd'), fechaDatos ('aaaa-mm-ddThh:mm:ss': la hora de descarga del archivo; ordena los cortes),
+    //     filasArchivo, odtsArchivo, filasResponsable, odts, totales (7 contadores enteros ≥ 0 que suman el total),
+    //     porEmpresa, porTipo, porZona, porMes (listas), nPartes (las que caben a 400 ODT por parte), version 1,
+    //     creadoPor {uid, nombre del perfil}, creadoEn (hora del servidor). Lo crea solo un admin con perfil, en UN
+    //     lote con sus partes.
+    //       /partes/{k} (k = '0'..'59'): {k, odts:[…]}; solo en el lote que CREA el corte (antes no existe; después,
+    //       sí); k < nPartes; todas llenas (400) menos la última, que lleva el resto: así suman `odts`. CADENA: cada
+    //       parte exige la ANTERIOR en el mismo lote y el corte exige la ÚLTIMA, así que el lote trae TODAS, de la 0 a
+    //       la nPartes − 1 (un lote con un hueco, o sin partes, se niega). Después no se le pueden agregar partes.
+    // PRESUPUESTO: Firestore evalúa como mucho 1000 expresiones por documento (en un lote, cada documento evalúa su
+    // propia regla). Por eso los campos sueltos se revisan completos, pero DENTRO de las listas (porEmpresa, porTipo,
+    // porZona, porMes y las ODT de cada parte) solo se revisa que sean listas, su tamaño máximo y la forma del PRIMER
+    // elemento (que exista, sus claves exactas y su texto acotado). Todo lo demás lo garantiza la página: planCorte
+    // (assets/js/data/odt_afinia_cortes_lotes.js) revisa CADA elemento antes de escribir y, al leer, unirPartes
+    // descarta lo que no tenga la forma de una ODT. Medido en el emulador con relleno calibrado (la prueba
+    // «presupuesto» de tests-rules/odt_afinia_cortes.rules.test.js lo vigila): el corte gasta ≈ 61 % del tope y cada
+    // parte ≈ 23 %. Lo que se agregue aquí debe dejar ese margen (la prueba exige ≥ 30 % libre).
+    // Accesos a documentos: por escritura, el corte ≤ 4 y cada parte ≤ 6 (tope: 10). Fuera del lote solo se leen el
+    // perfil, /admins (solo si no hay perfil) y el corte ANTES del lote: 3 documentos como mucho, tenga las partes que
+    // tenga; los existsAfter/getAfter a documentos del MISMO lote no cuentan para el tope de 20 por lote (medido en el
+    // emulador: una cadena de 61 documentos entra; 21 lecturas distintas fuera del lote, no).
+    // Lectura: solo administradores con perfil; listas con limit ≤ 50 (cortes) y ≤ 60 (partes). El corte anterior
+    // se busca con where responsable == + where/orderBy fechaDatos + orderBy creadoEn (índice compuesto).
+    // Va ANTES del bloque de la firma (y no después de «Por subsanar») para que las revisiones estáticas de esos dos
+    // bloques, que los leen hasta el siguiente, sigan viendo exactamente lo suyo. Solo usa las funciones globales de
+    // sesión/rol (hasProfile, isAdmin, profile) y las suyas (prefijo odtInd): no depende de las de la firma.
+    // ══════════════════════════════════════════════════════════════
+    function odtIndRuta(id) { return /databases/$(database)/documents/odt_afinia_cortes/$(id); }
+    function odtIndRutaParte(id, k) { return /databases/$(database)/documents/odt_afinia_cortes/$(id)/partes/$(k); }
+    function odtIndEntero(v, min, max) { return v is int && v >= min && v <= max; }
+    function odtIndIso(f) { return f.matches('^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$'); }
+    // Los 7 contadores: total == odts; los seis estados, enteros ≥ 0 (un solo patrón «n,n,n,n,n,n»: sin signo ni
+    // decimales; un texto que se cuele no se puede sumar y niega) que suman el total (así ninguno pasa de n).
+    function odtIndTotales(t, n) {
+      return t.size() == 7 && t.total == n
+        && (string(t.generada) + ',' + string(t.ejecutada) + ',' + string(t.noEjecutada) + ',' + string(t.cerrada)
+            + ',' + string(t.inactiva) + ',' + string(t.otro)).matches('^[0-9]+(,[0-9]+){5}$')
+        && t.generada + t.ejecutada + t.noEjecutada + t.cerrada + t.inactiva + t.otro == n;
+    }
+    // Contratistas, tipos o zonas: lista de 1 a 300 (sin el primero, l[0] niega); el PRIMERO, {clave (1..200),
+    // los 7 contadores} y nada más.
+    function odtIndGrupos(l) {
+      return l is list && l.size() <= 300 && l[0].size() == 8
+        && l[0].keys().hasOnly(['clave', 'total', 'generada', 'ejecutada', 'noEjecutada', 'cerrada', 'inactiva', 'otro'])
+        && l[0].clave.matches('^.{1,200}$');
+    }
+    // Meses: lista de 1 a 240; el PRIMERO, {mes 'aaaa-mm', generadas, cerradas} y nada más.
+    function odtIndMeses(l) {
+      return l is list && l.size() <= 240 && l[0].size() == 3
+        && l[0].keys().hasOnly(['mes', 'generadas', 'cerradas'])
+        && l[0].mes.matches('^[0-9]{4}-(0[1-9]|1[0-2])$');
+    }
+    // La PRIMERA ODT de una parte: los 9 campos y nada más, con su N.º (1..40).
+    function odtIndOdt(o) {
+      return o.size() == 9
+        && o.keys().hasOnly(['nro', 'empresa', 'tipo', 'zona', 'subestacion', 'prevista', 'cerrada', 'estado', 'principal'])
+        && o.nro.matches('^.{1,40}$');
+    }
+    // ── Guardar un corte (lote: el corte + sus partes), solo un admin con perfil ──
+    function odtIndCorte(id) {
+      let d = request.resource.data;
+      return hasProfile() && isAdmin() && id.matches('^[A-Za-z0-9]{20}$')
+        && d.size() == 17
+        && d.keys().hasOnly(['responsable', 'archivo', 'rango', 'fechaDatos', 'filasArchivo', 'odtsArchivo',
+             'filasResponsable', 'odts', 'totales', 'porEmpresa', 'porTipo', 'porZona', 'porMes', 'nPartes', 'version',
+             'creadoPor', 'creadoEn'])
+        // Texto de 3 a 120, sin espacios en las puntas (la página lo guarda limpio).
+        && d.responsable.matches('^\\S.{1,118}\\S$')
+        && d.archivo.size() == 3
+        && d.archivo.nombre.matches('^.{1,200}$')
+        && odtIndEntero(d.archivo.bytes, 1, 209715200)
+        && d.archivo.sha256.matches('^[0-9a-f]{64}$')
+        && d.rango.size() == 2
+        && odtIndIso(d.rango.desde) && odtIndIso(d.rango.hasta) && d.rango.desde <= d.rango.hasta
+        && d.fechaDatos.matches('^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$')
+        // Enteros y acotados: odts ≤ filasResponsable ≤ filasArchivo ≤ 2.000.000 y odts ≤ odtsArchivo ≤ filasArchivo;
+        // odts es entero ≥ 1 por los totales y por nPartes (abajo), así que los cuatro son ≥ 1.
+        && d.filasArchivo is int && d.filasArchivo <= 2000000
+        && d.odtsArchivo is int && d.odtsArchivo <= d.filasArchivo
+        && d.filasResponsable is int && d.filasResponsable <= d.filasArchivo
+        && d.odts <= d.filasResponsable && d.odts <= d.odtsArchivo
+        && odtIndTotales(d.totales, d.odts)
+        && odtIndGrupos(d.porEmpresa) && odtIndGrupos(d.porTipo) && odtIndGrupos(d.porZona) && odtIndMeses(d.porMes)
+        // nPartes coherente con las ODT, sin divisiones: (nPartes − 1) · 400 < odts ≤ nPartes · 400.
+        && odtIndEntero(d.nPartes, 1, 60)
+        && (d.nPartes - 1) * 400 < d.odts && d.odts <= d.nPartes * 400
+        && d.version == 1
+        && d.creadoPor == {'uid': request.auth.uid, 'nombre': profile().get('nombre', '')}
+        && d.creadoEn == request.time
+        // La ÚLTIMA parte existe al terminar el MISMO lote (y, por la cadena, todas las de antes).
+        && existsAfter(odtIndRutaParte(id, string(d.nPartes - 1)));
+    }
+    function odtIndParte(id, k) {
+      let d = request.resource.data;
+      let c = getAfter(odtIndRuta(id)).data;
+      return hasProfile() && isAdmin() && k.matches('^([0-9]|[1-5][0-9])$')
+        && d.size() == 2 && d.keys().hasOnly(['k', 'odts'])
+        && d.k == int(k)
+        // Solo en el lote que CREA el corte: antes no existe; después sí (si no, getAfter no tiene datos y niega).
+        && !exists(odtIndRuta(id))
+        && int(k) < c.nPartes
+        // CADENA: cada parte exige la ANTERIOR en el mismo lote (con la última, que exige el corte, están todas).
+        && (int(k) == 0 || existsAfter(odtIndRutaParte(id, string(int(k) - 1))))
+        // Llenas (400) menos la última, que lleva el resto.
+        && d.odts is list
+        && d.odts.size() == (int(k) < c.nPartes - 1 ? 400 : c.odts - (c.nPartes - 1) * 400)
+        && odtIndOdt(d.odts[0]);
+    }
+    match /odt_afinia_cortes/{id} {
+      allow get: if hasProfile() && isAdmin();
+      allow list: if request.query.limit <= 50 && hasProfile() && isAdmin();
+      allow create: if odtIndCorte(id);
+      // Trazabilidad: un corte nunca cambia ni se borra.
+      allow update, delete: if false;
+
+      match /partes/{k} {
+        allow get: if hasProfile() && isAdmin();
+        allow list: if request.query.limit <= 60 && hasProfile() && isAdmin();
+        allow create: if odtIndParte(id, k);
+        allow update, delete: if false;
+      }
+    }
+
+    // ══════════════════════════════════════════════════════════════
     // Firma de ODT Afinia (diseño W-11 del 2026-11-20, tras comité ×3; bloque ADITIVO)
     // Solo se guarda el PDF ORIGINAL publicado (en partes ≤ 900 KB). Cada firma es un ACTO que solo se crea
     // (create-only) con la imagen de firmas/{uid} DEL PROPIO firmante, verificada byte a byte aquí; el PDF
