@@ -9,7 +9,9 @@
 //     cuando todos están verificados. El admin ve además «Registrar ODT por subsanar».
 //   · Detalle (#subsanar=<id>): subsanar-detalle.js.
 //   · Registrar (#subsanar-nueva, solo admin): subsanar-registrar.js.
-// La lista y el contador de la pestaña salen de las obs (su `resumen`), sin leer los puntos.
+// La lista y el contador de la pestaña salen de las obs (su `resumen`), sin leer los puntos. Desde el 2026-11-24 el
+// contador lo dice con palabras («12 ODT · 40 puntos» al AZT; «12 ODT · 5 por verificar» al administrador): lo arma
+// domain/odt_afinia_obs_contador.js (archivo NUEVO, L-102) y viaja en `contador` junto a {total, deMiLado} de antes.
 // «Descargar Excel» (pedido del Ingeniero del 2026-11-24): sobre la lista (si hay alguna ODT), para quien
 // ve la pestaña; vive en subsanar-excel.js, que entra con import() (L-102): si no carga, la lista sigue igual.
 // app.js carga este archivo con import() y pregunta si existe montarPorSubsanar (L-102): si no
@@ -20,6 +22,7 @@
 import { h, vaciar, aviso, mensajeDe } from './comun.js';
 import { crearRepositorioObs } from '../../data/odt_afinia_obs.js';
 import { TOPES_OBS, ordenarLista, pendientesDeMiLado, textoConteo } from '../../domain/odt_afinia_obs.js';
+import { contadorPorSubsanar } from '../../domain/odt_afinia_obs_contador.js';
 import { montarDetalleObs, chipObs } from './subsanar-detalle.js';
 import { montarRegistrarObs } from './subsanar-registrar.js';
 
@@ -43,19 +46,27 @@ function cargarExcel() {
 }
 
 /**
+ * Lo que viaja al contador de la pestaña: {total, deMiLado} (de antes) y `contador` (ODT y puntos, con palabras; si la
+ * lista llegó al tope de la consulta, como mínimo: «12+ ODT»).
+ */
+const cuentaDe = (lista, sesion, tope) => ({
+  total: lista.length, deMiLado: pendientesDeMiLado(lista, sesion), contador: contadorPorSubsanar(lista, sesion, { tope: tope === true })
+});
+
+/**
  * Cuántas obs ve la sesión y cuántos puntos le tocan «de su lado» (para la pestaña).
- * @returns {Promise<{total:number, deMiLado:number}>}
+ * @returns {Promise<{total:number, deMiLado:number, contador:{odts:number, puntos:number, tope:boolean, texto:string, corto:string, resto:string, etiqueta:string}}>}
  */
 export async function contarDeMiLado({ repoObs, sesion }) {
-  const { lista } = await repoObs.listar();
-  return { total: lista.length, deMiLado: pendientesDeMiLado(lista, sesion) };
+  const { lista, tope } = await repoObs.listar();
+  return cuentaDe(lista, sesion, tope);
 }
 
 /**
  * Monta la vista pedida por el ancla.
  * @param {HTMLElement} contenedor
  * @param {{vista:'lista'|'detalle'|'nueva', obsId?:string, repoObs:object, repoOdt?:object, sesion:object,
- *          mensaje?:string, alIr:(ancla:string, mensaje?:string)=>void, alContar?:(datos?:{total:number, deMiLado:number})=>void}} p
+ *          mensaje?:string, alIr:(ancla:string, mensaje?:string)=>void, alContar?:(datos?:{total:number, deMiLado:number, contador:object})=>void}} p
  */
 export async function montarPorSubsanar(contenedor, p) {
   const { vista = 'lista', sesion } = p;
@@ -95,7 +106,7 @@ export async function montarListaObs(contenedor, { repoObs, sesion, mensaje, alI
   }
   cargando.remove();
   const lista = ordenarLista(datos.lista);
-  if (typeof alContar === 'function') alContar({ total: lista.length, deMiLado: pendientesDeMiLado(lista, sesion) });
+  if (typeof alContar === 'function') alContar(cuentaDe(lista, sesion, datos.tope));
   if (!lista.length) {
     contenedor.appendChild(h('p', { class: 'odt-vacio', text: sesion.esAdmin ? VACIO_ADMIN : VACIO_AZT }));
     return { lista };

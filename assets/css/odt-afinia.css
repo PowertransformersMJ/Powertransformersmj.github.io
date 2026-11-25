@@ -224,6 +224,9 @@ textarea.odt-campo { resize: vertical; }
    (allí la pestaña pone el texto en blanco: la píldora pasa a fondo blanco y número azul). */
 .odt-nav-btn .odt-cuenta { margin-left: 6px; color: var(--odt-tinta-2, #1f3656); }
 .odt-nav-btn[aria-current="page"] .odt-cuenta { background: #fff; color: var(--odt-marca, #007aff); }
+/* Con palabras (2026-11-24): «12 ODT · 40 puntos» (AZT) o «12 ODT · 5 por verificar» (admin), sin partirse; la frase
+   completa va en el aria-label y el title de la pestaña. En un celular muy angosto queda solo «12 ODT» (abajo). */
+.odt-nav-btn .odt-cuenta--palabras { white-space: nowrap; }
 /* «Descargar Excel» de la lista (2026-11-24): botón, casilla «Incluir las ya resueltas» y el avance. */
 .odt-obs-excel { margin: 10px 0 14px; padding: 10px 14px; border-radius: var(--odt-r, 10px); background: #fff; border: 1px solid var(--odt-linea, rgba(0, 40, 90, .12)); }
 .odt-obs-excel .odt-acciones { margin: 0; }
@@ -235,6 +238,9 @@ textarea.odt-campo { resize: vertical; }
   .odt-fila-btn { grid-template-columns: 1fr; }
   .odt-fila-btn .odt-chip { grid-column: 1; grid-row: auto; justify-self: start; }
   .odt-nav-btn { flex: 1 1 auto; justify-content: center; }
+}
+@media (max-width: 359px) {
+  .odt-nav-btn .odt-cuenta-resto { display: none; }
 }
 
 /* ── Impresión: el módulo NO se imprime (L-107) ───────────────────────────── */

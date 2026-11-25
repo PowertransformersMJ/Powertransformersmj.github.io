@@ -2061,11 +2061,20 @@ service cloud.firestore {
     // perfil, /admins (solo si no hay perfil) y el corte ANTES del lote: 3 documentos como mucho, tenga las partes que
     // tenga; los existsAfter/getAfter a documentos del MISMO lote no cuentan para el tope de 20 por lote (medido en el
     // emulador: una cadena de 61 documentos entra; 21 lecturas distintas fuera del lote, no).
-    // Lectura: solo administradores con perfil; listas con limit ≤ 50 (cortes) y ≤ 60 (partes). El corte anterior
-    // se busca con where responsable == + where/orderBy fechaDatos + orderBy creadoEn (índice compuesto).
+    // Lectura: los administradores con perfil y los LECTORES; listas con limit ≤ 50 (cortes) y ≤ 60 (partes). El corte
+    // anterior se busca con where responsable == + where/orderBy fechaDatos + orderBy creadoEn (índice compuesto).
+    // LECTORES (pedido del Ingeniero del 2026-11-24: que un AZT también tenga acceso a los indicadores; decidió «Todo,
+    // solo lectura»): leen los cortes y sus partes (get y list, con los mismos topes) las personas con perfil activo del
+    // equipo cuyo uid está en la lista EXPLÍCITA `lectores` de odt_afinia_config/indicadores (no «todo AZT»). Ese
+    // documento —{lectores: [uid] (≤ 20, sin repetir), actualizadoPor {uid, nombre del perfil}, actualizadoEn (hora del
+    // servidor)}— lo crea y lo cambia solo un admin con perfil; nadie lo borra; lo lee cualquier persona con perfil
+    // (solo trae uids: la página lo usa para saber si mostrar la pestaña). Un lector NO crea cortes (crear sigue siendo
+    // solo de un admin) ni escribe ese documento. Sin el documento, solo leen los administradores (un get de un
+    // documento que no existe da error y niega). Accesos: perfil + ese documento (2); presupuesto medido en
+    // tests-rules/odt_afinia_cortes_lectores.rules.test.js (prueba «presupuesto», ≥ 30 % libre).
     // Va ANTES del bloque de la firma (y no después de «Por subsanar») para que las revisiones estáticas de esos dos
     // bloques, que los leen hasta el siguiente, sigan viendo exactamente lo suyo. Solo usa las funciones globales de
-    // sesión/rol (hasProfile, isAdmin, profile) y las suyas (prefijo odtInd): no depende de las de la firma.
+    // sesión/rol (hasProfile, isAdmin, isTeamMember, profile) y las suyas (prefijo odtInd): no depende de las de la firma.
     // ══════════════════════════════════════════════════════════════
     function odtIndRuta(id) { return /databases/$(database)/documents/odt_afinia_cortes/$(id); }
     function odtIndRutaParte(id, k) { return /databases/$(database)/documents/odt_afinia_cortes/$(id)/partes/$(k); }
@@ -2150,19 +2159,46 @@ service cloud.firestore {
         && d.odts.size() == (int(k) < c.nPartes - 1 ? 400 : c.odts - (c.nPartes - 1) * 400)
         && odtIndOdt(d.odts[0]);
     }
+    // ── Leer cortes y partes: un admin con perfil, o un LECTOR de la lista (con perfil, activo y del equipo) ──
+    function odtIndRutaLectores() { return /databases/$(database)/documents/odt_afinia_config/indicadores; }
+    function odtIndLector() {
+      return hasProfile() && (isAdmin() || (isTeamMember() && request.auth.uid in get(odtIndRutaLectores()).data.lectores));
+    }
+    // ── La lista de lectores (crear o cambiar): solo un admin con perfil; forma exacta. `lectores`: de 0 a 20 uids
+    // (letras, números, «_» o «-», de 1 a 128), sin repetir. Se une con comas: el patrón niega uno vacío o con otro
+    // carácter, y volver a partirla y compararla con la lista niega lo que no es texto (join() escribe un 7 o un null
+    // como «7» o «null») y un elemento con una coma dentro (medido en el emulador).
+    function odtIndConfigLectores() {
+      let d = request.resource.data;
+      return hasProfile() && isAdmin()
+        && d.size() == 3 && d.keys().hasOnly(['lectores', 'actualizadoPor', 'actualizadoEn'])
+        && d.lectores is list && d.lectores.size() <= 20
+        && d.lectores.toSet().size() == d.lectores.size()
+        && (d.lectores.size() == 0
+            || (d.lectores.join(',').matches('^[A-Za-z0-9_-]{1,128}(,[A-Za-z0-9_-]{1,128})*$')
+                && d.lectores.join(',').split(',') == d.lectores))
+        && d.actualizadoPor == {'uid': request.auth.uid, 'nombre': profile().get('nombre', '')}
+        && d.actualizadoEn == request.time;
+    }
     match /odt_afinia_cortes/{id} {
-      allow get: if hasProfile() && isAdmin();
-      allow list: if request.query.limit <= 50 && hasProfile() && isAdmin();
+      allow get: if odtIndLector();
+      allow list: if request.query.limit <= 50 && odtIndLector();
       allow create: if odtIndCorte(id);
       // Trazabilidad: un corte nunca cambia ni se borra.
       allow update, delete: if false;
 
       match /partes/{k} {
-        allow get: if hasProfile() && isAdmin();
-        allow list: if request.query.limit <= 60 && hasProfile() && isAdmin();
+        allow get: if odtIndLector();
+        allow list: if request.query.limit <= 60 && odtIndLector();
         allow create: if odtIndParte(id, k);
         allow update, delete: if false;
       }
+    }
+    // ── Quién más puede ver los indicadores: lo lee quien tenga perfil; lo escribe solo un admin; nadie lo borra ──
+    match /odt_afinia_config/indicadores {
+      allow get: if hasProfile();
+      allow create, update: if odtIndConfigLectores();
+      allow list, delete: if false;
     }
 
     // ══════════════════════════════════════════════════════════════

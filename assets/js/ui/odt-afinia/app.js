@@ -14,9 +14,16 @@
 // contador de los puntos que le tocan: al AZT, los pendientes; al administrador, los subsanados
 // por verificar. Vive en archivos NUEVOS que entran con import() (L-102): si no cargan, la firma
 // sigue igual y la pestaña dice que se recargue.
-// Pestaña «Indicadores» (pedido del Ingeniero del 2026-11-23), SOLO para administradores: #indicadores (el
-// último corte), #indicadores=<id> (un corte del historial) y #indicadores-cargar (cargar el CSV de Afinia).
+// Pestaña «Indicadores» (pedido del Ingeniero del 2026-11-23): #indicadores (el último corte), #indicadores=<id> (un
+// corte del historial) y #indicadores-cargar (cargar el CSV de Afinia). La ven los administradores y, desde el
+// 2026-11-24 (acceso de un AZT a los indicadores: «Todo, solo lectura»), quien esté en la lista de lectores
+// odt_afinia_config/indicadores: se pregunta con indicadores-lectores.js (import(), solo si no es admin) y, si está,
+// aparece la pestaña (antes de «Por subsanar»); él no carga cortes (si no se pudo comprobar, p. ej. sin red, el ancla
+// lo dice: MSG_INDICADORES_SIN_COMPROBAR). Al admin se le pasa el repositorio de la firma
+// solo para la lista de AZT habilitados de «Quién más puede ver los indicadores» (`candidatos`, que ya existía).
 // También en archivos NUEVOS por import() (indicadores*.js); si no cargan, el resto de la página sigue.
+// El contador de «Por subsanar» lo dice con palabras (2026-11-24): «12 ODT · 40 puntos» al AZT, «12 ODT · 5 por
+// verificar» al admin (`contador` de por-subsanar.js; si llega uno viejo de la caché, solo el número, como antes).
 // Un mensaje («firma registrada», «anulada», «publicada») es de UNA ODT: se muestra en
 // su vista si la persona sigue en ella; si ya se fue a otra, va al aviso general de
 // arriba, nunca a la vista de otra ODT ni se pierde en la bandeja.
@@ -88,8 +95,23 @@ function cargarIndicadores() {
   }
   return _indicadores;
 }
+/** Quien no es admin ni está en la lista de lectores y entra por el ancla. */
+export const MSG_INDICADORES_SIN_ACCESO = 'Los indicadores son solo para los administradores y las personas que ellos autoricen.';
+/** Quien no es admin entra por el ancla y no se pudo comprobar si está en la lista de lectores (falló la conexión). */
+export const MSG_INDICADORES_SIN_COMPROBAR = 'No se pudo comprobar si usted puede ver los indicadores porque falló la conexión. Revise su red y recargue la página.';
 /** Si la pestaña no cargó: se recarga (como en el resto del módulo, L-102). */
 export const MSG_INDICADORES_NO_CARGO = 'No se pudo cargar «Indicadores». Recargue la página con Cmd + Shift + R (Ctrl + Shift + R en Windows).';
+
+/** ¿Quien NO es admin está en la lista de lectores? Vive en un archivo NUEVO: import() y se pregunta (L-102). */
+let _lectoresInd = null;
+function cargarLectoresInd() {
+  if (!_lectoresInd) {
+    _lectoresInd = import('./indicadores-lectores.js')
+      .then((m) => (m && typeof m.soyLectorIndicadores === 'function' ? m : null))
+      .catch(() => null);
+  }
+  return _lectoresInd;
+}
 
 /** La pestaña «Por subsanar» vive en un archivo NUEVO: se carga con import() y se pregunta si trae lo que se usa (L-102). */
 let _subsanar = null;
@@ -106,10 +128,10 @@ export const MSG_SUBSANAR_NO_CARGO = 'No se pudo cargar «Por subsanar». Recarg
 
 /**
  * @param {HTMLElement} raiz
- * @param {{franja?:HTMLElement, repoObs?:object, repoCortes?:object}} [op]  repoObs y repoCortes: inyectables (pruebas);
- *   la página no los pasa
+ * @param {{franja?:HTMLElement, repoObs?:object, repoCortes?:object, repoLectores?:object}} [op]  repoObs, repoCortes y
+ *   repoLectores: inyectables (pruebas); la página no los pasa
  */
-export async function montarOdtAfinia(raiz, { franja, repoObs: repoObsInyectado, repoCortes: repoCortesInyectado } = {}) {
+export async function montarOdtAfinia(raiz, { franja, repoObs: repoObsInyectado, repoCortes: repoCortesInyectado, repoLectores } = {}) {
   vaciar(raiz);
   raiz.appendChild(h('p', { class: 'odt-cargando', text: 'Verificando su sesión…' }));
   await esperarSesion();
@@ -151,7 +173,11 @@ export async function montarOdtAfinia(raiz, { franja, repoObs: repoObsInyectado,
     }
     return btnSubsanar;
   };
-  /** Pone el contador «de su lado» (o lo vuelve a consultar si no llega). Nunca rompe la página. */
+  /**
+   * Pone el contador «de su lado» (o lo vuelve a consultar si no llega). Nunca rompe la página. Con `contador` (desde
+   * el 2026-11-24): «12 ODT · 40 puntos» / «12 ODT · 5 por verificar», con la frase completa en aria-label y title
+   * (en un celular angosto el CSS deja solo «12 ODT»). Sin él (un por-subsanar.js viejo de la caché): solo el número.
+   */
   const ponerContador = async (datos) => {
     try {
       const m = await cargarSubsanar();
@@ -161,7 +187,15 @@ export async function montarOdtAfinia(raiz, { franja, repoObs: repoObsInyectado,
       if (!sesion.esAdmin && !(d.total > 0) && !btnSubsanar) return;   // sin ODT por subsanar: sin pestaña
       const b = pestanaSubsanar();
       for (const x of b.querySelectorAll('.odt-cuenta')) x.remove();
-      if (Number.isInteger(d.deMiLado)) {
+      const c = d && d.contador;
+      if (c && Number.isInteger(c.odts) && Number.isInteger(c.puntos) && typeof c.corto === 'string' && typeof c.resto === 'string') {
+        b.setAttribute('aria-label', String(c.etiqueta || ''));
+        b.setAttribute('title', String(c.etiqueta || ''));
+        b.appendChild(h('span', { class: 'odt-cuenta odt-cuenta--palabras', 'aria-hidden': 'true' },
+          h('span', { class: 'odt-cuenta-odt', text: c.corto }),
+          h('span', { class: 'odt-cuenta-resto', text: ' · ' + c.resto })));
+      } else if (Number.isInteger(d.deMiLado)) {
+        b.removeAttribute('aria-label'); b.removeAttribute('title');
         b.appendChild(h('span', {
           class: 'odt-cuenta', text: String(d.deMiLado),
           title: sesion.esAdmin ? 'Puntos subsanados por verificar' : 'Puntos pendientes por subsanar'
@@ -170,6 +204,32 @@ export async function montarOdtAfinia(raiz, { franja, repoObs: repoObsInyectado,
     } catch (_) { /* sin contador: la pestaña sigue (el admin la ve igual) */ }
   };
   if (sesion.esAdmin) pestanaSubsanar();
+
+  // ── «Indicadores» para quien NO es admin: solo si está en la lista de lectores (odt_afinia_config/indicadores) ──
+  /**
+   * true si la sesión (no admin) es lectora de los indicadores; false ante cualquier duda. Se pregunta UNA vez. Si no se
+   * pudo comprobar (sin red u otro fallo que no es un «no»), `lectorSinComprobar` lo recuerda para avisarlo en el ancla.
+   */
+  let lectorSinComprobar = false;
+  const lectorInd = sesion.esAdmin ? Promise.resolve(false) : cargarLectoresInd()
+    .then((m) => {
+      if (!m) return false;
+      if (typeof m.estadoLectorIndicadores !== 'function') return m.soyLectorIndicadores({ sesion, repoLectores });
+      return m.estadoLectorIndicadores({ sesion, repoLectores })
+        .then((x) => { lectorSinComprobar = !!x && x.sinComprobar === true; return !!x && x.lector === true; });
+    })
+    .then((x) => x === true, () => false);
+  let btnIndicadores = null;
+  /** La pestaña del lector, antes de «Por subsanar» (si ya está, esta se saca y se vuelve a poner al final). */
+  const pestanaIndicadores = () => {
+    if (btnIndicadores) return btnIndicadores;
+    btnIndicadores = h('a', { class: 'odt-nav-btn', href: '#indicadores', dataset: { clave: 'indicadores' }, text: 'Indicadores' });
+    nav.appendChild(btnIndicadores);
+    if (btnSubsanar) nav.appendChild(btnSubsanar);
+    if (leerAncla(location.hash).vista === 'indicadores') btnIndicadores.setAttribute('aria-current', 'page');
+    return btnIndicadores;
+  };
+  const avisarLector = lectorInd.then((si) => { if (si) pestanaIndicadores(); }).catch(() => {});
 
   /** Mensaje para la vista de UNA ODT: {odtId, texto}. */
   let pendiente = null;
@@ -224,15 +284,22 @@ export async function montarOdtAfinia(raiz, { franja, repoObs: repoObsInyectado,
       });
     }
     if (a.vista === 'indicadores') {
-      if (!sesion.esAdmin) { zona.appendChild(aviso('Los indicadores son solo para administradores.', 'aviso')); return null; }
+      const lector = !sesion.esAdmin && await lectorInd;
+      if (!sesion.esAdmin && !lector) { zona.appendChild(aviso(lectorSinComprobar ? MSG_INDICADORES_SIN_COMPROBAR : MSG_INDICADORES_SIN_ACCESO, 'aviso')); return null; }
       const m = await cargarIndicadores();
       if (!m) { zona.appendChild(aviso(MSG_INDICADORES_NO_CARGO, 'aviso')); return null; }
-      if (!repoCortes) repoCortes = m.crearRepositorioCortes();
+      if (!repoCortes) repoCortes = m.crearRepositorioCortes(lector ? { esLector: true } : {});
       return m.montarIndicadores(zona, {
-        vista: a.sub, corteId: a.corteId, repoCortes, sesion, mensaje: mensajeIndicadores,
-        alIr: (ancla, texto) => {
+        vista: a.sub, corteId: a.corteId, repoCortes, sesion, mensaje: mensajeIndicadores, lector,
+        // Solo al admin: la lista de AZT habilitados de «Quién más puede ver los indicadores» (solo `candidatos`).
+        repoOdt: sesion.esAdmin ? repo : null, repoLectores,
+        // {reemplazar: true} (el desvío del lector desde #indicadores-cargar): cambia el ancla SIN dejar la anterior en el
+        // historial del navegador (si no, «Atrás» lo devolvería a #indicadores-cargar y lo desviaría otra vez).
+        alIr: (ancla, texto, op) => {
           pendienteIndicadores = texto ? { ancla, texto } : null;
-          if ('#' + ancla === location.hash) ir(); else location.hash = ancla;
+          if ('#' + ancla === location.hash) ir();
+          else if (op && op.reemplazar && typeof location.replace === 'function') location.replace('#' + ancla);
+          else location.hash = ancla;
         }
       });
     }
@@ -252,5 +319,6 @@ export async function montarOdtAfinia(raiz, { franja, repoObs: repoObsInyectado,
   const contador = ponerContador();
   await ir();
   await contador;
+  await avisarLector;
   return { ir };
 }

@@ -17,6 +17,15 @@
 // vista y con el foco: así el cambio de corte no pasa inadvertido. La página tiene una barra superior FIJA (la del
 // menú, 64 px): lo que queda debajo de ella no se ve aunque esté dentro de la ventana, así que se cuenta como fuera
 // (BARRA_FIJA_PX) y el CSS deja el destino 80 px por debajo del borde (scroll-margin-top).
+// LECTORES (pedido del Ingeniero del 2026-11-24, «Todo, solo lectura»): quien no es admin pero está en la lista
+// odt_afinia_config/indicadores (app.js lo pregunta y lo pasa en `lector`) ve lo mismo, sin cargar ni guardar cortes:
+//   · #indicadores abre el ÚLTIMO corte guardado de cualquier responsable (él no es responsable), y la introducción
+//     dice de quién es el corte (nunca «usted es RESPONSABLE O.D.T.»);
+//   · sin «Cargar un corte nuevo»; si entra por #indicadores-cargar, se le lleva a #indicadores con un aviso corto,
+//     REEMPLAZANDO el ancla (alIr con {reemplazar: true}): así «Atrás» no lo devuelve a #indicadores-cargar (que lo
+//     volvería a desviar). Si todavía no hay cortes, el aviso no habla del «último corte guardado»;
+//   · el «Estado en SGM» de la lista de ODT sale solo de las ODT que le asignaron (el repositorio lo resuelve).
+// Solo al administrador, arriba: la sección plegada «Quién más puede ver los indicadores» (indicadores-lectores.js).
 // app.js carga este archivo con import() y pregunta si trae lo que usa (L-102): si no carga, el resto de la
 // página sigue. Archivo NUEVO a propósito (L-102): a sus vecinos de antes solo les pide nombres que ya existían.
 // ══════════════════════════════════════════════════════════════════════════════
@@ -26,13 +35,18 @@ import { crearRepositorioCortes } from '../../data/odt_afinia_cortes.js';
 import { normalizarNombre, corteMasReciente, formasGuardadas } from '../../domain/odt_afinia_indicadores.js';
 import { montarVistaCorte, BARRA_FIJA_PX } from './indicadores-vista.js';
 import { montarCargar } from './indicadores-cargar.js';
+import { montarSeccionLectores } from './indicadores-lectores.js';
+import {
+  introLector, INTRO_LECTOR, VACIO_LECTOR, MSG_CARGAR_SOLO_ADMIN, MSG_CARGAR_SOLO_ADMIN_SIN_CORTES, MSG_SIN_ACCESO, ultimoCorteDeTodos
+} from '../../domain/odt_afinia_ind_lectores.js';
 
 export { crearRepositorioCortes };
 
 export const TITULO_PESTANA = 'Indicadores';
 export const INTRO = 'Cuántas ODT hay generadas, ejecutadas y cerradas por contratista, solo de las ODT donde usted es RESPONSABLE O.D.T. en Afinia (fechas previstas desde el 01/01/2026). Cada corte se hace a pedido, con el archivo que descarga de Afinia, y queda guardado con su fecha: el historial es la trazabilidad.';
 export const VACIO = 'Todavía no hay cortes guardados. Descargue de Afinia el «Informe Seguimiento de Órdenes de Trabajo» en CSV y cárguelo aquí.';
-export const SOLO_ADMIN = 'Los indicadores son solo para administradores.';
+/** Para quien no es administrador ni está en la lista de lectores. */
+export const SOLO_ADMIN = MSG_SIN_ACCESO;
 
 /**
  * Lleva a la pantalla la vista recién montada: el aviso inicial (p. ej. «Corte guardado: …») o, si no hay, su título.
@@ -81,16 +95,25 @@ export async function ultimoPropio(repoCortes, historial, nombre) {
  * Monta la vista pedida por el ancla.
  * @param {HTMLElement} contenedor
  * @param {{vista?:'ultimo'|'corte'|'cargar', corteId?:string, repoCortes:object, sesion:object, mensaje?:string,
- *          alIr:(ancla:string, mensaje?:string)=>void}} p
+ *          alIr:(ancla:string, mensaje?:string, op?:{reemplazar?:boolean})=>void, lector?:boolean, repoOdt?:object,
+ *          repoLectores?:object}} p  (reemplazar: cambiar el ancla sin agregar una entrada al historial del navegador)
+ *   lector: la sesión NO es admin y está en la lista de lectores (solo lectura). repoOdt (solo admin): para la lista
+ *   de AZT habilitados de la sección «Quién más puede ver los indicadores» (solo se le pide `candidatos`).
  */
 export async function montarIndicadores(contenedor, p) {
-  const { vista = 'ultimo', corteId, repoCortes, sesion, mensaje, alIr } = p;
+  const { vista = 'ultimo', corteId, repoCortes, sesion, mensaje, alIr, repoOdt, repoLectores } = p;
   vaciar(contenedor);
-  if (!sesion || !sesion.esAdmin) { contenedor.appendChild(aviso(SOLO_ADMIN, 'aviso')); return null; }
-  if (sesion.legacy) {
+  const esAdmin = !!(sesion && sesion.esAdmin);
+  /** Un lector de la lista (no admin): todo, solo lectura. */
+  const soloLectura = !esAdmin && !!sesion && p.lector === true;
+  if (!esAdmin && !soloLectura) { contenedor.appendChild(aviso(SOLO_ADMIN, 'aviso')); return null; }
+  if (esAdmin && sesion.legacy) {
     contenedor.appendChild(aviso('Su cuenta de administrador no tiene perfil en la plataforma: créelo para usar los indicadores.', 'aviso'));
     return null;
   }
+  // El lector no carga cortes: por #indicadores-cargar se le lleva al último corte, con un aviso corto, reemplazando el
+  // ancla (sin dejar #indicadores-cargar en el historial del navegador).
+  if (soloLectura && vista === 'cargar') { alIr('indicadores', MSG_CARGAR_SOLO_ADMIN, { reemplazar: true }); return null; }
   const cargando = h('p', { class: 'odt-cargando', text: 'Consultando los cortes guardados…' });
   contenedor.appendChild(cargando);
   let historial = [];
@@ -111,32 +134,45 @@ export async function montarIndicadores(contenedor, p) {
     return r;
   }
 
-  // #indicadores: el último corte de la persona de la sesión (si no tiene, el último guardado, diciendo de quién es).
+  // #indicadores: el administrador, el último corte de la persona de la sesión (si no tiene, el último guardado,
+  // diciendo de quién es); el lector, el último corte guardado de cualquier responsable (él no es responsable).
   let id = corteId;
   let nota = '';
   if (vista !== 'corte' && !errorHistorial && historial.length) {
-    const propio = await ultimoPropio(repoCortes, historial, sesion.nombre);
-    if (propio) id = propio.id;
+    if (soloLectura) id = (ultimoCorteDeTodos(historial) || historial[0]).id;
     else {
-      id = historial[0].id;
-      nota = 'Todavía no hay cortes suyos' + (sesion.nombre ? ' (de ' + sesion.nombre + ')' : '') + ': se muestra el último guardado, de ' + (historial[0].responsable || '—') + '.';
+      const propio = await ultimoPropio(repoCortes, historial, sesion.nombre);
+      if (propio) id = propio.id;
+      else {
+        id = historial[0].id;
+        nota = 'Todavía no hay cortes suyos' + (sesion.nombre ? ' (de ' + sesion.nombre + ')' : '') + ': se muestra el último guardado, de ' + (historial[0].responsable || '—') + '.';
+      }
     }
   }
   cargando.remove();
 
-  contenedor.appendChild(h('p', { class: 'odt-mini', text: INTRO }));
+  // La introducción: al lector, de quién es el corte (se completa al leerlo); al administrador, la de siempre.
+  const intro = h('p', { class: 'odt-mini odt-ind-intro', text: soloLectura ? INTRO_LECTOR : INTRO });
+  contenedor.appendChild(intro);
+  // Solo al administrador: «Quién más puede ver los indicadores» (plegada; lee al abrirse).
+  if (esAdmin) {
+    try { montarSeccionLectores(contenedor, { repoLectores, repoOdt, sesion }); } catch (_) { /* sin la sección: los indicadores siguen */ }
+  }
   if (errorHistorial) {
     contenedor.appendChild(aviso(mensajeDe(errorHistorial), 'error'));
     contenedor.appendChild(h('div', { class: 'odt-acciones' },
       h('button', { type: 'button', class: 'odt-btn', text: 'Reintentar', onclick: () => montarIndicadores(contenedor, p) }),
-      h('button', { type: 'button', class: 'odt-btn odt-btn--primario', text: 'Cargar un corte', onclick: () => alIr('indicadores-cargar') })));
+      soloLectura ? null : h('button', { type: 'button', class: 'odt-btn odt-btn--primario', text: 'Cargar un corte', onclick: () => alIr('indicadores-cargar') })));
     return null;
   }
   if (vista !== 'corte' && !historial.length) {
-    if (mensaje) contenedor.appendChild(aviso(mensaje, 'ok'));
-    contenedor.appendChild(h('p', { class: 'odt-vacio', text: VACIO }));
-    contenedor.appendChild(h('div', { class: 'odt-acciones' },
-      h('button', { type: 'button', class: 'odt-btn odt-btn--primario', text: 'Cargar el primer corte', onclick: () => alIr('indicadores-cargar') })));
+    // Sin cortes no hay «último corte guardado»: el aviso del desvío del lector va sin esa parte.
+    if (mensaje) contenedor.appendChild(aviso(mensaje === MSG_CARGAR_SOLO_ADMIN ? MSG_CARGAR_SOLO_ADMIN_SIN_CORTES : mensaje, 'ok'));
+    contenedor.appendChild(h('p', { class: 'odt-vacio', text: soloLectura ? VACIO_LECTOR : VACIO }));
+    if (!soloLectura) {
+      contenedor.appendChild(h('div', { class: 'odt-acciones' },
+        h('button', { type: 'button', class: 'odt-btn odt-btn--primario', text: 'Cargar el primer corte', onclick: () => alIr('indicadores-cargar') })));
+    }
     return { historial };
   }
   const leyendo = h('p', { class: 'odt-cargando', text: 'Leyendo el corte guardado…' });
@@ -152,10 +188,11 @@ export async function montarIndicadores(contenedor, p) {
     return null;
   }
   leyendo.remove();
+  if (soloLectura) intro.textContent = introLector(r.corte && r.corte.responsable);
   const zona = h('div', { class: 'odt-ind-raiz' });
   contenedor.appendChild(zona);
   const vistaCorte = montarVistaCorte(zona, {
-    ...r, historial, historialTope, repoCortes, alIr, mensaje, nota,
+    ...r, historial, historialTope, repoCortes, alIr, mensaje, nota, soloLectura,
     masHistorial: (antesDe) => repoCortes.listar({ antesDe }),
     cargarSgm: typeof repoCortes.estadoSgm === 'function' ? (nros) => repoCortes.estadoSgm(nros) : null
   });
