@@ -189,6 +189,20 @@
 .odt-ind-definiciones dt { font-weight: 700; color: var(--odt-tinta, #0d1f38); }
 .odt-ind-definiciones dd { margin: 0; }
 
+/* ── «Quién más puede ver los indicadores» (solo admin, 2026-11-24): plegada arriba; una casilla por persona ── */
+.odt-ind-lectores { margin: 4px 0 14px; padding: 8px 14px; border-radius: var(--odt-r, 10px); background: #fff; border: 1px solid var(--odt-linea, rgba(0, 40, 90, .12)); }
+.odt-ind-lectores-cuerpo { padding: 4px 0 2px; }
+.odt-ind-lectores-actual { font-weight: 600; color: var(--odt-tinta, #0d1f38); }
+.odt-ind-lectores-grupo { margin: 8px 0; padding: 8px 12px 4px; border: 1px solid var(--odt-linea, rgba(0, 40, 90, .12)); border-radius: 8px; min-width: 0; }
+.odt-ind-lectores-grupo legend { padding: 0 4px; font-size: 13px; font-weight: 600; color: var(--odt-tinta-2, #1f3656); }
+.odt-ind-lectores-ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.odt-ind-lector { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; min-height: 40px; }
+/* La etiqueta cede y se parte junto a su casilla (un nombre largo no baja la casilla a otra línea en un celular). */
+.odt-ind-lector label { flex: 1 1 0; min-width: 0; cursor: pointer; font-weight: 600; overflow-wrap: anywhere; }
+.odt-ind-lector-nota { flex-basis: 100%; margin: 0 0 0 32px; }
+/* Bajo la lista de ODT de un lector (no admin): por qué algunas dicen «Sin consultar». */
+.odt-ind-sgm-parcial { margin: 0 0 8px; }
+
 /* ── Celular (después de las reglas base: L-121) ──────────────────────────── */
 @media (max-width: 720px) {
   .odt-ind-tarjetas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -200,6 +214,7 @@
   .odt-ind-definiciones dd { margin: 0 0 8px; }
   .odt-ind-figura { padding: 10px; }
   .odt-ind-periodo { padding: 2px 10px 0; }
+  .odt-ind-lectores { padding: 8px 10px; }
   /* En un celular, las tablas por contratista, por tipo y por zona (y la comparación por contratista) van como FICHAS:
      una por fila (su nombre arriba y sus números en tres columnas, cada uno con su nombre, de data-etq). Nada se sale
      de lado. En la tabla por contratista, los encabezados quedan como botones para ordenar; en las demás, solo para

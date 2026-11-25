@@ -84,10 +84,10 @@ const RE_PLACA = /\bplaca\b/;
 const RE_LEER = /\b(?:legible|ilegible|nitida|se lee|se lean|se leen|leer|leerse|reflejo|de cerca|enfocada|borrosa)\b/;
 
 /** Verbos que piden un CAMBIO (infinitivo, con o sin pronombre: «cambiarla»; o en subjuntivo: «corrija»). */
-const VERBOS_CAMBIO = ['corregir', 'cambiar', 'anexar', 'enviar', 'cargar', 'generar', 'regenerar', 'quitar', 'retirar', 'reemplazar',
+const VERBOS_CAMBIO = ['corregir', 'reemitir', 'cambiar', 'anexar', 'enviar', 'cargar', 'generar', 'regenerar', 'quitar', 'retirar', 'reemplazar',
   'sustituir', 'subir', 'adjuntar', 'rehacer', 'completar', 'diligenciar', 'escribir', 'incluir', 'agregar', 'firmar', 'marcar',
   'actualizar', 'ajustar', 'modificar', 'imprimir'];
-const SUBJUNTIVOS = ['corrija', 'cambie', 'anexe', 'envie', 'cargue', 'genere', 'quite', 'reemplace', 'suba', 'adjunte', 'complete',
+const SUBJUNTIVOS = ['corrija', 'reemita', 'cambie', 'anexe', 'envie', 'cargue', 'genere', 'quite', 'reemplace', 'suba', 'adjunte', 'complete',
   'diligencie', 'incluya', 'agregue', 'firme', 'actualice', 'modifique'];
 const RE_CAMBIO = new RegExp('\\b(?:(?:' + VERBOS_CAMBIO.join('|') + ')(?:la|lo|las|los|le|les)?|(?:' + SUBJUNTIVOS.join('|') + ')n?'
   + '|deben? (?:traer|decir|llevar|incluir|quedar))\\b');
@@ -110,7 +110,7 @@ const RE_PIDE_MAS = new RegExp([
 const RE_REMITE = new RegExp('\\b(?:' + VERBOS_CAMBIO.join('|') + '|tomar)(?:la|lo|las|los)\\b|^deben? (?:decir|ser|traer|llevar|quedar)\\b');
 /** La ODT como lo que se corrige: «en la ODT», «generar de nuevo la ODT», «cargar la ODT», «corregir la ODT». */
 const RE_ODT_OBJETO = new RegExp('\\ben (?:la|su|esta|cada) odt\\b'
-  + '|\\b(?:' + VERBOS_CAMBIO.join('|') + ')(?:la|lo)? (?:de nuevo |otra vez |nuevamente )?(?:la|una|su|esta) odt\\b');
+  + '|\\b(?:' + VERBOS_CAMBIO.join('|') + ')(?:la|lo)? (?:(?:en afinia|de nuevo|otra vez|nuevamente) )*(?:la|una|su|esta) odt\\b');
 /** Campos propios del formato de la ODT. */
 const RE_CAMPO_ODT = /\bhoras? real(?:es)? (?:de )?(?:inicio|fin)\b|\bcondiciones ambientales\b|\b(?:recibe|entrega) (?:zp|zt)\b/;
 /** La ODT como SUJETO al comienzo de la frase («La ODT no tiene la firma…»), sin N.º (con N.º es otra ODT). */
@@ -182,6 +182,7 @@ export function documentosDe(texto) {
 const RE_AVISO = /^aviso\s*:/;
 const RE_DECISION = /\b(?:decidir|definir)\b|^(?:aceptar|aprobar|autorizar|validar)\b|\b(?:en|del) (?:el )?sistema\b/;
 const RE_ACLARAR = /\b(?:aclarar|confirmar|indicar|precisar|explicar)\b/;
+const RE_ACLARAR_INICIO = /^(?:aclarar|confirmar|indicar|precisar|explicar)\b/;
 
 /**
  * Clasifica UN punto por su texto (y a quién le toca).
@@ -201,5 +202,9 @@ export function clasificarPunto({ texto, quien } = {}) {
   if (quien === 'responsable' && RE_DECISION.test(norm)) return resultado(CATEGORIAS.sistema);
   if (quien === 'azt' && RE_ACLARAR.test(norm) && !RE_CAMBIO.test(norm)) return resultado(CATEGORIAS.aclaracion);
   const documentos = documentosDe(texto);
-  return documentos.length ? resultado(CATEGORIAS.documento, documentos) : resultado(CATEGORIAS.otro);
+  if (documentos.length) return resultado(CATEGORIAS.documento, documentos);
+  // Un punto del AZT que EMPIEZA pidiendo aclarar o confirmar y no nombra un documento por corregir («Confirmar el nombre
+  // de la Persona 1 para completarla en el sistema») sigue siendo una aclaración, aunque mencione un cambio después.
+  if (quien === 'azt' && RE_ACLARAR_INICIO.test(norm)) return resultado(CATEGORIAS.aclaracion);
+  return resultado(CATEGORIAS.otro);
 }

@@ -115,21 +115,27 @@ describe('arranque: la pestaña «Por subsanar» y su contador', () => {
     }
   }
   const nav = (raiz) => raiz.querySelectorAll('.odt-nav-btn').map((b) => b.textContent);
-  test('el AZT con una ODT asignada ve la pestaña con sus puntos pendientes; un técnico sin ninguna, no', async () => {
+  test('el AZT con una ODT asignada ve la pestaña con sus ODT y sus puntos pendientes, con palabras; un técnico sin ninguna, no', async () => {
     const { repoObs } = await conObs();
-    assert.deepEqual(nav(await arrancar(AZT, repoObs(AZT))), ['Bandeja', 'Habilitarme y Mi firma', 'Por subsanar2']);
+    // 2026-11-24: el contador dice con palabras «1 ODT · 2 puntos» (antes, solo «2»: se leía como 2 ODT).
+    assert.deepEqual(nav(await arrancar(AZT, repoObs(AZT))), ['Bandeja', 'Habilitarme y Mi firma', 'Por subsanar1 ODT · 2 puntos']);
     const b = (await arrancar(AZT, repoObs(AZT))).querySelectorAll('.odt-nav-btn').at(-1);
     assert.equal(b.getAttribute('href'), '#subsanar');
-    assert.equal(b.querySelectorAll('.odt-cuenta')[0].getAttribute('title'), 'Puntos pendientes por subsanar');
+    assert.equal(b.getAttribute('aria-label'), 'Por subsanar: 1 ODT abierta suya con 2 puntos pendientes por subsanar');
+    assert.equal(b.getAttribute('title'), b.getAttribute('aria-label'));
+    assert.equal(b.querySelectorAll('.odt-cuenta-odt')[0].textContent, '1 ODT', 'en un celular angosto queda solo esto');
     assert.deepEqual(nav(await arrancar(TERCERO, repoObs(TERCERO))), ['Bandeja', 'Habilitarme y Mi firma'], 'sin datos ajenos: no la ve');
   });
   test('el admin la ve siempre; su contador son los subsanados por verificar', async () => {
     const { repoObs, id } = await conObs();
     // 2026-11-23: el admin ve además «Indicadores» (después de «Publicar ODT»); «Por subsanar» sigue al final.
-    assert.deepEqual(nav(await arrancar(ADMIN, repoObs(ADMIN))), ['Bandeja', 'Habilitarme y Mi firma', 'Publicar ODT', 'Indicadores', 'Por subsanar0']);
+    // 2026-11-24: con palabras, «1 ODT · 0 por verificar» (las ODT abiertas · los puntos subsanados por verificar).
+    assert.deepEqual(nav(await arrancar(ADMIN, repoObs(ADMIN))), ['Bandeja', 'Habilitarme y Mi firma', 'Publicar ODT', 'Indicadores', 'Por subsanar1 ODT · 0 por verificar']);
     await repoObs(AZT).cambiarPunto(id, '0', 'subsanar', 'Se subió la foto');
-    assert.deepEqual(nav(await arrancar(ADMIN, repoObs(ADMIN))).at(-1), 'Por subsanar1');
-    assert.deepEqual(await contarDeMiLado({ repoObs: repoObs(AZT), sesion: AZT }), { total: 1, deMiLado: 1 });
+    assert.deepEqual(nav(await arrancar(ADMIN, repoObs(ADMIN))).at(-1), 'Por subsanar1 ODT · 1 por verificar');
+    const c = await contarDeMiLado({ repoObs: repoObs(AZT), sesion: AZT });
+    assert.deepEqual({ total: c.total, deMiLado: c.deMiLado }, { total: 1, deMiLado: 1 }, 'lo de antes no cambia');
+    assert.deepEqual([c.contador.odts, c.contador.puntos, c.contador.texto], [1, 1, '1 ODT · 1 punto']);
   });
 });
 
@@ -142,7 +148,7 @@ describe('lista', () => {
     assert.ok(!boton(c, 'Registrar ODT por subsanar'), 'el AZT no registra');
     await boton(c, 'ODT N.º').disparar('click');
     assert.deepEqual(idas, [['subsanar=' + id, '']]);
-    assert.deepEqual(cuentas, [{ total: 1, deMiLado: 2 }]);
+    assert.deepEqual(cuentas.map((x) => [x.total, x.deMiLado, x.contador.texto]), [[1, 2, '1 ODT · 2 puntos']]);
     sinRestos(c);
   });
   test('un técnico sin ODT ve el estado vacío; el admin ve «Registrar ODT por subsanar» y la insignia «Lista para publicar»', async () => {

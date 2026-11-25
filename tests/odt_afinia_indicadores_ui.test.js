@@ -130,7 +130,8 @@ describe('anclas y pestaña', () => {
     sinRestos(raiz);
     const r2 = await arrancar(TECNICO, '#indicadores', { repoCortes: repoDe(fs, TECNICO) });
     assert.ok(!r2.querySelectorAll('.odt-nav-btn').some((x) => x.textContent === 'Indicadores'));
-    assert.ok(r2.textContent.includes('Los indicadores son solo para administradores.'));
+    // 2026-11-24: también los ven los LECTORES de la lista (tests/odt_afinia_indicadores_lectores.test.js); el técnico no está.
+    assert.ok(r2.textContent.includes('Los indicadores son solo para los administradores y las personas que ellos autoricen.'));
     assert.match(MSG_INDICADORES_NO_CARGO, /Recargue la página/);
   });
 });

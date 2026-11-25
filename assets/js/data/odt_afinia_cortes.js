@@ -15,6 +15,16 @@
 //   · estadoSgm  el estado en SGM de unos N.º, de SOLO LECTURA: where('nro','in', ≤ 10) + limit(50) sobre las ODT
 //                de la firma (odt_afinia) y las de «Por subsanar» (odt_afinia_obs); las reglas de esas dos ya
 //                dejan listar a un administrador con perfil (limit ≤ 50), y el N.º tiene su índice de un campo.
+//                Un LECTOR (no admin) solo puede leer ahí lo que le asignaron (lectores array-contains uid; esas
+//                reglas no cambian): se leen sus ODT con las MISMAS consultas de la bandeja y de «Por subsanar»
+//                (con sus índices) y se cruzan por N.º; lo demás no se puede afirmar y vuelve con `parcial`
+//                (la vista dice «Sin consultar»). Lo que trajeron esas dos consultas se REUTILIZA un minuto
+//                (SGM_LECTOR_VIGENCIA_MS) en las siguientes listas del lector: no se vuelven a leer (hasta 100
+//                documentos) cada vez que abre otro número; si fallan, no se guarda nada y la próxima vuelve a leer.
+// LECTORES (pedido del Ingeniero del 2026-11-24, «Todo, solo lectura»): además de un administrador con perfil, leen
+// (listar, leer, anterior, ultimoDe, estadoSgm) las personas de la lista odt_afinia_config/indicadores; la página
+// lo sabe por data/odt_afinia_ind_lectores.js y lo pasa en `opciones.esLector`. Guardar y porHuella (solo de la carga)
+// siguen siendo solo de un administrador. La regla decide de verdad (odtIndLector).
 // Un corte NUNCA cambia: no hay actualizar ni borrar (la regla los niega siempre).
 // Un lote que no responde a tiempo NO se da por perdido: si el servidor aún no muestra el corte, se lanza
 // ErrorOdt('pendiente') («NO repita», MENSAJES.pendiente) con `final`, el desenlace del lote; la pantalla lo
@@ -35,9 +45,13 @@ const CDN_FIRESTORE = 'https://www.gstatic.com/firebasejs/10.14.1/firebase-fires
 export const TIEMPO_LOTE_CORTE_MS = 60000;
 export const MSG_CORTE_NO_EXISTE = 'Ese corte no existe en la plataforma.';
 export const MSG_SOLO_ADMIN = 'Los indicadores son solo para administradores.';
+/** Para quien no es admin ni está en la lista de lectores. */
+export const MSG_SIN_ACCESO_CORTES = 'Los indicadores son solo para los administradores y las personas que ellos autoricen.';
 /** N.º por consulta del estado en SGM (where in) y el tope de cada consulta (la regla de esas colecciones pide ≤ 50). */
 export const SGM_POR_CONSULTA = 10;
 const SGM_LIMITE = 50;
+/** Cuánto se reutiliza lo que el LECTOR tiene asignado (las dos consultas de su «Estado en SGM»). */
+const SGM_LECTOR_VIGENCIA_MS = 60000;
 
 /** Timestamp de Firestore (o número) → milisegundos, o null. */
 const aMs = (t) => {
@@ -70,12 +84,18 @@ const corteDesdeDoc = (id, d) => ({ ...(d || {}), id, creadoEnMs: aMs(d && d.cre
  * @param {object} [opciones.db]    instancia de Firestore (por defecto, getDbSafe())
  * @param {() => object|null} [opciones.sesion]  por defecto la del guard (sesionGlobal)
  * @param {number} [opciones.tiempoLoteMs]
+ * @param {boolean|(() => boolean)} [opciones.esLector]  ¿la sesión (no admin) está en la lista de lectores? (solo leer)
+ * @param {() => number} [opciones.ahora]  reloj en ms (pruebas); por defecto Date.now
  */
 export function crearRepositorioCortes(opciones = {}) {
   let _sdk = opciones.sdk || null;
   let _db = opciones.db || null;
   const leerSesion = typeof opciones.sesion === 'function' ? opciones.sesion : sesionGlobal;
   const tiempoLote = Number(opciones.tiempoLoteMs) > 0 ? Number(opciones.tiempoLoteMs) : TIEMPO_LOTE_CORTE_MS;
+  const esLector = typeof opciones.esLector === 'function' ? () => opciones.esLector() === true : () => opciones.esLector === true;
+  const ahora = typeof opciones.ahora === 'function' ? opciones.ahora : () => Date.now();
+  /** El LECTOR: lo que tiene asignado en la firma y en «Por subsanar» ({uid, t, promesa}), reutilizado un minuto. */
+  let asignados = null;
 
   async function sdk() {
     if (!_sdk) _sdk = await import(CDN_FIRESTORE);
@@ -100,6 +120,14 @@ export function crearRepositorioCortes(opciones = {}) {
     if (s.legacy) throw new ErrorOdt('sin_permiso', 'Su cuenta de administrador no tiene perfil en la plataforma: créelo para usar los indicadores.');
     return s;
   }
+  /** Para LEER: un administrador con perfil o un lector de la lista (la regla lo vuelve a exigir: odtIndLector). */
+  function exigirLectura() {
+    const s = leerSesion();
+    if (!s || !s.uid) throw new ErrorOdt('cuenta', 'La sesión venció. Recargue la página e ingrese de nuevo.');
+    if (s.esAdmin) return exigirAdmin();
+    if (!esLector()) throw new ErrorOdt('sin_permiso', MSG_SIN_ACCESO_CORTES);
+    return s;
+  }
   async function op(fn) {
     try { return await fn(); } catch (e) { throw errorDesdeFirebase(e); }
   }
@@ -112,7 +140,7 @@ export function crearRepositorioCortes(opciones = {}) {
      * corte de una página anterior), los siguientes 50 guardados antes que él.
      */
     async listar({ antesDe } = {}) {
-      exigirAdmin();
+      exigirLectura();
       return op(async () => {
         const F = await sdk(); const d = await db();
         const filtros = antesDe && antesDe.creadoEn ? [F.where('creadoEn', '<', antesDe.creadoEn)] : [];
@@ -130,7 +158,7 @@ export function crearRepositorioCortes(opciones = {}) {
      * de datos de los que se miraron (muy raro: el mismo archivo guardado decenas de veces).
      */
     async anterior(corte) {
-      exigirAdmin();
+      exigirLectura();
       const fd = fechaDatosDeCorte(corte);
       if (!corte || !corte.responsable || !fd) return { anterior: null, tope: false };
       return op(async () => {
@@ -148,7 +176,7 @@ export function crearRepositorioCortes(opciones = {}) {
 
     /** El corte de datos más recientes del responsable (escrito como lo guarda el corte), o null. */
     async ultimoDe(responsable) {
-      exigirAdmin();
+      exigirLectura();
       const r0 = limpiar(responsable);
       if (!r0) return null;
       return op(async () => {
@@ -173,12 +201,36 @@ export function crearRepositorioCortes(opciones = {}) {
 
     /**
      * El estado en SGM de unos N.º (SOLO LECTURA): {mapa: Map(nro → {clave, etiqueta}), consultados: [nro]}. Un N.º
-     * consultado que no está en el mapa NO está en SGM (ni publicado en la firma ni por subsanar).
+     * consultado que no está en el mapa NO está en SGM (ni publicado en la firma ni por subsanar). Para un LECTOR (no
+     * admin) vuelve además `parcial: true`: solo se miraron las ODT que le asignaron (sus reglas no le dejan ver otras),
+     * así que uno que no está en el mapa NO se puede afirmar.
      */
     async estadoSgm(nros) {
-      exigirAdmin();
+      const s = exigirLectura();
       const lista = [...new Set((nros || []).map((x) => limpiar(x)).filter((x) => x && x.length <= TOPES_CORTE.nroMax))];
       if (!lista.length) return { mapa: new Map(), consultados: [] };
+      if (!s.esAdmin) {
+        return op(async () => {
+          // Las mismas consultas de la bandeja (odt_afinia) y de «Por subsanar» (odt_afinia_obs), con sus índices; lo que
+          // traen se reutiliza un minuto (otra lista del lector no las repite). Si fallan, no queda guardado.
+          if (!asignados || asignados.uid !== s.uid || !(ahora() - asignados.t < SGM_LECTOR_VIGENCIA_MS)) {
+            const promesa = (async () => {
+              const F = await sdk(); const d = await db();
+              const [ro, rb] = await Promise.all([[COL.odt, 'publicadoEn'], [COL_OBS.obs, 'creadoEn']].map(([col, orden]) => getsServidor(F,
+                F.query(F.collection(d, col), F.where('lectores', 'array-contains', s.uid), F.orderBy(orden, 'desc'), F.limit(SGM_LIMITE)))));
+              return { odts: ro.docs.map((x) => x.data()), obs: rb.docs.map((x) => x.data()) };
+            })();
+            const vez = { uid: s.uid, t: ahora(), promesa };
+            asignados = vez;
+            promesa.catch(() => { if (asignados === vez) asignados = null; });
+          }
+          const vigente = asignados.promesa;
+          const { odts, obs } = await vigente;
+          const pedidos = new Set(lista);
+          const suyos = (xs) => xs.filter((x) => x && pedidos.has(limpiar(x.nro)));
+          return { mapa: mapaEstadoSgm({ odts: suyos(odts), obs: suyos(obs) }), consultados: lista, parcial: true };
+        });
+      }
       return op(async () => {
         const F = await sdk(); const d = await db();
         const consultar = async (col, trozo) => {
@@ -197,7 +249,7 @@ export function crearRepositorioCortes(opciones = {}) {
 
     /** Un corte con sus ODT, del servidor: {corte, odts, completo, faltan}. */
     async leer(id) {
-      exigirAdmin();
+      exigirLectura();
       if (!esIdOdt(id)) throw new ErrorOdt('no_existe', MSG_CORTE_NO_EXISTE);
       return op(async () => {
         const F = await sdk(); const d = await db();

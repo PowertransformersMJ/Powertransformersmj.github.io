@@ -11,7 +11,11 @@
 //     lecturas de documentos (≤ 10 por operación, ≤ 20 por lote) y las mismas constantes que el dominio;
 //   · repo público: sin correos, sin apellidos del equipo, y en las pruebas solo N.º de ODT inventados (empiezan por 9);
 //   · el PERIODO (2026-11-24) vive en dos archivos NUEVOS (su dominio puro y su bloque de pantalla): al dominio de antes
-//     solo le pide nombres que ya existían, y el dominio de antes no cambia.
+//     solo le pide nombres que ya existían, y el dominio de antes no cambia;
+//   · LECTORES (2026-11-24, «Todo, solo lectura»): su dominio, sus datos y su sección en tres archivos NUEVOS; la regla
+//     de lectura de cortes y partes es odtIndLector (admin con perfil, o un uid de odt_afinia_config/indicadores con
+//     perfil y del equipo); ese documento lo escriben solo los admin y nadie lo borra; al repositorio de la firma solo
+//     se le pide `candidatos` (que ya existía), preguntando antes, y solo desde la sección del admin.
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
@@ -33,11 +37,16 @@ const NUEVOS = [
   'assets/js/ui/odt-afinia/indicadores-graficos.js',
   // El periodo (2026-11-24): sus exportaciones son nuevas, así que van en archivos nuevos (L-102 (3)).
   'assets/js/domain/odt_afinia_indicadores_periodo.js',
-  'assets/js/ui/odt-afinia/indicadores-periodo.js'
+  'assets/js/ui/odt-afinia/indicadores-periodo.js',
+  // Los lectores (2026-11-24): sus exportaciones son nuevas, así que van en archivos nuevos (L-102 (3)).
+  'assets/js/domain/odt_afinia_ind_lectores.js',
+  'assets/js/data/odt_afinia_ind_lectores.js',
+  'assets/js/ui/odt-afinia/indicadores-lectores.js'
 ];
 const PRUEBAS = ['tests/odt_afinia_indicadores.test.js', 'tests/odt_afinia_indicadores_datos.test.js', 'tests/odt_afinia_indicadores_ui.test.js',
   'tests/odt_afinia_indicadores_fixture.js', 'tests/odt_afinia_indicadores_estatico.test.js', 'tests-rules/odt_afinia_cortes.rules.test.js',
-  'tests/odt_afinia_indicadores_azt_jefe.test.js', 'tests/odt_afinia_indicadores_periodo.test.js'];
+  'tests/odt_afinia_indicadores_azt_jefe.test.js', 'tests/odt_afinia_indicadores_periodo.test.js',
+  'tests/odt_afinia_indicadores_lectores.test.js', 'tests-rules/odt_afinia_cortes_lectores.rules.test.js'];
 const CSS_NUEVO = 'assets/css/odt-afinia-indicadores.css';
 const FUENTE = Object.fromEntries(NUEVOS.map((p) => [p, leer(p)]));
 /** Lo que los archivos nuevos pueden pedir a cada vecino de ANTES (nombres que ya exportaban antes de esta entrega). */
@@ -94,23 +103,37 @@ describe('L-102: lo nuevo en archivos NUEVOS; a los vecinos de antes, solo lo qu
       for (const n of nombres) assert.ok(n in m, mod + ' · ' + n);
     }
   });
-  test('app.js carga «Indicadores» con import() (nunca estático), pregunta si trae lo que usa y la da solo al admin', () => {
+  test('app.js carga «Indicadores» con import() (nunca estático), pregunta si trae lo que usa y la da al admin y al LECTOR', () => {
     const app = codigo(leer('assets/js/ui/odt-afinia/app.js'));
-    assert.ok(!/^import[^;]*(indicadores|odt_afinia_cortes)/m.test(app), 'sin import estático de lo nuevo');
+    assert.ok(!/^import[^;]*(indicadores|odt_afinia_cortes|odt_afinia_ind_lectores)/m.test(app), 'sin import estático de lo nuevo');
     assert.match(app, /import\('\.\/indicadores\.js'\)/);
     assert.match(app, /typeof m\.montarIndicadores === 'function' && typeof m\.crearRepositorioCortes === 'function'/);
     assert.match(app, /MSG_INDICADORES_NO_CARGO/);
     assert.match(app, /\.\.\.\(sesion\.esAdmin \? \[\{ clave: 'publicar', titulo: 'Publicar ODT' \}, \{ clave: 'indicadores', titulo: 'Indicadores' \}\] : \[\]\)/);
-    assert.match(app, /if \(a\.vista === 'indicadores'\) \{\s*if \(!sesion\.esAdmin\)/);
+    // El lector: se pregunta (import() del archivo nuevo, solo si no es admin) y, si no está en la lista, el ancla avisa.
+    assert.match(app, /import\('\.\/indicadores-lectores\.js'\)/);
+    assert.match(app, /typeof m\.soyLectorIndicadores === 'function'/);
+    assert.match(app, /const lectorInd = sesion\.esAdmin \? Promise\.resolve\(false\)/);
+    assert.match(app, /if \(a\.vista === 'indicadores'\) \{\s*const lector = !sesion\.esAdmin && await lectorInd;\s*if \(!sesion\.esAdmin && !lector\)/);
+    assert.match(app, /m\.crearRepositorioCortes\(lector \? \{ esLector: true \} : \{\}\)/);
     assert.match(app, /return \{ ir \};/);
   });
-  test('a la firma y a «Por subsanar» (que pudieron quedar viejos) no se les pide nada: el estado en SGM va por el repositorio de cortes', () => {
+  test('a la firma y a «Por subsanar» (que pudieron quedar viejos) solo se les pide `candidatos` (para la sección del admin): el estado en SGM va por el repositorio de cortes', () => {
     const i = codigo(FUENTE['assets/js/ui/odt-afinia/indicadores.js']);
-    assert.ok(!/repoOdt|repoObs|cargarObs|listarBandeja/.test(i), 'la pestaña no usa los repositorios de la firma ni de «Por subsanar»');
+    assert.ok(!/repoObs|cargarObs|listarBandeja/.test(i), 'la pestaña no usa el repositorio de «Por subsanar»');
+    // indicadores.js solo pasa repoOdt a la sección del admin; no le pide nada.
+    assert.deepEqual([...i.matchAll(/repoOdt\.(\w+)/g)].map((m) => m[1]), [], 'indicadores.js no le pide nada a repoOdt');
+    assert.match(i, /montarSeccionLectores\(contenedor, \{ repoLectores, repoOdt, sesion \}\)/);
     assert.match(i, /typeof repoCortes\.estadoSgm === 'function' \? \(nros\) => repoCortes\.estadoSgm\(nros\)/);
+    // La sección del admin: solo `candidatos`, preguntando antes si está (L-102: el repositorio pudo quedar viejo).
+    const l = codigo(FUENTE['assets/js/ui/odt-afinia/indicadores-lectores.js']);
+    assert.match(l, /typeof repoOdt\.candidatos !== 'function'/);
+    assert.deepEqual([...new Set([...l.matchAll(/repoOdt\.(\w+)/g)].map((m) => m[1]))], ['candidatos']);
+    for (const p of NUEVOS.filter((x) => !x.endsWith('indicadores-lectores.js') && !x.endsWith('/indicadores.js'))) assert.ok(!/repoOdt/.test(codigo(FUENTE[p])), p + ' usa repoOdt');
     const app = codigo(leer('assets/js/ui/odt-afinia/app.js'));
     const llamada = /m\.montarIndicadores\(zona, \{([^}]*)/.exec(app);
-    assert.ok(llamada && !/repoOdt|cargarObs/.test(llamada[1]), 'app.js no le pasa los repositorios de la firma');
+    assert.ok(llamada && !/repoObs|cargarObs/.test(llamada[1]), 'app.js no le pasa el repositorio de «Por subsanar»');
+    assert.match(llamada[1], /repoOdt: sesion\.esAdmin \? repo : null/, 'el repositorio de la firma, solo al admin');
     for (const p of NUEVOS) assert.ok(!/repo(Odt|Obs)\.(publicar|firmar|anular|reemplazar|registrar|cambiarPunto|agregarPunto|resolver|habilitarme)\b/.test(codigo(FUENTE[p])), p + ' escribe en la firma o en «Por subsanar»');
     // Mutación (L-144): una llamada que escribe SÍ se ve.
     assert.ok(/repo(Odt|Obs)\.(publicar|firmar|anular|reemplazar|registrar|cambiarPunto|agregarPunto|resolver|habilitarme)\b/.test('repoObs.cambiarPunto(id)'));
@@ -123,7 +146,8 @@ describe('L-102: lo nuevo en archivos NUEVOS; a los vecinos de antes, solo lo qu
 });
 
 describe('dominio y armado del lote: puros', () => {
-  for (const p of ['assets/js/domain/odt_afinia_indicadores.js', 'assets/js/data/odt_afinia_cortes_lotes.js', 'assets/js/domain/odt_afinia_indicadores_periodo.js']) {
+  for (const p of ['assets/js/domain/odt_afinia_indicadores.js', 'assets/js/data/odt_afinia_cortes_lotes.js', 'assets/js/domain/odt_afinia_indicadores_periodo.js',
+    'assets/js/domain/odt_afinia_ind_lectores.js']) {
     test(p + ': sin Firebase, sin DOM, sin red', () => {
       const c = codigo(FUENTE[p]);
       assert.ok(!/firebasejs|gstatic|firebase-init|session-guard/.test(c), 'Firebase');
@@ -247,22 +271,52 @@ describe('reglas: bloque «Indicadores · ODT Afinia» de firestore.rules', () =
     assert.ok(!REGLAS.slice(firma, resto).includes('odt_afinia_cortes'), 'nada de los cortes en los otros dos bloques');
     assert.equal((REGLAS.match(/match \/odt_afinia_cortes\/\{id\}/g) || []).length, 1);
   });
-  test('crear: solo un admin con perfil; update y delete prohibidos SIEMPRE; leer: solo admin con perfil', () => {
+  test('crear: solo un admin con perfil; update y delete prohibidos SIEMPRE; leer: admin con perfil o LECTOR de la lista; la lista: la escribe solo un admin y nadie la borra', () => {
     const allows = [...sc.matchAll(/allow\s+([\w, ]+):\s*if\s+([\s\S]*?);/g)].map((m) => [m[1].trim(), m[2].replace(/\s+/g, ' ').trim()]);
     assert.deepEqual(allows, [
-      ['get', 'hasProfile() && isAdmin()'],
-      ['list', 'request.query.limit <= 50 && hasProfile() && isAdmin()'],
+      ['get', 'odtIndLector()'],
+      ['list', 'request.query.limit <= 50 && odtIndLector()'],
       ['create', 'odtIndCorte(id)'],
       ['update, delete', 'false'],
-      ['get', 'hasProfile() && isAdmin()'],
-      ['list', 'request.query.limit <= 60 && hasProfile() && isAdmin()'],
+      ['get', 'odtIndLector()'],
+      ['list', 'request.query.limit <= 60 && odtIndLector()'],
       ['create', 'odtIndParte(id, k)'],
-      ['update, delete', 'false']
+      ['update, delete', 'false'],
+      // odt_afinia_config/indicadores: lo lee quien tenga perfil; crear/cambiar, solo admin; listar y borrar, nunca.
+      ['get', 'hasProfile()'],
+      ['create, update', 'odtIndConfigLectores()'],
+      ['list, delete', 'false']
     ]);
-    for (const f of ['odtIndCorte', 'odtIndParte']) {
+    assert.equal((REGLAS.match(/match \/odt_afinia_config\/indicadores \{/g) || []).length, 1);
+    assert.ok(B.includes('match /odt_afinia_config/indicadores {'), 'la lista de lectores vive en este bloque');
+    for (const f of ['odtIndCorte', 'odtIndParte', 'odtIndConfigLectores']) {
       const cuerpo = new RegExp('function ' + f + '\\([^)]*\\) \\{([\\s\\S]*?)\\n {4}\\}').exec(sc)[1];
       assert.match(cuerpo, /return hasProfile\(\) && isAdmin\(\)/, f);
     }
+    // Leer: un admin con perfil, o (con perfil, activo y del equipo) un uid de la lista.
+    const lector = /function odtIndLector\(\) \{([\s\S]*?)\n {4}\}/.exec(sc)[1].replace(/\s+/g, ' ').trim();
+    assert.equal(lector, 'return hasProfile() && (isAdmin() || (isTeamMember() && request.auth.uid in get(odtIndRutaLectores()).data.lectores));');
+    assert.match(sc, /function odtIndRutaLectores\(\) \{ return \/databases\/\$\(database\)\/documents\/odt_afinia_config\/indicadores; \}/);
+  });
+  test('la lista de lectores: forma exacta (3 campos), ≤ 20 uids sin repetir, quién y cuándo; iguales al dominio', async () => {
+    const { TOPE_LECTORES, CONFIG_INDICADORES, docLectores, esUid } = await import('../assets/js/domain/odt_afinia_ind_lectores.js');
+    const c = /function odtIndConfigLectores\(\) \{([\s\S]*?)\n {4}\}/.exec(sc)[1];
+    const doc = docLectores({ uids: ['uidPrueba1'], por: { uid: 'uidPrueba0', nombre: 'n' }, ts: 'TS' });
+    assert.deepEqual([...hasOnly(c)[0]].sort(), Object.keys(doc).sort());
+    assert.ok(c.includes('d.size() == ' + Object.keys(doc).length));
+    for (const x of ['d.lectores is list && d.lectores.size() <= ' + TOPE_LECTORES, 'd.lectores.toSet().size() == d.lectores.size()',
+      "d.actualizadoPor == {'uid': request.auth.uid, 'nombre': profile().get('nombre', '')}", 'd.actualizadoEn == request.time']) assert.ok(c.includes(x), x);
+    // El patrón de cada uid (en la regla, sobre la lista unida con comas, y contando las comas) es el del dominio.
+    const p = patron(c, "d.lectores.join(',')");
+    assert.ok(c.includes("d.lectores.size() == 0") && c.includes("d.lectores.join(',').split(',') == d.lectores"));
+    // Como la regla: join() escribe cualquier cosa como texto; partir y comparar con la lista niega lo que no lo era.
+    const regla = (xs) => xs.length === 0 || (p.test(xs.join(',')) && JSON.stringify(xs.join(',').split(',')) === JSON.stringify(xs));
+    for (const [xs, ok] of [[[], true], [['a'], true], [['uidA', 'uid_B-2'], true], [['x'.repeat(128)], true], [['x'.repeat(129)], false],
+      [[''], false], [['a', ''], false], [['a b'], false], [['a/b'], false], [['ñ'], false], [['a,b'], false], [['a', 7], false], [[null], false]]) {
+      assert.equal(regla(xs), ok, JSON.stringify(xs));
+      assert.equal(xs.every(esUid), ok, 'dominio ' + JSON.stringify(xs));
+    }
+    assert.deepEqual(CONFIG_INDICADORES, { col: 'odt_afinia_config', doc: 'indicadores' });
   });
   /** El cuerpo de una función del bloque (sin comentarios). */
   const cuerpo = (f) => {
@@ -373,7 +427,9 @@ describe('reglas: bloque «Indicadores · ODT Afinia» de firestore.rules', () =
       llamadas.push(m[1] + '(' + sc.slice(m.index + m[0].length, i - 1).replace(/\s+/g, '') + ')');
     }
     assert.deepEqual([...new Set(llamadas)].sort(), ['exists(odtIndRuta(id))', 'existsAfter(odtIndRutaParte(id,string(d.nPartes-1)))',
-      'existsAfter(odtIndRutaParte(id,string(int(k)-1)))', 'getAfter(odtIndRuta(id))'].sort());
+      'existsAfter(odtIndRutaParte(id,string(int(k)-1)))', 'getAfter(odtIndRuta(id))', 'get(odtIndRutaLectores())'].sort());
+    // Leer como lector: el perfil (exists + get de usuarios: un documento) y la lista de lectores: 2 de 10.
+    assert.equal(llamadas.filter((x) => x === 'get(odtIndRutaLectores())').length, 1, 'la lista se lee en un solo sitio (odtIndLector)');
     // Con las del perfil (hasProfile: exists usuarios; isAdmin/profile: get usuarios; arranque: exists admins), el peor caso
     // por texto: guardar el corte 3 + 1, cada parte 3 + 3 (tope: 10 por operación). En el lote, los existsAfter/getAfter a
     // documentos del MISMO lote no cuentan para el tope de 20 (medido en el emulador: una cadena de 61 entra); fuera del
@@ -386,7 +442,7 @@ describe('reglas: bloque «Indicadores · ODT Afinia» de firestore.rules', () =
     for (const f of ['odtIndRutaParte', 'odtIndRuta']) assert.match(sc, new RegExp('function ' + f + '\\([^)]*\\) \\{ return /databases/\\$\\(database\\)/documents/odt_afinia_cortes/'));
     // Solo funciones globales de sesión/rol y las suyas (prefijo odtInd), ninguna del bloque de la firma.
     const usadas = new Set([...sc.matchAll(/\b(odt[A-Za-z]+|isAdmin|hasProfile|profile|isTeamMember)\(/g)].map((m) => m[1]));
-    for (const u of usadas) assert.ok(/^odtInd/.test(u) || ['isAdmin', 'hasProfile', 'profile'].includes(u), 'usa ' + u);
+    for (const u of usadas) assert.ok(/^odtInd/.test(u) || ['isAdmin', 'hasProfile', 'profile', 'isTeamMember'].includes(u), 'usa ' + u);
   });
   test('presupuesto de 1000 expresiones: el bloque lo explica y la prueba de reglas lo vigila (≥ 30 % libre)', () => {
     for (const x of ['PRESUPUESTO', '1000 expresiones', 'PRIMER', 'planCorte', 'unirPartes']) assert.ok(B.includes(x), x);

@@ -32,6 +32,11 @@
 //     cortes). Con periodo, las ODT sin fecha prevista quedan fuera y el resumen dice cuántas; la evolución mensual
 //     muestra solo sus meses (los vacíos en 0) y pulsar un mes en ella lo pone como periodo. «Quitar filtros» también
 //     lo quita. El bloque no se repinta al cambiar una fecha: el foco se queda en el campo.
+//   · SOLO LECTURA (pedido del 2026-11-24: un lector de la lista odt_afinia_config/indicadores, que no es admin): la
+//     misma vista sin «Cargar un corte nuevo». En la lista de ODT, su «Estado en SGM» sale solo de las ODT que le
+//     asignaron (las reglas de la firma y de «Por subsanar» no le dejan ver otras): las demás dicen «Sin consultar»,
+//     con una nota (NOTA_SGM_PARCIAL). Lo que al admin le pide «cargue un corte nuevo» (un corte de la versión 1 o uno
+//     INCOMPLETO), al lector le dice lo que él sí puede hacer (abrir otro del historial o avisar a un administrador).
 // Todo con textContent (nunca innerHTML). Archivo NUEVO a propósito (L-102): a sus vecinos de antes (comun.js)
 // solo les pide nombres que ya existían.
 // ══════════════════════════════════════════════════════════════════════════════
@@ -47,6 +52,7 @@ import {
   SIN_PERIODO, PERIODO_ANIO, filtrarPeriodo, contarSinPrevista, textoPeriodo, mesesDelPeriodo, periodoDeMes
 } from '../../domain/odt_afinia_indicadores_periodo.js';
 import { crearBloquePeriodo } from './indicadores-periodo.js';
+import { NOTA_SIN_AZT_JEFE_LECTOR, CIERRE_INCOMPLETO_LECTOR } from '../../domain/odt_afinia_ind_lectores.js';
 
 /** Cuántas ODT se pintan de entrada en una lista (el resto con «Mostrar todas»). */
 export const TOPE_LISTA = 200;
@@ -71,6 +77,8 @@ export const textoSinPrevista = (n) => num(n) + (n === 1 ? ' ODT sin fecha previ
 export const textoCerradasFuera = (n) => (n === 1
   ? '1 ODT de este periodo se cerró en un mes fuera de él: cuenta en «Cerradas», pero no tiene columna en este gráfico (solo muestra los meses del periodo).'
   : num(n) + ' ODT de este periodo se cerraron en un mes fuera de él: cuentan en «Cerradas», pero no tienen columna en este gráfico (solo muestra los meses del periodo).');
+/** Bajo la lista de ODT de un lector (no admin): por qué algunas dicen «Sin consultar». */
+export const NOTA_SGM_PARCIAL = '«' + SGM_SIN_CONSULTAR + '»: en SGM usted solo puede ver las ODT que le asignaron (las de su «Bandeja» y su «Por subsanar»); el estado de las demás no se consulta.';
 /** Los filtros, en el orden de la pantalla: [clave, nombre en el resumen]. */
 const FILTROS = Object.freeze([['tipo', 'Tipo'], ['zona', 'Zona'], ['empresa', 'Contratista'], ['azt', 'AZT en sitio'], ['jefe', 'Jefe de trabajo']]);
 const num = (n) => Number(n || 0).toLocaleString('es-CO');
@@ -106,16 +114,17 @@ const deDonde = (sel) => [sel.empresa, sel.tipo, sel.zona].filter(Boolean).map((
  * @param {{corte:object, odts:object[], completo?:boolean, descartadas?:number, historial?:object[],
  *          historialTope?:boolean, masHistorial?:(antesDe:object)=>Promise<{cortes:object[], tope:boolean}>,
  *          repoCortes?:object, cargarSgm?:(nros:string[])=>Promise<{mapa:Map, consultados?:string[], tope?:boolean}>,
- *          alIr:(ancla:string, mensaje?:string)=>void, mensaje?:string, nota?:string}} p
+ *          alIr:(ancla:string, mensaje?:string)=>void, mensaje?:string, nota?:string, soloLectura?:boolean}} p
+ *   soloLectura: un lector que no es admin (sin «Cargar un corte nuevo»)
  */
 export function montarVistaCorte(contenedor, {
   corte, odts = [], completo = true, descartadas = 0, historial = [], historialTope = false, masHistorial,
-  repoCortes, cargarSgm, alIr, mensaje, nota
+  repoCortes, cargarSgm, alIr, mensaje, nota, soloLectura = false
 }) {
   vaciar(contenedor);
   const estado = {
     filtros: { tipo: '', zona: '', empresa: '', azt: '', jefe: '' }, periodo: { ...SIN_PERIODO }, orden: { col: 'total', dir: 'desc' }, sel: null, abridor: null, verTodas: false,
-    sgm: new Map(), sgmPendientes: new Set(), sgmError: '', sgmTope: false,
+    sgm: new Map(), sgmPendientes: new Set(), sgmError: '', sgmTope: false, sgmParcial: false,
     anterior: null, anteriorBuscando: true, anteriorTope: false, odtsAnterior: null, anteriorCargando: false, anteriorError: '',
     historial: [...historial], historialTope: !!historialTope, historialCargando: false, historialError: ''
   };
@@ -125,7 +134,7 @@ export function montarVistaCorte(contenedor, {
   const zonaHistorial = h('section', { class: 'odt-ind-seccion', 'aria-label': 'Historial de cortes' });
   contenedor.append(
     h('div', { class: 'odt-acciones' },
-      h('button', { type: 'button', class: 'odt-btn odt-btn--primario', text: 'Cargar un corte nuevo', onclick: () => alIr('indicadores-cargar') }),
+      soloLectura ? null : h('button', { type: 'button', class: 'odt-btn odt-btn--primario', text: 'Cargar un corte nuevo', onclick: () => alIr('indicadores-cargar') }),
       h('button', { type: 'button', class: 'odt-btn', text: 'Ver el historial de cortes', onclick: () => { llevarA(zonaHistorial); enfocar(zonaHistorial.firstChild); } })),
     h('h2', { class: 'odt-subtitulo odt-ind-titulo', tabindex: '-1', text: 'Indicadores de ODT · ' + (corte.responsable || '—') }),
     h('p', { class: 'odt-mini', text: 'Responsable O.D.T. en Afinia. Datos del ' + textoFechaDatos(corte) + '; corte guardado el ' + fechaHora(corte.creadoEnMs) + (corte.creadoPor && corte.creadoPor.nombre ? ' por ' + corte.creadoPor.nombre : '') + '. Un corte no cambia: es la foto del archivo de Afinia de ese día.' }),
@@ -142,7 +151,7 @@ export function montarVistaCorte(contenedor, {
   }
   if (nota) contenedor.appendChild(aviso(nota, 'aviso'));
   if (!completo) {
-    contenedor.appendChild(aviso('Este corte está INCOMPLETO: le faltan datos guardados en la plataforma' + (descartadas ? ' (o traen otra forma)' : '') + ', así que las listas y los números recalculados pueden no cuadrar con los totales guardados (' + num(corte.totales && corte.totales.total) + ' ODT). Un corte no se puede corregir: cargue uno nuevo con el mismo archivo.', 'error'));
+    contenedor.appendChild(aviso('Este corte está INCOMPLETO: le faltan datos guardados en la plataforma' + (descartadas ? ' (o traen otra forma)' : '') + ', así que las listas y los números recalculados pueden no cuadrar con los totales guardados (' + num(corte.totales && corte.totales.total) + ' ODT). ' + (soloLectura ? CIERRE_INCOMPLETO_LECTOR : 'Un corte no se puede corregir: cargue uno nuevo con el mismo archivo.'), 'error'));
   }
 
   // ── Filtros ──
@@ -179,7 +188,7 @@ export function montarVistaCorte(contenedor, {
     selector('odtIndEmpresa', 'Contratista', opciones.empresas, 'empresa'),
     selector('odtIndAzt', 'AZT en sitio', opciones.azts, 'azt', persona),
     selector('odtIndJefe', 'Jefe de trabajo', opciones.jefes, 'jefe', persona),
-    conAztJefe ? null : h('p', { id: idNota, class: 'odt-mini odt-ind-nota-filtros', text: NOTA_SIN_AZT_JEFE }),
+    conAztJefe ? null : h('p', { id: idNota, class: 'odt-mini odt-ind-nota-filtros', text: soloLectura ? NOTA_SIN_AZT_JEFE_LECTOR : NOTA_SIN_AZT_JEFE }),
     h('div', { class: 'odt-acciones odt-ind-filtros-acciones' }, quitar)));
   contenedor.appendChild(resumenFiltro);
 
@@ -225,9 +234,12 @@ export function montarVistaCorte(contenedor, {
       .then((r) => {
         const mapa = (r && r.mapa) || new Map();
         if (r && r.tope) estado.sgmTope = true;
+        if (r && r.parcial === true) estado.sgmParcial = true;
         const consultados = new Set(r && Array.isArray(r.consultados) ? r.consultados : faltanNros);
-        // null = consultado y no está; 'tope' = solo se miraron las publicaciones más recientes (no se puede afirmar).
-        for (const n of faltanNros) if (consultados.has(n)) estado.sgm.set(n, mapa.get(n) || (r && r.tope ? 'tope' : null));
+        // null = consultado y no está; 'tope' = solo se miraron las publicaciones más recientes (no se puede afirmar);
+        // 'parcial' = un lector solo ve en SGM las ODT que le asignaron (tampoco se puede afirmar).
+        const noSe = r && r.parcial === true ? 'parcial' : (r && r.tope ? 'tope' : null);
+        for (const n of faltanNros) if (consultados.has(n)) estado.sgm.set(n, mapa.get(n) || noSe);
       }, (e) => { estado.sgmError = mensajeDe(e); })
       .finally(() => { for (const n of faltanNros) estado.sgmPendientes.delete(n); if (sigueEn(zonaLista, contenedor)) pintarLista(); });
   }
@@ -330,6 +342,7 @@ export function montarVistaCorte(contenedor, {
     if (estado.sgm.has(o.nro)) {
       const x = estado.sgm.get(o.nro);
       if (x === 'tope') return h('td', { 'data-etq': ETQ_SGM, title: 'Solo se consultaron las publicaciones más recientes de «Firma» y de «Por subsanar».', text: SGM_SIN_CONSULTAR });
+      if (x === 'parcial') return h('td', { 'data-etq': ETQ_SGM, title: 'En SGM usted solo puede ver las ODT que le asignaron.', text: SGM_SIN_CONSULTAR });
       return h('td', { 'data-etq': ETQ_SGM }, x ? h('span', { class: 'odt-chip odt-ind-sgm odt-ind-sgm--' + x.clave, text: x.etiqueta }) : SGM_NO_ESTA);
     }
     if (estado.sgmPendientes.has(o.nro)) return h('td', { 'data-etq': ETQ_SGM, 'aria-label': 'Consultando', text: '…' });
@@ -358,6 +371,7 @@ export function montarVistaCorte(contenedor, {
         h('button', { type: 'button', class: 'odt-btn odt-btn--chico', text: 'Reintentar la consulta en SGM', onclick: () => { estado.sgmError = ''; consultarSgm(visibles, true); pintarLista(); } })));
     }
     if (estado.sgmTope) zonaLista.appendChild(h('p', { class: 'odt-mini', text: '«' + SGM_SIN_CONSULTAR + '»: solo se pudieron consultar las publicaciones más recientes de «Firma» y de «Por subsanar» (hasta 50 de cada una).' }));
+    if (estado.sgmParcial) zonaLista.appendChild(h('p', { class: 'odt-mini odt-ind-sgm-parcial', text: NOTA_SGM_PARCIAL }));
     // El AZT y el jefe de trabajo, solo si el corte los guardó (versión 2): en uno de la versión 1 serían columnas vacías.
     const columnas = ['N.º', ...(conContratista ? ['Contratista'] : []), 'Subestación', 'Tipo de trabajo', ...(conAztJefe ? ['AZT', 'Jefe de trabajo'] : []),
       'Fecha prevista', 'Estado en Afinia', 'Fecha de cierre', 'Estado en SGM'];

@@ -23,7 +23,9 @@ const NUEVOS = [
   'assets/js/data/odt_afinia_obs.js',
   'assets/js/ui/odt-afinia/por-subsanar.js',
   'assets/js/ui/odt-afinia/subsanar-detalle.js',
-  'assets/js/ui/odt-afinia/subsanar-registrar.js'
+  'assets/js/ui/odt-afinia/subsanar-registrar.js',
+  // El contador de la pestaña con palabras (2026-11-24): su exportación es nueva, va en un archivo nuevo (L-102 (3)).
+  'assets/js/domain/odt_afinia_obs_contador.js'
 ];
 const FUENTE = Object.fromEntries(NUEVOS.map((p) => [p, leer(p)]));
 /**
@@ -56,7 +58,7 @@ function pedidosNuevos(ruta, texto) {
 }
 
 describe('L-102: lo nuevo en archivos NUEVOS; a los vecinos de antes, solo lo que ya existía', () => {
-  test('los seis archivos existen y su cabecera dice que son nuevos a propósito', () => {
+  test('los archivos nuevos existen y su cabecera dice que son nuevos a propósito', () => {
     for (const p of NUEVOS) {
       assert.ok(existsSync(resolve(RAIZ, p)), p);
       assert.match(FUENTE[p], /Archivo NUEVO a propósito \(L-102\)/, p);
