@@ -152,7 +152,7 @@ describe('vista de un corte', () => {
     const { c, r } = await montar({ repoCortes: repoDe(fs), sesion: ADMIN });
     await r.vista.anterior;
     const t = c.textContent;
-    for (const x of ['Indicadores de ODT · ' + RESP_A, 'Datos del 10/04/2026 08:00', 'del 05/01/2026 al 06/04/2026', 'Generadas', 'Por ejecutar', 'Ejecutadas sin cerrar', 'Cerradas',
+    for (const x of ['Indicadores de ODT · ' + RESP_A, 'Datos del 10/04/2026 03:00', 'del 05/01/2026 al 06/04/2026', 'Generadas', 'Por ejecutar', 'Ejecutadas sin cerrar', 'Cerradas',
       'No ejecutadas / inactivas', '% de cierre', '50,0 %', '3 de 6', 'Otro estado', 'Por contratista', ALFA, BETA, 'Evolución mensual',
       'Por tipo de trabajo', 'Por zona', 'ZONA NORTE', 'Qué es cada indicador', 'Cerradas ÷ (Generadas − No ejecutadas − Inactivas).',
       'Historial de cortes', 'Este corte', 'Sin filtros: las 8 ODT del corte.', 'Es el primer corte de este responsable']) assert.ok(t.includes(x), x);
@@ -310,7 +310,7 @@ describe('vista de un corte', () => {
     await r.vista.anterior;
     await hasta(() => c.textContent.includes('ODT que cambiaron de estado'));
     const t = c.textContent;
-    assert.ok(t.includes('Corte anterior: datos del 01/04/2026 08:00'));
+    assert.ok(t.includes('Corte anterior: datos del 01/04/2026 03:00'));
     assert.ok(t.includes('INFORME_ODT_20260401080000_antes.csv'));
     assert.ok(t.includes('ODT que cambiaron de estado (1)'));
     assert.ok(t.includes('ODT nuevas en este corte (1)'));
@@ -340,7 +340,7 @@ describe('vista de un corte', () => {
     const { c, r } = await montar({ repoCortes: repoDe(fs), sesion: ADMIN });
     assert.equal(r.corte.id, nuevo.id, '#indicadores abre el de datos más recientes, no el último guardado');
     await r.vista.anterior;
-    assert.ok(c.textContent.includes('Corte anterior: datos del 05/04/2026 08:00'));
+    assert.ok(c.textContent.includes('Corte anterior: datos del 05/04/2026 03:00'));
   });
   test('#indicadores abre el último corte DE LA PERSONA de la sesión, aunque esté fuera de los 50 más recientes', async () => {
     const fs = nuevoFs();
@@ -507,7 +507,7 @@ describe('cargar un corte', () => {
     const { fs, c, idas } = await cargar(ADMIN, archivoBase());
     const t = c.textContent;
     for (const x of ['Vista previa', 'Filas leídas', '11', 'ODT distintas en el archivo', '10', 'Responsables O.D.T.', 'Huella SHA-256 (identifica este archivo exacto)',
-      'Fecha de los datos', '10/04/2026 08:00', 'del 05/01/2026 al 06/04/2026', '% de cierre', '50,0 %', 'Responsables del archivo (2)', RESP_B,
+      'Fecha de los datos', '10/04/2026 03:00', 'del 05/01/2026 al 06/04/2026', '% de cierre', '50,0 %', 'Responsables del archivo (2)', RESP_B,
       'Estados que esta página no conoce']) assert.ok(t.includes(x), x);
     assert.ok(!t.includes('ISO-8859-1'), 'sin la codificación (palabra técnica)');
     assert.equal(porId(c, 'odtIndResponsable').value, RESP_A, 'por defecto, el del perfil (comparado sin tildes)');
@@ -519,7 +519,7 @@ describe('cargar un corte', () => {
     assert.ok(visible(si));
     assert.ok(!visible(guardar));
     assert.equal(activo(), si, 'el foco pasa a «Sí, guardar el corte»');
-    assert.match(c.textContent, /Se guarda el corte de PERSONA FICTICIA UNO: 8 ODT \(3 cerradas\), con datos del 10\/04\/2026 08:00/);
+    assert.match(c.textContent, /Se guarda el corte de PERSONA FICTICIA UNO: 8 ODT \(3 cerradas\), con datos del 10\/04\/2026 03:00/);
     await si.disparar('click');
     assert.equal(idas.length, 1);
     assert.match(idas[0][0], /^indicadores=[A-Za-z0-9]{20}$/);
@@ -646,7 +646,7 @@ describe('cargar un corte', () => {
     await guardarCorte(fs, archivoBase(), { nombre: 'INFORME_ODT_20260420080000_x.csv' });
     const { c } = await cargar(ADMIN, archivoBase(), {}, fs);
     await hasta(() => c.textContent.includes('más viejos que el último corte guardado de este responsable'));
-    assert.ok(c.textContent.includes('Este archivo trae datos del 10/04/2026 08:00, más viejos que el último corte guardado de este responsable (datos del 20/04/2026 08:00)'));
+    assert.ok(c.textContent.includes('Este archivo trae datos del 10/04/2026 03:00, más viejos que el último corte guardado de este responsable (datos del 20/04/2026 03:00)'));
     assert.ok(visible(boton(c, 'Guardar corte')), 'se puede guardar igual (completa el historial)');
     const n = await cargar(ADMIN, archivoBase(), {}, fs, 'INFORME_ODT_20260425080000_prueba.csv');
     await new Promise((r) => setTimeout(r, 30));

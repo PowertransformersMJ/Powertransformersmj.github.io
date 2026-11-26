@@ -400,7 +400,11 @@ describe('% de cierre, meses sin huecos y fecha de los datos', () => {
     assert.deepEqual(D.fechaDatosDe('INFORME_ODT_20260315083000_prueba.csv', { hasta: '2026-03-01' }), { valor: '2026-03-15T08:30:00', origen: 'archivo' });
     assert.deepEqual(D.fechaDatosDe('copia.csv', { desde: '2026-01-02', hasta: '2026-03-01' }), { valor: '2026-03-01T23:59:59', origen: 'rango' });
     assert.deepEqual(D.fechaDatosDe('copia.csv', {}), { valor: '', origen: '' });
-    assert.equal(D.textoFechaDatos({ archivo: { nombre: 'INFORME_ODT_20260315083000_prueba.csv' } }), '15/03/2026 08:30');
+    assert.equal(D.textoFechaDatos({ archivo: { nombre: 'INFORME_ODT_20260315083000_prueba.csv' } }), '15/03/2026 03:30');
+    // La hora del nombre es UTC: se muestra en hora de Colombia (UTC−5), también cuando cambia el día.
+    assert.equal(D.textoFechaDatos({ archivo: { nombre: 'INFORME_ODT_20990301024500_prueba.csv' } }), '28/02/2099 21:45');
+    assert.equal(D.textoHoraColombiaDeSello('2099-12-31T23:59:59'), '31/12/2099 18:59');
+    assert.equal(D.textoHoraColombiaDeSello('no'), '');
     assert.equal(D.textoFechaDatos({ archivo: { nombre: 'copia.csv' }, rango: { hasta: '2026-03-01' } }), '01/03/2026 (fecha prevista más reciente)');
     assert.equal(D.textoFechaDatos({}), '—');
     assert.equal(D.fechaDatosDeCorte({ fechaDatos: '2026-04-01T10:00:00', archivo: { nombre: 'INFORME_ODT_20260315083000_x.csv' } }), '2026-04-01T10:00:00', 'la guardada manda');
