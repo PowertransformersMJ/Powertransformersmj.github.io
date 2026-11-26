@@ -447,7 +447,7 @@ describe('pantalla: comparación con un corte anterior de la versión 1', () => 
     // Con el AZT: no se compara (el anterior no lo guardó); ni tablas ni listas con números.
     await elegir(c, 'odtIndAzt', AZT_1);
     assert.ok(zona().textContent.includes(NOTA_COMPARAR_SIN_AZT_JEFE), zona().textContent);
-    assert.ok(zona().textContent.includes('Corte anterior: datos del 01/04/2026 08:00'), 'dice cuál es el anterior');
+    assert.ok(zona().textContent.includes('Corte anterior: datos del 01/04/2026 03:00'), 'dice cuál es el anterior');
     assert.equal(tablaPorCaption(zona(), 'Por estado'), undefined);
     assert.ok(!zona().textContent.includes('ODT que cambiaron de estado'));
     await elegir(c, 'odtIndAzt', '');

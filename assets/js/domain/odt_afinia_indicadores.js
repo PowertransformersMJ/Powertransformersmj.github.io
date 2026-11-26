@@ -239,12 +239,23 @@ export function fechaDatosDeCorte(c) {
   if (c && esFechaDatos(c.fechaDatos)) return c.fechaDatos;
   return fechaDatosDe(c && c.archivo && c.archivo.nombre, c && c.rango).valor;
 }
-/** «23/11/2026 21:35» (la hora de descarga del archivo) o «20/11/2026 (fecha prevista más reciente)»; '—' si no hay. */
+/**
+ * La hora del nombre del archivo viene en UTC: Afinia la pone así (comprobado el 2026-11-25: un archivo descargado en
+ * Colombia el 25/11 a las 20:53 se llama INFORME_ODT_20261126015247…). Se GUARDA tal cual (ordena los cortes igual) y se
+ * MUESTRA en hora de Colombia (UTC−5, sin horario de verano): 'aaaa-mm-ddThh:mm:ss' UTC → «dd/mm/aaaa hh:mm».
+ */
+export function textoHoraColombiaDeSello(v) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(texto(v));
+  if (!m) return '';
+  const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]) - 5 * 3600000);
+  const dos = (n) => String(n).padStart(2, '0');
+  return dos(d.getUTCDate()) + '/' + dos(d.getUTCMonth() + 1) + '/' + d.getUTCFullYear() + ' ' + dos(d.getUTCHours()) + ':' + dos(d.getUTCMinutes());
+}
+/** «23/11/2026 16:35» (la hora de descarga del archivo, en hora de Colombia) o «20/11/2026 (fecha prevista más reciente)»; '—' si no hay. */
 export function textoFechaDatos(c) {
   const v = fechaDatosDeCorte(c);
   if (!v) return '—';
-  const dma = fechaDMA(v.slice(0, 10));
-  return selloDeArchivo(c && c.archivo && c.archivo.nombre) === v ? dma + ' ' + v.slice(11, 16) : dma + ' (fecha prevista más reciente)';
+  return selloDeArchivo(c && c.archivo && c.archivo.nombre) === v ? textoHoraColombiaDeSello(v) : fechaDMA(v.slice(0, 10)) + ' (fecha prevista más reciente)';
 }
 
 // ── Decodificación ─────────────────────────────────────────────────────────────
