@@ -13,6 +13,11 @@
 //   · VERSIÓN 2 (2026-11-24, filtros por AZT y por jefe de trabajo): los cortes nuevos se crean con version == 2 y la
 //     PRIMERA ODT de cada parte con sus 11 campos (azt y jefe, textos de 0 a 200); un corte nuevo de la versión 1 se
 //     niega, y los de la versión 1 ya guardados se siguen leyendo (y nunca cambian).
+//   · VERSIÓN 3 (2026-11-26, 99 §236, cumplimiento del cierre): los cortes nuevos se crean con version == 3 y la PRIMERA
+//     ODT de cada parte con sus 13 campos (más `ejecucion`, 'aaaa-mm-dd' o vacía, y `equipo`, texto de 0 a 200); uno
+//     nuevo de la versión 2 se niega.
+//     El resto de la versión 3 (claves de más o de menos, la forma de la fecha) se prueba en
+//     tests-rules/odt_afinia_cumplimiento.rules.test.js.
 // Cada caso en las DOS direcciones (L-73/L-78): lo que se niega tiene su control que pasa. Incluye SABOTAJES: lo que
 // alguien con la sesión admin intentaría escribir a mano y la regla debe rechazar.
 // Prefijo `ic_` (ids `iccorte…`); nunca clearFirestore() (el emulador se comparte con las demás pruebas de reglas).
@@ -57,11 +62,15 @@ const odtDe = (i) => {
     nro: String(90000000 + i), empresa: 'CONTRATISTA FICTICIO ' + (i % 6), tipo: 'TIPO DE TRABAJO FICTICIO ' + (i % 6),
     zona: 'ZONA FICTICIA ' + (i % 4), subestacion: 'S/E PRUEBA ' + (i % 9), prevista: '2026-' + mm(i) + '-15',
     cerrada: estado === 'CERRADA' ? '2026-' + mm(i) + '-20' : '', estado, principal: i % 5 !== 0,
-    azt: 'AZT FICTICIO DE PRUEBA ' + (i % 7), jefe: 'JEFE DE TRABAJO FICTICIO DE PRUEBA ' + (i % 11)
+    azt: 'AZT FICTICIO DE PRUEBA ' + (i % 7), jefe: 'JEFE DE TRABAJO FICTICIO DE PRUEBA ' + (i % 11),
+    // Versión 3 (99 §236): la fecha de ejecución (una de cada 9, vacía) y el equipo (del largo de los reales).
+    ejecucion: i % 9 === 0 ? '' : '2026-' + mm(i) + '-12', equipo: 'EQUIPO FICTICIO DE PRUEBA DE LA BAHÍA ' + (i % 13)
   };
 };
-/** Una ODT como las guardaba la VERSIÓN 1 (9 campos, sin azt ni jefe). */
-const odtV1 = (i) => { const { azt, jefe, ...resto } = odtDe(i); return resto; };
+/** Una ODT como las guardaba la VERSIÓN 1 (9 campos, sin azt, jefe, ejecucion ni equipo). */
+const odtV1 = (i) => { const { azt, jefe, ejecucion, equipo, ...resto } = odtDe(i); return resto; };
+/** Una ODT como las guardaba la VERSIÓN 2 (11 campos, sin la fecha de ejecución ni el equipo). */
+const odtV2 = (i) => { const { ejecucion, equipo, ...resto } = odtDe(i); return resto; };
 const odtsDe = (n) => Array.from({ length: n }, (_, i) => odtDe(i));
 const nombreDe = (u) => (P[u] ? P[u].nombre : '');
 /** El corte como lo arma la página (los agregados salen del dominio: agregar). */
@@ -74,7 +83,7 @@ function corteDe(uid, n, extra = {}) {
     fechaDatos: '2026-01-01T00:00:00',
     filasArchivo: n + 10, odtsArchivo: n + 5, filasResponsable: n + 2, odts: n,
     totales: ag.totales, porEmpresa: ag.porEmpresa, porTipo: ag.porTipo, porZona: ag.porZona, porMes: ag.porMes,
-    nPartes: Math.ceil(n / 400), version: 2,
+    nPartes: Math.ceil(n / 400), version: 3,
     creadoPor: { uid, nombre: nombreDe(uid) }, creadoEn: serverTimestamp(),
     ...extra
   };
@@ -157,8 +166,9 @@ describe('guardar un corte — solo un admin con perfil, en UN lote con todas su
     await assertFails(mal(28, { rango: { desde: '2026-11-20', hasta: '2026-01-02' } }));                  // al revés
     await assertFails(mal(29, { rango: { desde: '02/01/2026', hasta: '2026-11-20' } }));                  // no es aaaa-mm-dd
     await assertFails(mal(30, { version: 1 }));                                                          // la versión vieja
-    await assertFails(mal(34, { version: 3 }));
-    await assertFails(mal(35, { version: '2' }));
+    await assertFails(mal(34, { version: 2 }));                                                          // la de antes del 2026-11-26
+    await assertFails(mal(35, { version: '3' }));
+    await assertFails(mal(310, { version: 4 }));
     await assertFails(mal(31, { creadoPor: { uid: 'ic_admin', nombre: 'Otro Nombre' } }));
     await assertFails(mal(32, { creadoPor: { uid: 'ic_admin2', nombre: nombreDe('ic_admin2') } }));
     // Una hora puesta por el cliente (un minuto atrás: con «ahora» podría caer en el mismo milisegundo que el servidor).
@@ -233,16 +243,22 @@ describe('listas: que sean listas, su tamaño y la forma del PRIMER elemento (el
   });
 });
 
-describe('versión 2 — cada ODT con su AZT en sitio y su jefe de trabajo (2026-11-24)', () => {
+describe('versión 2 (AZT en sitio y jefe de trabajo, 2026-11-24) y versión 3 (fecha de ejecución, 2026-11-26)', () => {
   /** Las partes como las escribía la versión 1 (ODT de 9 campos). */
   const partesV1 = (n) => partesDe(n).map(([k, d]) => [k, { k: d.k, odts: d.odts.map((_, j) => odtV1(Number(k) * 400 + j)) }]);
-  test('entra la versión 2; un corte NUEVO de la versión 1 se niega (con sus ODT de 9 campos, o con las de 11)', async () => {
-    assert.deepEqual(Object.keys(partesDe(5)[0][1].odts[0]).sort(), ['azt', 'cerrada', 'empresa', 'estado', 'jefe', 'nro', 'prevista', 'principal', 'subestacion', 'tipo', 'zona']);
+  /** Las partes como las escribía la versión 2 (ODT de 11 campos, sin la fecha de ejecución ni el equipo). */
+  const partesV2 = (n) => partesDe(n).map(([k, d]) => [k, { k: d.k, odts: d.odts.map((_, j) => odtV2(Number(k) * 400 + j)) }]);
+  test('entra la versión 3; un corte NUEVO de la versión 1 o de la 2 se niega (con sus ODT de 9 u 11 campos, o con las de 13)', async () => {
+    assert.deepEqual(Object.keys(partesDe(5)[0][1].odts[0]).sort(), ['azt', 'cerrada', 'ejecucion', 'empresa', 'equipo', 'estado', 'jefe', 'nro', 'prevista', 'principal', 'subestacion', 'tipo', 'zona']);
     await assertFails(guardar('ic_admin', ID(140), 5, { corte: corteDe('ic_admin', 5, { version: 1 }), partes: partesV1(5) }));   // la forma vieja entera
-    await assertFails(guardar('ic_admin', ID(141), 5, { partes: partesV1(5) }));                                                 // versión 2 con ODT de 9
-    await assertFails(guardar('ic_admin', ID(142), 5, { corte: corteDe('ic_admin', 5, { version: 1 }) }));                       // versión 1 con ODT de 11
+    await assertFails(guardar('ic_admin', ID(141), 5, { partes: partesV1(5) }));                                                 // versión 3 con ODT de 9
+    await assertFails(guardar('ic_admin', ID(142), 5, { corte: corteDe('ic_admin', 5, { version: 1 }) }));                       // versión 1 con ODT de 13
     await assertFails(guardar('ic_admin', ID(144), 803, { partes: partesV1(803) }));                                             // 3 partes viejas
-    // Control: la versión 2 entera pasa (1 y 3 partes).
+    await assertFails(guardar('ic_admin', ID(146), 5, { corte: corteDe('ic_admin', 5, { version: 2 }), partes: partesV2(5) }));   // la versión 2 entera
+    await assertFails(guardar('ic_admin', ID(147), 5, { partes: partesV2(5) }));                                                 // versión 3 con ODT de 11
+    await assertFails(guardar('ic_admin', ID(148), 5, { corte: corteDe('ic_admin', 5, { version: 2 }) }));                       // versión 2 con ODT de 13
+    await assertFails(guardar('ic_admin', ID(149), 803, { partes: partesV2(803) }));                                             // 3 partes de la versión 2
+    // Control: la versión 3 entera pasa (1 y 3 partes).
     await assertSucceeds(guardar('ic_admin', ID(143), 5));
     await assertSucceeds(guardar('ic_admin', ID(145), 803));
     assert.equal((await leer('odt_afinia_cortes/' + ID(145) + '/partes/2')).odts[0].azt, odtDe(800).azt);
@@ -258,9 +274,9 @@ describe('versión 2 — cada ODT con su AZT en sitio y su jefe de trabajo (2026
     await assertFails(mal(163, (o) => ({ ...o, azt: 'A'.repeat(201) })));
     await assertFails(mal(156, (o) => ({ ...o, azt: ['AZT FICTICIO'] })));
     await assertFails(mal(157, (o) => ({ ...o, jefe: { nombre: 'JEFE FICTICIO' } })));
-    await assertFails(mal(158, (o) => { const x = { ...o, aztt: o.azt }; delete x.azt; return x; }));   // 11 campos, otra clave
-    await assertFails(mal(159, (o) => ({ ...o, extra: '' })));                                   // 12 campos
-    // 9 campos CON azt y jefe, pero sin estado ni principal: solo `size() == 11` la niega (claves y textos están bien).
+    await assertFails(mal(158, (o) => { const x = { ...o, aztt: o.azt }; delete x.azt; return x; }));   // 13 campos, otra clave
+    await assertFails(mal(159, (o) => ({ ...o, extra: '' })));                                   // 14 campos
+    // 11 campos CON azt, jefe, ejecucion y equipo, pero sin estado ni principal: solo `size() == 13` la niega (claves y textos están bien).
     await assertFails(mal(162, (o) => { delete o.estado; delete o.principal; return o; }));
     // Control: vacíos y de 200 letras pasan.
     await assertSucceeds(mal(160, (o) => ({ ...o, azt: '', jefe: 'J'.repeat(200) })));

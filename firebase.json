@@ -48,7 +48,8 @@
         ".git",
         "firebase-debug.log",
         "firebase-debug.*.log",
-        "*.local"
+        "*.local",
+        "apps-script"
       ],
       "predeploy": [
         "node functions/prepare-deploy.mjs"

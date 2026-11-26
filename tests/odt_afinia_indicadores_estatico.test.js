@@ -41,12 +41,30 @@ const NUEVOS = [
   // Los lectores (2026-11-24): sus exportaciones son nuevas, así que van en archivos nuevos (L-102 (3)).
   'assets/js/domain/odt_afinia_ind_lectores.js',
   'assets/js/data/odt_afinia_ind_lectores.js',
-  'assets/js/ui/odt-afinia/indicadores-lectores.js'
+  'assets/js/ui/odt-afinia/indicadores-lectores.js',
+  // El cumplimiento del cierre (99 §236, 2026-11-26): su dominio, sus avisos, sus datos y sus dos piezas de pantalla.
+  'assets/js/domain/odt_afinia_cumplimiento.js',
+  'assets/js/domain/odt_afinia_cumplimiento_avisos.js',
+  'assets/js/data/odt_afinia_cumplimiento.js',
+  'assets/js/ui/odt-afinia/indicadores-cumplimiento.js',
+  'assets/js/ui/odt-afinia/indicadores-avisos.js',
+  // El script de Google que envía los avisos (99 §236, 2026-11-26): su dominio, su repositorio y su bloque de pantalla.
+  'assets/js/domain/odt_afinia_cumplimiento_remitente.js',
+  'assets/js/data/odt_afinia_cumplimiento_script.js',
+  'assets/js/ui/odt-afinia/indicadores-avisos-script.js',
+  // Las notificaciones de cumplimiento (99 §236, pedido del 2026-11-26: «cuándo y cuántas veces notificas»).
+  'assets/js/domain/odt_afinia_cumplimiento_resumen.js',
+  'assets/js/data/odt_afinia_cumplimiento_notificaciones.js',
+  'assets/js/ui/odt-afinia/indicadores-notificaciones.js'
 ];
 const PRUEBAS = ['tests/odt_afinia_indicadores.test.js', 'tests/odt_afinia_indicadores_datos.test.js', 'tests/odt_afinia_indicadores_ui.test.js',
   'tests/odt_afinia_indicadores_fixture.js', 'tests/odt_afinia_indicadores_estatico.test.js', 'tests-rules/odt_afinia_cortes.rules.test.js',
   'tests/odt_afinia_indicadores_azt_jefe.test.js', 'tests/odt_afinia_indicadores_periodo.test.js',
-  'tests/odt_afinia_indicadores_lectores.test.js', 'tests-rules/odt_afinia_cortes_lectores.rules.test.js'];
+  'tests/odt_afinia_indicadores_lectores.test.js', 'tests-rules/odt_afinia_cortes_lectores.rules.test.js',
+  'tests/odt_afinia_cumplimiento.test.js', 'tests/odt_afinia_cumplimiento_ui.test.js', 'tests-rules/odt_afinia_cumplimiento.rules.test.js',
+  'functions/tests/cumplimiento_avisos.test.mjs', 'functions/tests/cumplimiento_remitente.test.mjs', 'functions/tests/apps_script.test.mjs',
+  'tests/odt_afinia_cumplimiento_remitente.test.js', 'tests/odt_afinia_cumplimiento_notificaciones.test.js',
+  'functions/tests/cumplimiento_resumen.test.mjs'];
 const CSS_NUEVO = 'assets/css/odt-afinia-indicadores.css';
 const FUENTE = Object.fromEntries(NUEVOS.map((p) => [p, leer(p)]));
 /** Lo que los archivos nuevos pueden pedir a cada vecino de ANTES (nombres que ya exportaban antes de esta entrega). */
@@ -203,7 +221,12 @@ describe('pantalla: pasos escondidos de verdad, sin HTML y sin salidas del docum
   test('sin dependencias nuevas de CDN (ni Chart.js ni otra librería)', () => {
     for (const p of NUEVOS) {
       const urls = [...codigo(FUENTE[p]).matchAll(/https?:\/\/[^'"\s)]+/g)].map((m) => m[0]);
-      for (const u of urls) assert.ok(u === 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js' || u === 'http://www.w3.org/2000/svg', p + ': ' + u);
+      // El SDK de funciones (la misma versión 10.14.1) solo para pedir el reproceso de los avisos (99 §236).
+      const permitidas = ['https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js', 'http://www.w3.org/2000/svg',
+        ...(p === 'assets/js/data/odt_afinia_cumplimiento.js' ? ['https://www.gstatic.com/firebasejs/10.14.1/firebase-functions.js'] : []),
+        // El emisor de los tokens de identidad de Google (un texto que se compara, no algo que se carga; 99 §236).
+        ...(p === 'assets/js/domain/odt_afinia_cumplimiento_remitente.js' ? ['https://accounts.google.com'] : [])];
+      for (const u of urls) assert.ok(permitidas.includes(u), p + ': ' + u);
     }
   });
 });
@@ -362,10 +385,11 @@ describe('reglas: bloque «Indicadores · ODT Afinia» de firestore.rules', () =
     const o = cuerpo('odtIndOdt');
     iguales(hasOnly(o)[0], Object.keys(p.partes[0].odts[0]), 'una ODT');
     assert.ok(o.includes('o.size() == ' + Object.keys(p.partes[0].odts[0]).length));
-    // La ODT de la versión que se crea (la 2: con azt y jefe), la misma del armado del lote.
+    // La ODT de la versión que se crea (la 3 desde el 2026-11-26, 99 §236: con azt, jefe y ejecucion), la misma del
+    // armado del lote.
     const { CAMPOS_ODT_POR_VERSION } = await import('../assets/js/data/odt_afinia_cortes_lotes.js');
     iguales(hasOnly(o)[0], CAMPOS_ODT_POR_VERSION[VERSION_CORTE], 'una ODT de la versión ' + VERSION_CORTE);
-    assert.equal(VERSION_CORTE, 2);
+    assert.equal(VERSION_CORTE, 3);
     iguales(hasOnly(cuerpo('odtIndParte'))[0], Object.keys(p.operaciones[1].datos), 'una parte');
     const t = cuerpo('odtIndTotales');
     assert.ok(t.includes('t.size() == ' + CLAVES.length));

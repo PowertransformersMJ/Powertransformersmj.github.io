@@ -1,0 +1,63 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   SGM · TRANSPOWER — Firma de ODT Afinia · INDICADORES · NOTIFICACIONES DE CUMPLIMIENTO (99 §236)
+   ---------------------------------------------------------------------------
+   Pedido del Ingeniero (2026-11-26): «cuándo y cuántas veces notificas». El bloque «Notificaciones a …» de la vista
+   de un corte (indicadores-notificaciones.js) y la columna «Avisos recibidos» de las ODT abiertas. Se apoya en los
+   tokens (--odt-*) y las clases de `odt-afinia.css`, `odt-afinia-indicadores.css` y `odt-afinia-cumplimiento.css`
+   (.odt-cum-tarjetas, .odt-ind-tabla…): aquí solo lo propio, bajo `.odt-not-`. Sin transition: all, sin
+   backdrop-filter, sin animar el layout. Archivo NUEVO (L-102).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.odt-not { container-type: inline-size; container-name: odt-not; }
+.odt-not-titulo { scroll-margin-top: 80px; }
+.odt-not-titulo:focus-visible { outline: 3px solid var(--odt-marca, #007aff); outline-offset: 2px; }
+.odt-not-sin-filtros { font-style: italic; }
+.odt-not-vacio { margin: 8px 0; }
+
+/* Tarjetas: el color del borde dice qué cuenta (de 10, 15 y 20 días: cada vez más urgente). */
+.odt-not-tarjeta--enviados .odt-cum-tarjeta-caja { border-left-color: #2a78d6; }
+.odt-not-tarjeta--u10 .odt-cum-tarjeta-caja { border-left-color: #eda100; }
+.odt-not-tarjeta--u15 .odt-cum-tarjeta-caja { border-left-color: #eb6834; }
+.odt-not-tarjeta--u20 .odt-cum-tarjeta-caja { border-left-color: #b3140e; }
+.odt-not-tarjeta--odt .odt-cum-tarjeta-caja { border-left-color: #6b4fbb; }
+.odt-not-tarjeta--ultima .odt-cum-tarjeta-caja { border-left-color: var(--odt-marca, #007aff); background: var(--odt-info-fondo, #eaf2ff); }
+.odt-not-tarjeta--ultima .odt-cum-tarjeta-valor { font-size: 18px; }
+.odt-not-tarjeta--cola .odt-cum-tarjeta-caja { border-left-color: #eda100; background: #fff8e6; }
+.odt-not-tarjeta--error .odt-cum-tarjeta-caja { border-left-color: #b3140e; background: var(--odt-mal-fondo, #fdecea); }
+
+/* El estado de cada notificación (y de cada aviso del buscador), con su color. */
+.odt-not-estado--enviado { color: var(--odt-ok, #00733b); font-weight: 600; }
+.odt-not-estado--cola { color: var(--odt-aviso, #7a4200); font-weight: 600; }
+.odt-not-estado--error { color: var(--odt-mal, #b3140e); font-weight: 600; }
+.odt-not-estado--reemplazado { color: var(--odt-tenue, #4d6485); }
+
+/* ODT incluidas: la cantidad, que despliega (details) la lista de N.º. */
+.odt-not-nros-det > summary { cursor: pointer; color: var(--odt-marca-hondo, #0051d5); font-weight: 600; }
+.odt-not-nros-det > summary:focus-visible { outline: 3px solid var(--odt-marca, #007aff); outline-offset: 2px; }
+.odt-not-nros { margin: 6px 0 0; }
+.odt-not-mas { margin: 8px 0 0; }
+
+/* El buscador «Historial de avisos de una ODT». */
+.odt-not-buscador { margin: 14px 0 0; padding: 12px 0 0; border-top: 1px solid var(--odt-linea, rgba(0, 40, 90, .12)); }
+.odt-not-buscar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 12px; margin: 6px 0; }
+.odt-not-buscar .odt-campo-fila { margin: 0; }
+.odt-not-buscar-campo { max-width: 240px; }
+
+/* La columna «Avisos recibidos» de las franjas (en la sección de cumplimiento). */
+.odt-cum-avisos-odt { white-space: normal; }
+
+/* Si la caja del bloque mide menos de 1000 px, la tabla va como FICHAS (como las de cumplimiento): el primer dato
+   arriba y cada dato con su nombre (data-etq), sin salirse de lado. La del buscador (3 columnas) cabe como tabla. */
+@container odt-not (max-width: 999px) {
+  .odt-not .odt-not-tabla, .odt-not .odt-not-tabla thead, .odt-not .odt-not-tabla tbody, .odt-not .odt-not-tabla tr { display: block; width: 100%; }
+  .odt-not .odt-not-tabla thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .odt-not .odt-not-tabla tbody tr { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 2px 12px; padding: 10px 0; border-bottom: 1px solid var(--odt-linea, rgba(0, 40, 90, .12)); }
+  .odt-not .odt-not-tabla tbody th { grid-column: 1 / -1; padding: 0 0 4px; border: 0; }
+  .odt-not .odt-not-tabla td { display: block; padding: 2px 0; border: 0; overflow-wrap: anywhere; }
+  .odt-not .odt-not-tabla td::before { content: attr(data-etq); display: block; font-size: 11px; font-weight: 500; color: var(--odt-tenue, #4d6485); }
+}
+
+@media (max-width: 720px) {
+  .odt-not-buscar { align-items: stretch; }
+  .odt-not-buscar-campo { max-width: none; }
+}

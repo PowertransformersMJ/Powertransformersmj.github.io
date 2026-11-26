@@ -1,0 +1,83 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   SGM · TRANSPOWER — Firma de ODT Afinia · INDICADORES · CUMPLIMIENTO DEL CIERRE (99 §236)
+   ---------------------------------------------------------------------------
+   La sección «Cumplimiento del cierre (20 días desde la ejecución)» de la vista de un corte y el bloque
+   «Avisos de cumplimiento por correo» del administrador. Se apoya en los tokens (--odt-*) y las clases de
+   `odt-afinia.css` y `odt-afinia-indicadores.css` (.odt-ind-tarjetas, .odt-ind-tabla, .odt-detalles…): aquí
+   solo lo propio, bajo `.odt-`. Sin transition: all, sin backdrop-filter, sin animar el layout.
+   Archivo NUEVO (L-102).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.odt-cum-titulo, .odt-cum-correos, .odt-cum-config { scroll-margin-top: 80px; }
+.odt-cum-titulo:focus-visible { outline: 3px solid var(--odt-marca, #007aff); outline-offset: 2px; }
+
+/* Tarjetas (la misma forma que las de los estados, con clases propias): el color del borde dice qué cuenta. */
+.odt-cum-tarjetas { list-style: none; margin: 8px 0 4px; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.odt-cum-tarjeta { margin: 0; }
+.odt-cum-tarjeta-caja {
+  display: flex; flex-direction: column; gap: 2px; width: 100%; height: 100%; padding: 10px 12px; box-sizing: border-box;
+  background: #fff; border: 1px solid var(--odt-linea, rgba(0, 40, 90, .12)); border-left: 4px solid var(--odt-linea-fuerte, rgba(0, 40, 90, .22));
+  border-radius: var(--odt-r, 10px);
+}
+.odt-cum-tarjeta-valor { font-size: 26px; font-weight: 700; line-height: 1.15; color: var(--odt-tinta, #0d1f38); font-variant-numeric: tabular-nums; }
+.odt-cum-tarjeta-titulo { font-size: 13px; font-weight: 600; color: var(--odt-tinta-2, #1f3656); }
+.odt-cum-tarjeta-nota { font-size: 12px; color: var(--odt-tenue, #4d6485); }
+.odt-cum-tarjeta--evaluables .odt-cum-tarjeta-caja { border-left-color: #2a78d6; }
+.odt-cum-tarjeta--cerradasATiempo .odt-cum-tarjeta-caja { border-left-color: #1baf7a; }
+.odt-cum-tarjeta--cerradasFuera .odt-cum-tarjeta-caja { border-left-color: #eb6834; }
+.odt-cum-tarjeta--abiertasVencidas .odt-cum-tarjeta-caja { border-left-color: #b3140e; }
+.odt-cum-tarjeta--pct .odt-cum-tarjeta-caja { border-left-color: var(--odt-marca, #007aff); background: var(--odt-info-fondo, #eaf2ff); }
+.odt-cum-tarjeta--mediana .odt-cum-tarjeta-caja { border-left-color: #6b4fbb; }
+
+/* Un incumplimiento (> 0) en la tabla por contratista. */
+.odt-cum-incumple { color: var(--odt-mal, #b3140e); font-weight: 700; }
+
+/* Franjas de las ODT abiertas: un chip por franja, más cálido cuanto más cerca (o más allá) del día 20. */
+.odt-cum-franjas-lista { list-style: none; margin: 6px 0 10px; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.odt-cum-franja { padding: 6px 10px; border-radius: 8px; border: 1px solid var(--odt-linea, rgba(0, 40, 90, .12)); background: #fff; font-size: 13px; color: var(--odt-tinta-2, #1f3656); }
+.odt-cum-franja-n { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--odt-tinta, #0d1f38); }
+.odt-cum-franja--f15 { border-color: #eda100; background: #fff8e6; }
+.odt-cum-franja--f20 { border-color: #eb6834; background: #fff1ea; }
+.odt-cum-franja--f21 { border-color: #f3b4ae; background: var(--odt-mal-fondo, #fdecea); color: var(--odt-mal, #b3140e); }
+.odt-cum-franja--f21 .odt-cum-franja-n { color: var(--odt-mal, #b3140e); }
+
+/* Historial de correos: el estado con su color. */
+.odt-cum-correo--enviado { color: var(--odt-ok, #00733b); font-weight: 600; }
+.odt-cum-correo--error { color: var(--odt-mal, #b3140e); font-weight: 600; }
+.odt-cum-correo--pendiente { color: var(--odt-aviso, #7a4200); font-weight: 600; }
+.odt-cum-correo--en_envio { color: var(--odt-marca-hondo, #0051d5); font-weight: 600; }   /* 6,7:1 sobre blanco (corrector 99 §236) */
+
+/* El script de Google que envía los correos (99 §236): su estado y el pedido de permiso. */
+.odt-cum-script { margin: 8px 0 12px; padding: 10px 12px; border: 1px solid var(--odt-linea, rgba(0, 40, 90, .12)); border-radius: var(--odt-r, 10px); background: #fff; }
+.odt-cum-script-datos { margin: 6px 0; }
+.odt-cum-script-pedido { margin: 8px 0; padding: 10px 12px; border: 1px solid #eda100; border-radius: 8px; background: #fff8e6; }
+.odt-cum-script-pide { font-weight: 700; color: var(--odt-aviso, #7a4200); margin: 0 0 4px; }
+/* El título del bloque es un párrafo destacado (no un h4: arriba no hay h2 ni h3) y el identificador del script parte
+   la línea en un teléfono (un tramo de ~60 caracteres sin espacios). Corrector 99 §236. */
+.odt-cum-script-titulo { margin: 0 0 6px; font-size: 14.5px; color: var(--odt-tinta, #0d1f38); }
+.odt-cum-script-id { overflow-wrap: anywhere; word-break: break-all; }
+
+/* Las listas de ODT (abiertas por franja y fechas por revisar) y el historial de correos: como la lista principal
+   (odt-afinia-indicadores.css, .odt-ind-lista), si la caja de la sección mide menos de 1000 px van como FICHAS: el
+   primer dato arriba y cada dato con su nombre (data-etq), sin salirse de lado ni esconder columnas a la derecha. */
+.odt-cum { container-type: inline-size; container-name: odt-cum; }
+.odt-cum-nota-aviso { margin: 4px 0 8px; }
+@container odt-cum (max-width: 999px) {
+  .odt-cum .odt-cum-tabla-odt, .odt-cum .odt-cum-tabla-odt thead, .odt-cum .odt-cum-tabla-odt tbody, .odt-cum .odt-cum-tabla-odt tr,
+  .odt-cum .odt-cum-tabla-correos, .odt-cum .odt-cum-tabla-correos thead, .odt-cum .odt-cum-tabla-correos tbody, .odt-cum .odt-cum-tabla-correos tr { display: block; width: 100%; }
+  .odt-cum .odt-cum-tabla-odt thead, .odt-cum .odt-cum-tabla-correos thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .odt-cum .odt-cum-tabla-odt tbody tr, .odt-cum .odt-cum-tabla-correos tbody tr { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 2px 12px; padding: 10px 0; border-bottom: 1px solid var(--odt-linea, rgba(0, 40, 90, .12)); }
+  .odt-cum .odt-cum-tabla-odt tbody th, .odt-cum .odt-cum-tabla-correos tbody th { grid-column: 1 / -1; padding: 0 0 4px; border: 0; }
+  .odt-cum .odt-cum-tabla-odt td, .odt-cum .odt-cum-tabla-correos td { display: block; padding: 2px 0; border: 0; overflow-wrap: anywhere; }
+  .odt-cum .odt-cum-tabla-odt td::before, .odt-cum .odt-cum-tabla-correos td::before { content: attr(data-etq); display: block; font-size: 11px; font-weight: 500; color: var(--odt-tenue, #4d6485); }
+}
+
+/* Configuración de los avisos (solo admin). */
+.odt-cum-activo { display: flex; align-items: center; gap: 8px; }
+.odt-cum-destinatario { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0 12px; }
+.odt-cum-grupo { margin: 10px 0 0; }
+
+@media (max-width: 720px) {
+  .odt-cum-destinatario { grid-template-columns: 1fr; }
+  .odt-cum-franja { flex: 1 1 140px; }
+}

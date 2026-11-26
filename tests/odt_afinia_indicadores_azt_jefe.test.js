@@ -74,7 +74,8 @@ describe('dominio: lectura del AZT en sitio y del jefe de trabajo', () => {
     assert.deepEqual(por['90000001'], [AZT_1, JEFE_1]);
     assert.deepEqual(por['90000003'], [AZT_2, JEFE_2]);
     assert.deepEqual(por['90000005'], [AZT_1, JEFE_3], 'jefe en sitio vacío: el asignado');
-    assert.deepEqual(D.CAMPOS_OPCIONALES, { azt: 'AZT EN SITIO', jefe: 'JEFE DE TRABAJO EN SITIO', jefeRespaldo: 'JEFE DE TRABAJO' });
+    // 99 §236: también la fecha de ejecución (FECHA Y HORA AZT - RECIBE ZT) y el equipo (EQUIPO), opcionales como el AZT y el jefe.
+    assert.deepEqual(D.CAMPOS_OPCIONALES, { azt: 'AZT EN SITIO', jefe: 'JEFE DE TRABAJO EN SITIO', jefeRespaldo: 'JEFE DE TRABAJO', ejecucion: 'FECHA Y HORA AZT - RECIBE ZT', equipo: 'EQUIPO' });
     for (const enc of Object.values(D.CAMPOS_OPCIONALES)) assert.ok(!D.ENCABEZADOS_MINIMOS.includes(enc), 'no es de los mínimos: ' + enc);
     // Sin avisos nuevos en el archivo de prueba (todas traen los dos; ninguno cambia entre filas).
     assert.deepEqual(A.conflictos, []);
@@ -174,10 +175,11 @@ describe('dominio: filtros por AZT y por jefe, combinados, y sus opciones con co
     // Lo de antes no cambia (textos sin conteo).
     assert.deepEqual(o.tipos, ['TIPO DOS', 'TIPO UNO']);
   });
-  test('un corte de la versión 1 (sus ODT no traen azt ni jefe) no los tiene; uno de la 2, sí', () => {
-    assert.equal(D.VERSION_CORTE, 2);
+  test('un corte de la versión 1 (sus ODT no traen azt ni jefe) no los tiene; uno de la 2 (o de la 3), sí', () => {
+    assert.equal(D.VERSION_CORTE, 3, 'desde el 2026-11-26 (99 §236) los cortes nuevos son de la versión 3');
     assert.equal(D.corteTraeAztJefe({ version: 1 }), false);
     assert.equal(D.corteTraeAztJefe({ version: 2 }), true);
+    assert.equal(D.corteTraeAztJefe({ version: 3 }), true);
     assert.equal(D.corteTraeAztJefe({}), false);
     assert.equal(D.corteTraeAztJefe(null), false);
     // Las ODT de la versión 1 (sin los campos) caen en «(sin dato)»: por eso la pantalla deshabilita esos filtros.
@@ -192,14 +194,15 @@ describe('datos: versión 2 del corte (ODT de 11 campos) y lectura de los de la 
   const plan = (a = analisis) => planCorte({ id: ID, archivo: { nombre: 'INFORME_ODT_20260101000000_prueba.csv', bytes: 10, sha256: HEX }, lectura, analisis: a, por: ADMIN, ts: TS });
   const v2 = (nro, extra = {}) => ({ nro, empresa: ALFA, tipo: 'TIPO UNO', zona: 'ZONA NORTE', subestacion: 'S/E PRUEBA UNO', prevista: '2026-03-15', cerrada: '', estado: 'GENERADA', principal: true, azt: AZT_1, jefe: JEFE_1, ...extra });
   const v1 = (nro) => { const { azt, jefe, ...resto } = v2(nro); return resto; };
-  test('planCorte: version 2 y CADA ODT con los 11 campos (azt y jefe, textos de hasta 200)', () => {
+  test('planCorte: CADA ODT con el azt y el jefe (textos de hasta 200); desde el 2026-11-26, la versión 3 (13 campos)', () => {
     const p = plan();
-    assert.equal(p.corte.version, 2);
+    assert.equal(p.corte.version, 3, '99 §236: la versión 3 suma la fecha de ejecución');
     assert.equal(Object.keys(p.corte).length, 17, 'el corte sigue con los mismos 17 campos');
     assert.deepEqual([...CAMPOS_ODT_POR_VERSION[2]], [...CAMPOS_ODT_POR_VERSION[1], 'azt', 'jefe']);
+    assert.deepEqual([...CAMPOS_ODT_POR_VERSION[3]], [...CAMPOS_ODT_POR_VERSION[2], 'ejecucion', 'equipo']);
     for (const o of p.partes[0].odts) {
-      assert.deepEqual(Object.keys(o), [...CAMPOS_ODT_POR_VERSION[2]]);
-      assert.ok(odtValida(o, 2));
+      assert.deepEqual(Object.keys(o), [...CAMPOS_ODT_POR_VERSION[3]]);
+      assert.ok(odtValida(o, 3));
     }
     assert.deepEqual(p.partes[0].odts.filter((o) => o.nro === '90000005').map((o) => [o.azt, o.jefe]), [[AZT_1, JEFE_3]]);
     // Un AZT de más de 200 letras se recorta (como los demás textos), también en la ÚLTIMA ODT.
@@ -236,8 +239,8 @@ describe('datos: versión 2 del corte (ODT de 11 campos) y lectura de los de la 
     const repo = crearRepositorioCortes({ sdk: fs.F, db: fs.db, sesion: () => ADMIN, tiempoLoteMs: 30 });
     const g = await repo.guardar({ archivo: { nombre: 'INFORME_ODT_20260101000000_prueba.csv', bytes: 10, sha256: HEX }, lectura, analisis });
     const datos = fs.lotes[0].ops.map((o) => o.datos);
-    assert.equal(datos[0].version, 2);
-    assert.ok(datos[1].odts.every((o) => Object.keys(o).length === 11));
+    assert.equal(datos[0].version, 3, '99 §236: los cortes nuevos son de la versión 3');
+    assert.ok(datos[1].odts.every((o) => Object.keys(o).length === 13), '99 §236: 13 campos (con la ejecución y el equipo)');
     const l2 = await repo.leer(g.id);
     assert.equal(l2.completo, true); assert.equal(l2.odts[0].azt, AZT_1);
     aVersion1(fs, g.id);
@@ -255,7 +258,7 @@ function aVersion1(fs, id) {
   fs.store.set(ruta, { ...c, version: 1 });
   for (let k = 0; k < c.nPartes; k++) {
     const p = fs.store.get(ruta + '/partes/' + k);
-    fs.store.set(ruta + '/partes/' + k, { ...p, odts: p.odts.map(({ azt, jefe, ...resto }) => resto) });
+    fs.store.set(ruta + '/partes/' + k, { ...p, odts: p.odts.map(({ azt, jefe, ejecucion, equipo, ...resto }) => resto) });   // 99 §236: la versión 1 tampoco trae la ejecución ni el equipo
   }
 }
 
@@ -500,7 +503,7 @@ describe('pantalla: la vista previa de la carga', () => {
     await boton(c, 'Sí, guardar el corte').disparar('click');
     assert.equal(idas.length, 1);
     const [corte, parte] = fs.lotes[0].ops.map((o) => o.datos);
-    assert.equal(corte.version, 2);
+    assert.equal(corte.version, D.VERSION_CORTE, 'la versión vigente (3 desde el 2026-11-26, 99 §236), con el AZT y el jefe');
     assert.deepEqual(parte.odts.map((o) => [o.nro, o.azt, o.jefe]).find((x) => x[0] === '90000005'), ['90000005', AZT_1, JEFE_3]);
     sinRestos(c);
   });

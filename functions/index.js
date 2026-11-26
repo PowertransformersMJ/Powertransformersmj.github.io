@@ -24,11 +24,11 @@
 // ══════════════════════════════════════════════════════════════
 
 import { initializeApp } from 'firebase-admin/app';
-import { getFirestore }   from 'firebase-admin/firestore';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getStorage }     from 'firebase-admin/storage';
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { onSchedule }        from 'firebase-functions/v2/scheduler';
-import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { onCall, onRequest, HttpsError } from 'firebase-functions/v2/https';
 import { defineSecret }       from 'firebase-functions/params';
 import Anthropic from '@anthropic-ai/sdk';
 import { Agent } from 'undici';
@@ -50,6 +50,13 @@ const IA_DISPATCHER = new Agent({ bodyTimeout: 0, headersTimeout: 0, keepAliveTi
 import { snapshotSaludCompleto, fusionarConservandoCondicion } from './domain/salud_activos.js';
 import { cargaActualDesdeTransformador, conservarFuenteCRG } from './domain/salud_carga_vigente.js';
 import { mergeConBaseline } from './domain/umbrales_salud_baseline.js';
+// Avisos de cumplimiento del cierre de ODT Afinia (99 §236): la lógica es dominio puro; aquí solo el cableado.
+import { procesarCorteCumplimiento, esIdCorte } from './domain/odt_afinia_cumplimiento_avisos.js';
+import * as REMITENTE from './domain/odt_afinia_cumplimiento_remitente.js';
+import { crearDepsCumplimiento, esAdminConPerfil } from './cumplimiento.mjs';
+import { crearDepsRemitente, crearVerificadorGoogle, responderHttp } from './cumplimiento_remitente.mjs';
+import * as RESUMEN from './domain/odt_afinia_cumplimiento_resumen.js';
+import { crearOperacionesResumen } from './cumplimiento_resumen.mjs';
 
 // G010: lee la config de umbrales editada por el admin (F18) con
 // fallback al baseline si el doc no existe o la lectura falla —
@@ -887,5 +894,104 @@ export const narrativaTendenciaIA = onCall(
       `metricas=${metricas.length} in=${usage.input} out=${usage.output}`);
 
     return { narrativa, modelUsed: model, usage };
+  }
+);
+
+// ══════════════════════════════════════════════════════════════
+// Avisos de CUMPLIMIENTO DEL CIERRE de ODT Afinia (99 §236)
+// ──────────────────────────────────────────────────────────────
+// Pedido del Ingeniero (2026-11-26): toda ODT debe quedar CERRADA a más tardar 20 días calendario después de su
+// EJECUCIÓN; a los 10, 15 y 20 días se avisa por correo a los destinatarios de odt_afinia_config/cumplimiento.
+//   · avisosCumplimientoCorte: al GUARDAR un corte de Indicadores (onDocumentCreated de odt_afinia_cortes/{id}; las
+//     partes van en el mismo lote, así que ya existen). Solo cortes de la versión 3 y del responsable configurado.
+//   · reprocesarAvisosCumplimiento({corteId}): solo un administrador con perfil. Re-arma lo que falte de un corte y
+//     devuelve a la cola los correos en «error», sin repetir lo ya enviado.
+//   · avisosCorreoRemitente (HTTPS, POST con JSON): la llama el script de Google de la cuenta remitente para pedir los
+//     correos en cola y avisar si salieron (functions/apps-script/). Se identifica con su token de identidad de Google
+//     (Authorization: Bearer …); la firma se verifica con google-auth-library y el aud debe ser el script APROBADO por
+//     un administrador (config.audienciaScript). Sin CORS: no se llama desde un navegador.
+// CAMBIO del 2026-11-26 (99 §236): el Ingeniero no activa la verificación en dos pasos en la cuenta remitente, así que
+// no hay contraseña de aplicación de Gmail: las funciones YA NO ENVÍAN correo ni usan ningún secreto (el despliegue de
+// estas tres no pide ninguno). Las dos primeras dejan los correos EN COLA; los envía el script con MailApp.
+// La lógica y su idempotencia: assets/js/domain/odt_afinia_cumplimiento_avisos.js y
+// odt_afinia_cumplimiento_remitente.js; la base: cumplimiento.mjs y cumplimiento_remitente.mjs.
+// Sin configuración o con activo == false no se encola nada (el motivo queda en el registro de la función).
+// maxInstances 1 + concurrency 1: de verdad un solo proceso a la vez en cada una (además de las reservas con
+// create() y las transacciones).
+// ══════════════════════════════════════════════════════════════
+const registroCumplimiento = (nivel, mensaje, datos) => (nivel === 'error' ? console.error : console.log)('[cumplimiento]', mensaje, JSON.stringify(datos || {}));
+
+function depsCumplimiento() {
+  return crearDepsCumplimiento({ db, FieldValue, log: registroCumplimiento });
+}
+// 99 §236 (pedido del 2026-11-26: «cuándo y cuántas veces notificas»): el resumen de notificaciones
+// (odt_afinia_config/cumplimiento_resumen), que escribe SOLO el servidor.
+const resumenCumplimiento = () => crearOperacionesResumen({ db, FieldValue, logica: RESUMEN });
+
+export const avisosCumplimientoCorte = onDocumentCreated(
+  {
+    document: 'odt_afinia_cortes/{id}',
+    region: 'southamerica-east1',
+    timeoutSeconds: 300,
+    maxInstances: 1,
+    concurrency: 1
+  },
+  async (event) => {
+    const id = event.params && event.params.id;
+    try {
+      await procesarCorteCumplimiento(id, depsCumplimiento(), { origen: 'al guardar el corte' });
+    } catch (e) {
+      console.error('[cumplimiento] falló el proceso del corte', id, e && e.message ? e.message : e);
+    }
+  }
+);
+
+export const reprocesarAvisosCumplimiento = onCall(
+  {
+    region: 'southamerica-east1',
+    timeoutSeconds: 300,
+    maxInstances: 1,
+    concurrency: 1
+  },
+  async (request) => {
+    const uid = request.auth && request.auth.uid;
+    if (!uid) throw new HttpsError('unauthenticated', 'Requiere sesión iniciada.');
+    const perfil = await db.doc(`usuarios/${uid}`).get();
+    if (!esAdminConPerfil({ existe: perfil.exists, datos: perfil.exists ? perfil.data() : null })) {
+      throw new HttpsError('permission-denied', 'Solo un administrador con perfil puede revisar y enviar los avisos.');
+    }
+    const corteId = request.data && request.data.corteId;
+    if (!esIdCorte(corteId)) throw new HttpsError('invalid-argument', 'El corte no es válido.');
+    let resultado;
+    try {
+      resultado = await procesarCorteCumplimiento(corteId, depsCumplimiento(), { origen: 'a pedido de ' + uid });
+    } catch (e) {
+      console.error('[cumplimiento] falló el reproceso del corte', corteId, e && e.message ? e.message : e);
+      throw new HttpsError('internal', 'No se pudieron revisar los avisos de este corte. Inténtelo de nuevo en unos minutos.');
+    }
+    // 99 §236 (resumen de notificaciones): el reproceso además lo RECALCULA desde los correos enviados. Si falla, el
+    // reproceso igual vale (queda en el registro de la función).
+    try { resultado.resumen = await resumenCumplimiento().recalcular(); } catch (e) {
+      console.error('[cumplimiento] no se pudo recalcular el resumen de notificaciones', e && e.message ? e.message : e);
+    }
+    return resultado;
+  }
+);
+
+// El verificador guarda en caché los certificados públicos de Google entre llamadas (una instancia a la vez).
+const verificarTokenGoogle = crearVerificadorGoogle();
+
+export const avisosCorreoRemitente = onRequest(
+  {
+    region: 'southamerica-east1',
+    timeoutSeconds: 60,
+    maxInstances: 1,
+    concurrency: 1,
+    cors: false,
+    invoker: 'public'      // la llama el script de Google; quién es lo decide su token de identidad (arriba)
+  },
+  async (req, res) => {
+    const deps = crearDepsRemitente({ db, FieldValue, verificarToken: verificarTokenGoogle, logica: REMITENTE, log: registroCumplimiento, resumen: resumenCumplimiento() });
+    await responderHttp(req, res, (sol) => REMITENTE.atenderRemitente(sol, deps));
   }
 );

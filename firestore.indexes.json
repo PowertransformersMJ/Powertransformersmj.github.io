@@ -477,6 +477,31 @@
         { "fieldPath": "fechaDatos",  "order": "DESCENDING" },
         { "fieldPath": "creadoEn",    "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "odt_afinia_correos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "responsableNorm", "order": "ASCENDING" },
+        { "fieldPath": "estado",          "order": "ASCENDING" },
+        { "fieldPath": "creadoEn",        "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "odt_afinia_correos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "estado",   "order": "ASCENDING" },
+        { "fieldPath": "creadoEn", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "odt_afinia_correos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "estado", "order": "ASCENDING" },
+        { "fieldPath": "nros",   "arrayConfig": "CONTAINS" }
+      ]
     }
   ],
   "fieldOverrides": [

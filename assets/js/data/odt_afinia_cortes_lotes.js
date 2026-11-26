@@ -8,13 +8,18 @@
 //     descarga del nombre del archivo o, si no la trae, el final del día de rango.hasta; ordena los cortes y
 //     elige el anterior), filasArchivo, odtsArchivo, filasResponsable, odts (cuántas), totales {total, generada,
 //     ejecutada, noEjecutada, cerrada, inactiva, otro}, porEmpresa / porTipo / porZona [{clave, …contadores}],
-//     porMes [{mes, generadas, cerradas}] (sin huecos), nPartes, version (2), creadoPor {uid, nombre}, creadoEn
+//     porMes [{mes, generadas, cerradas}] (sin huecos), nPartes, version (3), creadoPor {uid, nombre}, creadoEn
 //     (hora del servidor).
 //   · odt_afinia_cortes/{id}/partes/{k}  (2 campos): {k, odts:[{nro, empresa, tipo, zona, subestacion, prevista,
-//     cerrada, estado, principal, azt, jefe}]}, en trozos de 400 (la última, el resto): todas llenas menos la última.
+//     cerrada, estado, principal, azt, jefe, ejecucion, equipo}]}, en trozos de 400 (la última, el resto): todas llenas
+//     menos la última.
 //     VERSIÓN 2 (pedido del Ingeniero del 2026-11-24): cada ODT lleva además su AZT en sitio (`azt`) y su jefe de
 //     trabajo (`jefe`), textos de 0 a 200 (11 campos). Los cortes de la versión 1 (ODT de 9 campos) ya guardados se
 //     siguen leyendo: unirPartes acepta la forma de la versión de cada corte.
+//     VERSIÓN 3 (99 §236, 2026-11-26: cumplimiento del cierre a 20 días desde la ejecución): cada ODT lleva además su
+//     fecha de ejecución (`ejecucion`, 'aaaa-mm-dd' o vacía) y su equipo (`equipo`, texto de 0 a 200, para la tabla de
+//     los avisos): 13 campos. Los cortes nuevos son siempre de la versión 3 (version 3); los de la 1 y la 2 se siguen
+//     leyendo con su forma.
 // La regla no puede recorrer listas y tiene un tope de 1000 expresiones por documento: de cada lista (porEmpresa,
 // porTipo, porZona, porMes y las ODT de cada parte) solo revisa que sea lista, su tamaño máximo y la forma del PRIMER
 // elemento (por eso cada lista lleva al menos uno). TODOS los elementos los valida AQUÍ planCorte antes de escribir
@@ -48,17 +53,23 @@ function contadoresParaGuardar(c = {}) {
 }
 const grupoParaGuardar = (g) => ({ clave: limpiar(g.clave).slice(0, TOPES_CORTE.textoMax), ...contadoresParaGuardar(g) });
 const RE_MES = /^\d{4}-(0[1-9]|1[0-2])$/;
-/** Los campos de una ODT guardada en cada versión del corte (la 2 suma el AZT en sitio y el jefe de trabajo). */
+/**
+ * Los campos de una ODT guardada en cada versión del corte (la 2 suma el AZT en sitio y el jefe de trabajo; la 3, la
+ * fecha de ejecución y el equipo).
+ */
 export const CAMPOS_ODT_POR_VERSION = Object.freeze({
   1: Object.freeze(['nro', 'empresa', 'tipo', 'zona', 'subestacion', 'prevista', 'cerrada', 'estado', 'principal']),
-  2: Object.freeze(['nro', 'empresa', 'tipo', 'zona', 'subestacion', 'prevista', 'cerrada', 'estado', 'principal', 'azt', 'jefe'])
+  2: Object.freeze(['nro', 'empresa', 'tipo', 'zona', 'subestacion', 'prevista', 'cerrada', 'estado', 'principal', 'azt', 'jefe']),
+  3: Object.freeze(['nro', 'empresa', 'tipo', 'zona', 'subestacion', 'prevista', 'cerrada', 'estado', 'principal', 'azt', 'jefe', 'ejecucion', 'equipo'])
 });
 const textoHasta = (v, min, max) => typeof v === 'string' && v.length >= min && v.length <= max;
+/** Los campos que son fechas 'aaaa-mm-dd' o vacías (los demás, salvo nro y principal, son textos acotados). */
+const FECHAS_ODT = Object.freeze(['prevista', 'cerrada', 'ejecucion']);
 
 /**
  * ¿Tiene la forma de una ODT guardada? Los campos de su versión y nada más (versión 1: 9; versión 2: 11, con `azt` y
- * `jefe`), textos acotados, fechas 'aaaa-mm-dd' o vacías y principal sí/no. Sin `version` (1 o 2), vale cualquiera de
- * las dos formas.
+ * `jefe`; versión 3: 13, con `ejecucion` y `equipo`), textos acotados, fechas 'aaaa-mm-dd' o vacías y principal sí/no. Sin
+ * `version` (1, 2 o 3), vale cualquiera de las tres formas.
  */
 export function odtValida(o, version) {
   if (!o || typeof o !== 'object' || Array.isArray(o)) return false;
@@ -66,8 +77,8 @@ export function odtValida(o, version) {
   const campos = formas.find((c) => Object.keys(o).length === c.length && c.every((k) => k in o));
   return !!campos
     && textoHasta(o.nro, 1, TOPES_CORTE.nroMax)
-    && campos.filter((k) => !['nro', 'prevista', 'cerrada', 'principal'].includes(k)).every((k) => textoHasta(o[k], 0, TOPES_CORTE.textoMax))
-    && (o.prevista === '' || esIso(o.prevista)) && (o.cerrada === '' || esIso(o.cerrada)) && typeof o.principal === 'boolean';
+    && campos.filter((k) => !['nro', 'principal', ...FECHAS_ODT].includes(k)).every((k) => textoHasta(o[k], 0, TOPES_CORTE.textoMax))
+    && campos.filter((k) => FECHAS_ODT.includes(k)).every((k) => o[k] === '' || esIso(o[k])) && typeof o.principal === 'boolean';
 }
 
 /**

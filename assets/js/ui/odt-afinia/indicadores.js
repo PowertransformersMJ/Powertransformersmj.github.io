@@ -25,7 +25,8 @@
 //     REEMPLAZANDO el ancla (alIr con {reemplazar: true}): así «Atrás» no lo devuelve a #indicadores-cargar (que lo
 //     volvería a desviar). Si todavía no hay cortes, el aviso no habla del «último corte guardado»;
 //   · el «Estado en SGM» de la lista de ODT sale solo de las ODT que le asignaron (el repositorio lo resuelve).
-// Solo al administrador, arriba: la sección plegada «Quién más puede ver los indicadores» (indicadores-lectores.js).
+// Solo al administrador, arriba: la sección plegada «Quién más puede ver los indicadores» (indicadores-lectores.js) y,
+// desde el 2026-11-26 (99 §236), «Avisos de cumplimiento por correo» (indicadores-avisos.js, archivo nuevo).
 // app.js carga este archivo con import() y pregunta si trae lo que usa (L-102): si no carga, el resto de la
 // página sigue. Archivo NUEVO a propósito (L-102): a sus vecinos de antes solo les pide nombres que ya existían.
 // ══════════════════════════════════════════════════════════════════════════════
@@ -36,6 +37,7 @@ import { normalizarNombre, corteMasReciente, formasGuardadas } from '../../domai
 import { montarVistaCorte, BARRA_FIJA_PX } from './indicadores-vista.js';
 import { montarCargar } from './indicadores-cargar.js';
 import { montarSeccionLectores } from './indicadores-lectores.js';
+import { montarSeccionAvisos } from './indicadores-avisos.js';
 import {
   introLector, INTRO_LECTOR, VACIO_LECTOR, MSG_CARGAR_SOLO_ADMIN, MSG_CARGAR_SOLO_ADMIN_SIN_CORTES, MSG_SIN_ACCESO, ultimoCorteDeTodos
 } from '../../domain/odt_afinia_ind_lectores.js';
@@ -96,12 +98,14 @@ export async function ultimoPropio(repoCortes, historial, nombre) {
  * @param {HTMLElement} contenedor
  * @param {{vista?:'ultimo'|'corte'|'cargar', corteId?:string, repoCortes:object, sesion:object, mensaje?:string,
  *          alIr:(ancla:string, mensaje?:string, op?:{reemplazar?:boolean})=>void, lector?:boolean, repoOdt?:object,
- *          repoLectores?:object}} p  (reemplazar: cambiar el ancla sin agregar una entrada al historial del navegador)
+ *          repoLectores?:object, repoCumplimiento?:object, repoNotificaciones?:object}} p  (reemplazar: cambiar el ancla
+ *          sin agregar una entrada al historial del navegador; repoCumplimiento: el de data/odt_afinia_cumplimiento.js;
+ *          repoNotificaciones: el de data/odt_afinia_cumplimiento_notificaciones.js; ambos 99 §236)
  *   lector: la sesión NO es admin y está en la lista de lectores (solo lectura). repoOdt (solo admin): para la lista
  *   de AZT habilitados de la sección «Quién más puede ver los indicadores» (solo se le pide `candidatos`).
  */
 export async function montarIndicadores(contenedor, p) {
-  const { vista = 'ultimo', corteId, repoCortes, sesion, mensaje, alIr, repoOdt, repoLectores } = p;
+  const { vista = 'ultimo', corteId, repoCortes, sesion, mensaje, alIr, repoOdt, repoLectores, repoCumplimiento, repoNotificaciones } = p;
   vaciar(contenedor);
   const esAdmin = !!(sesion && sesion.esAdmin);
   /** Un lector de la lista (no admin): todo, solo lectura. */
@@ -157,6 +161,7 @@ export async function montarIndicadores(contenedor, p) {
   // Solo al administrador: «Quién más puede ver los indicadores» (plegada; lee al abrirse).
   if (esAdmin) {
     try { montarSeccionLectores(contenedor, { repoLectores, repoOdt, sesion }); } catch (_) { /* sin la sección: los indicadores siguen */ }
+    try { montarSeccionAvisos(contenedor, { repoCumplimiento, sesion }); } catch (_) { /* sin la sección: los indicadores siguen */ }
   }
   if (errorHistorial) {
     contenedor.appendChild(aviso(mensajeDe(errorHistorial), 'error'));
@@ -192,7 +197,7 @@ export async function montarIndicadores(contenedor, p) {
   const zona = h('div', { class: 'odt-ind-raiz' });
   contenedor.appendChild(zona);
   const vistaCorte = montarVistaCorte(zona, {
-    ...r, historial, historialTope, repoCortes, alIr, mensaje, nota, soloLectura,
+    ...r, historial, historialTope, repoCortes, alIr, mensaje, nota, soloLectura, repoCumplimiento, repoNotificaciones,
     masHistorial: (antesDe) => repoCortes.listar({ antesDe }),
     cargarSgm: typeof repoCortes.estadoSgm === 'function' ? (nros) => repoCortes.estadoSgm(nros) : null
   });
