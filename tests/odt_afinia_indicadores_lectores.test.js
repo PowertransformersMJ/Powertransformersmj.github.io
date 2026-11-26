@@ -484,7 +484,7 @@ function aVersion1(fs, id) {
   fs.store.set(ruta, { ...c, version: 1 });
   for (let k = 0; k < c.nPartes; k++) {
     const p = fs.store.get(ruta + '/partes/' + k);
-    fs.store.set(ruta + '/partes/' + k, { ...p, odts: p.odts.map(({ azt, jefe, ...resto }) => resto) });
+    fs.store.set(ruta + '/partes/' + k, { ...p, odts: p.odts.map(({ azt, jefe, ejecucion, equipo, ...resto }) => resto) });   // 99 §236: la versión 1 tampoco trae la ejecución ni el equipo
   }
 }
 

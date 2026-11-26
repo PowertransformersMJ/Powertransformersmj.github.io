@@ -261,7 +261,7 @@ describe('responsable, deduplicación y agregados', () => {
     const o2 = a.odts.find((o) => o.nro === '90000002');
     assert.equal(o2.prevista, '2026-02-10', 'la más temprana');
     assert.equal(a.previstasDistintas, 1);
-    assert.deepEqual(Object.keys(o2).sort(), ['azt', 'cerrada', 'empresa', 'estado', 'jefe', 'nro', 'prevista', 'principal', 'subestacion', 'tipo', 'zona']);
+    assert.deepEqual(Object.keys(o2).sort(), ['azt', 'cerrada', 'ejecucion', 'empresa', 'equipo', 'estado', 'jefe', 'nro', 'prevista', 'principal', 'subestacion', 'tipo', 'zona']);   // versión 3 (99 §236)
   });
   test('totales, % de cierre y «Otro» para un estado que la página no conoce', () => {
     const a = D.analizarResponsable(L, RESP_A);

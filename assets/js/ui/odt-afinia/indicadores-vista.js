@@ -37,6 +37,11 @@
 //     asignaron (las reglas de la firma y de «Por subsanar» no le dejan ver otras): las demás dicen «Sin consultar»,
 //     con una nota (NOTA_SGM_PARCIAL). Lo que al admin le pide «cargue un corte nuevo» (un corte de la versión 1 o uno
 //     INCOMPLETO), al lector le dice lo que él sí puede hacer (abrir otro del historial o avisar a un administrador).
+//   · CUMPLIMIENTO DEL CIERRE (99 §236, 2026-11-26: toda ODT CERRADA a más tardar 20 días después de su ejecución): la
+//     sección «Cumplimiento del cierre (20 días desde la ejecución)» vive en indicadores-cumplimiento.js (archivo nuevo);
+//     aquí solo se monta (entre la lista de ODT y la comparación) y se repinta con las MISMAS ODT filtradas de arriba.
+//     Pedido del 2026-11-26 («cuándo y cuántas veces notificas», 99 §236): justo arriba, el bloque ABIERTO
+//     «Notificaciones a …» (indicadores-notificaciones.js, archivo nuevo); no depende de los filtros.
 // Todo con textContent (nunca innerHTML). Archivo NUEVO a propósito (L-102): a sus vecinos de antes (comun.js)
 // solo les pide nombres que ya existían.
 // ══════════════════════════════════════════════════════════════════════════════
@@ -53,6 +58,8 @@ import {
 } from '../../domain/odt_afinia_indicadores_periodo.js';
 import { crearBloquePeriodo } from './indicadores-periodo.js';
 import { NOTA_SIN_AZT_JEFE_LECTOR, CIERRE_INCOMPLETO_LECTOR } from '../../domain/odt_afinia_ind_lectores.js';
+import { montarCumplimiento } from './indicadores-cumplimiento.js';
+import { montarNotificaciones } from './indicadores-notificaciones.js';
 
 /** Cuántas ODT se pintan de entrada en una lista (el resto con «Mostrar todas»). */
 export const TOPE_LISTA = 200;
@@ -114,12 +121,17 @@ const deDonde = (sel) => [sel.empresa, sel.tipo, sel.zona].filter(Boolean).map((
  * @param {{corte:object, odts:object[], completo?:boolean, descartadas?:number, historial?:object[],
  *          historialTope?:boolean, masHistorial?:(antesDe:object)=>Promise<{cortes:object[], tope:boolean}>,
  *          repoCortes?:object, cargarSgm?:(nros:string[])=>Promise<{mapa:Map, consultados?:string[], tope?:boolean}>,
- *          alIr:(ancla:string, mensaje?:string)=>void, mensaje?:string, nota?:string, soloLectura?:boolean}} p
+ *          alIr:(ancla:string, mensaje?:string)=>void, mensaje?:string, nota?:string, soloLectura?:boolean,
+ *          repoCumplimiento?:object, repoNotificaciones?:object}} p
  *   soloLectura: un lector que no es admin (sin «Cargar un corte nuevo»)
+ *   repoCumplimiento: el de data/odt_afinia_cumplimiento.js (99 §236; si no llega, la sección crea el suyo al abrir
+ *   el historial de correos)
+ *   repoNotificaciones: el de data/odt_afinia_cumplimiento_notificaciones.js (99 §236, «Notificaciones a …» y los
+ *   avisos de cada ODT; si no llega, cada uno crea el suyo)
  */
 export function montarVistaCorte(contenedor, {
   corte, odts = [], completo = true, descartadas = 0, historial = [], historialTope = false, masHistorial,
-  repoCortes, cargarSgm, alIr, mensaje, nota, soloLectura = false
+  repoCortes, cargarSgm, alIr, mensaje, nota, soloLectura = false, repoCumplimiento = null, repoNotificaciones = null
 }) {
   vaciar(contenedor);
   const estado = {
@@ -196,7 +208,22 @@ export function montarVistaCorte(contenedor, {
   const zonaDatos = h('div', { class: 'odt-ind-datos' });
   const zonaLista = h('section', { class: 'odt-ind-seccion odt-ind-lista', 'aria-label': 'Lista de ODT' });
   const zonaComparar = h('section', { class: 'odt-ind-seccion', 'aria-label': 'Comparación con el corte anterior' });
-  contenedor.append(zonaTarjetas, definiciones(), zonaDatos, zonaLista, zonaComparar, zonaHistorial);
+  // 99 §236: el cumplimiento del cierre. Su archivo se importa arriba (es parte de la vista: si no carga, no carga la
+  // vista); el try solo cubre un error al montarla o al pintarla: entonces la vista sigue sin la sección.
+  const zonaCumplimiento = h('section', { class: 'odt-ind-seccion odt-cum', 'aria-label': 'Cumplimiento del cierre' });
+  // 99 §236 (pedido del 2026-11-26, «cuándo y cuántas veces notificas»): el bloque «Notificaciones a …», ABIERTO y
+  // justo arriba del cumplimiento; se lee al montarse y otra vez después de un reproceso. Mismo try que la sección.
+  // Su nombre accesible es su título visible (aria-labelledby, lo pone montarNotificaciones: corrector ronda 1).
+  const zonaNotificaciones = h('section', { class: 'odt-ind-seccion odt-not' });
+  let notificaciones = null;
+  try { notificaciones = montarNotificaciones(zonaNotificaciones, { corte, repo: repoNotificaciones }); } catch (_) { notificaciones = null; }
+  let cumplimiento = null;
+  try {
+    cumplimiento = montarCumplimiento(zonaCumplimiento, {
+      corte, soloLectura, repoCumplimiento, repoNotificaciones, alReprocesar: () => { if (notificaciones) notificaciones.cargar(); }
+    });
+  } catch (_) { cumplimiento = null; }
+  contenedor.append(zonaTarjetas, definiciones(), zonaDatos, zonaLista, zonaNotificaciones, zonaCumplimiento, zonaComparar, zonaHistorial);
   /** Las ODT que cumplen los filtros Y el periodo (el mismo para el corte y para el anterior). */
   const conFiltros = (xs) => filtrarPeriodo(filtrar(xs, estado.filtros), estado.periodo);
   /** « · Periodo: del … al …» para un título (vacío sin periodo). */
@@ -587,10 +614,11 @@ export function montarVistaCorte(contenedor, {
       h('div', { class: 'odt-ind-dos' }, tablaGrupo('Por tipo de trabajo', 'tipo', ag.porTipo, ag.totales), tablaGrupo('Por zona', 'zona', ag.porZona, ag.totales))
     ].filter(Boolean));
     pintarLista();
+    if (cumplimiento) { try { cumplimiento.pintar(lista); } catch (_) { /* sin la sección: lo demás sigue */ } }
     pintarComparacion();
   }
   pintar();
   pintarHistorial();
   const listo = buscarAnterior();
-  return { estado, elegir, pintar, periodo: bloquePeriodo, anterior: listo.then(() => estado.anterior) };
+  return { estado, elegir, pintar, periodo: bloquePeriodo, anterior: listo.then(() => estado.anterior), cumplimiento, notificaciones };
 }

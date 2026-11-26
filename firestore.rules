@@ -2029,6 +2029,87 @@ service cloud.firestore {
     }
 
     // ══════════════════════════════════════════════════════════════
+    // Cumplimiento del cierre · ODT Afinia (99 §236, pedido del Ingeniero del 2026-11-26; bloque ADITIVO)
+    // Toda ODT debe quedar CERRADA a más tardar 20 días calendario después de su EJECUCIÓN. Al guardar un corte de
+    // Indicadores (versión 3), una Cloud Function deja en cola los avisos por correo de los 10, 15 y 20 días (los envía
+    // un script de Google de la cuenta remitente). Aquí, lo que la PÁGINA puede tocar (las funciones escriben con el
+    // Admin SDK, sin pasar por estas reglas):
+    //   · odt_afinia_config/cumplimiento {activo (sí/no), remitente (correo), para [{correo, nombre}] (1 a 5), cc
+    //     [correo] (0 a 5), responsable (3 a 120, sin espacios en las puntas), audienciaScript (0 a 200: el script de
+    //     Google APROBADO, ver abajo)}: EXACTAMENTE esas 6 claves. Lo leen, lo crean y lo cambian solo los
+    //     administradores con perfil; nadie lo borra ni lo lista. Los destinatarios y las copias se revisan UNO POR UNO
+    //     (como mucho 5 de cada uno: sin recorrer listas). El nombre de cada destinatario (1 a 80) es el del saludo del
+    //     correo: ningún correo ni nombre vive en el código.
+    //   · odt_afinia_config/cumplimiento_script {audienciaVista, vistaEn, ultimaConexionEn, ultimoResultado} (99 §236,
+    //     2026-11-26: los correos los envía un script de Google de la cuenta remitente, sin contraseñas): el estado de
+    //     ese script, que ESCRIBE SOLO EL SERVIDOR (la función avisosCorreoRemitente). Lo lee solo un administrador con
+    //     perfil, que aprueba el script copiando audienciaVista en audienciaScript de la configuración.
+    //   · odt_afinia_config/cumplimiento_resumen (99 §236, pedido del 2026-11-26: «cuándo y cuántas veces notificas»):
+    //     el resumen de notificaciones {enviados, porUmbral, odtAvisadas, primerEnvioEn, ultimoEnvioEn, actualizadoEn,
+    //     porRecalcular}. Lo ESCRIBE SOLO EL SERVIDOR (en la transacción del envío y en el recálculo del reproceso); lo
+    //     leen los administradores con perfil y los LECTORES de Indicadores (odtIndLector); nadie lo lista.
+    //   · odt_afinia_correos/{corteId_umbral} (el registro de cada correo) y odt_afinia_avisos/{nro_umbral} (qué aviso
+    //     recibió cada ODT): los ESCRIBE SOLO EL SERVIDOR (escritura del cliente: false, siempre). Los leen los
+    //     administradores con perfil y los LECTORES de Indicadores (odtIndLector, la misma lista de
+    //     odt_afinia_config/indicadores), con listas de limit ≤ 50.
+    // Va ANTES del bloque «Indicadores · ODT Afinia» (cuyas revisiones estáticas lo leen hasta el de la firma) y usa su
+    // odtIndLector para la lectura. Accesos a documentos: perfil (+ /admins sin perfil) y, para un lector, la lista de
+    // lectores: 3 como mucho. La forma de la configuración es la de domain/odt_afinia_cumplimiento.js
+    // (docConfigCumplimiento, RE_CORREO); tests-rules/odt_afinia_cumplimiento.rules.test.js la prueba en el emulador.
+    // ══════════════════════════════════════════════════════════════
+    function odtCumCorreo(v) {
+      return v is string && v.matches('^[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9.-]{1,180}[.][A-Za-z]{2,24}$');
+    }
+    function odtCumDestinatario(x) {
+      return x is map && x.size() == 2 && x.keys().hasOnly(['correo', 'nombre'])
+        && odtCumCorreo(x.correo) && x.nombre is string && x.nombre.matches('^\\S(.{0,78}\\S)?$');
+    }
+    function odtCumConfig() {
+      let d = request.resource.data;
+      return hasProfile() && isAdmin()
+        && d.size() == 6 && d.keys().hasOnly(['activo', 'remitente', 'para', 'cc', 'responsable', 'audienciaScript'])
+        && d.activo is bool
+        && odtCumCorreo(d.remitente)
+        && d.para is list && d.para.size() >= 1 && d.para.size() <= 5
+        && odtCumDestinatario(d.para[0])
+        && (d.para.size() < 2 || odtCumDestinatario(d.para[1]))
+        && (d.para.size() < 3 || odtCumDestinatario(d.para[2]))
+        && (d.para.size() < 4 || odtCumDestinatario(d.para[3]))
+        && (d.para.size() < 5 || odtCumDestinatario(d.para[4]))
+        && d.cc is list && d.cc.size() <= 5
+        && (d.cc.size() < 1 || odtCumCorreo(d.cc[0]))
+        && (d.cc.size() < 2 || odtCumCorreo(d.cc[1]))
+        && (d.cc.size() < 3 || odtCumCorreo(d.cc[2]))
+        && (d.cc.size() < 4 || odtCumCorreo(d.cc[3]))
+        && (d.cc.size() < 5 || odtCumCorreo(d.cc[4]))
+        && d.audienciaScript is string && d.audienciaScript.matches('^[A-Za-z0-9._:/-]{0,200}$')
+        && d.responsable is string && d.responsable.matches('^\\S.{1,118}\\S$');
+    }
+    match /odt_afinia_config/cumplimiento {
+      allow get: if hasProfile() && isAdmin();
+      allow create, update: if odtCumConfig();
+      allow list, delete: if false;
+    }
+    match /odt_afinia_config/cumplimiento_script {
+      allow get: if hasProfile() && isAdmin();
+      allow list, create, update, delete: if false;
+    }
+    match /odt_afinia_config/cumplimiento_resumen {
+      allow get: if odtIndLector();
+      allow list, create, update, delete: if false;
+    }
+    match /odt_afinia_correos/{id} {
+      allow get: if odtIndLector();
+      allow list: if request.query.limit <= 50 && odtIndLector();
+      allow create, update, delete: if false;
+    }
+    match /odt_afinia_avisos/{id} {
+      allow get: if odtIndLector();
+      allow list: if request.query.limit <= 50 && odtIndLector();
+      allow create, update, delete: if false;
+    }
+
+    // ══════════════════════════════════════════════════════════════
     // Indicadores · ODT Afinia (pedido del Ingeniero del 2026-11-23; bloque ADITIVO, aparte de la firma y de «Por subsanar»)
     // Cortes de trazabilidad: cuántas ODT hay generadas, ejecutadas y cerradas por contratista, solo de las ODT de UN
     // responsable O.D.T., leídas del CSV del «Informe Seguimiento de Órdenes de Trabajo» de Afinia. Cada corte se hace
@@ -2037,7 +2118,7 @@ service cloud.firestore {
     //   · odt_afinia_cortes/{id} (17 campos exactos): responsable, archivo {nombre, bytes, sha256}, rango {desde, hasta}
     //     ('aaaa-mm-dd'), fechaDatos ('aaaa-mm-ddThh:mm:ss': la hora de descarga del archivo; ordena los cortes),
     //     filasArchivo, odtsArchivo, filasResponsable, odts, totales (7 contadores enteros ≥ 0 que suman el total),
-    //     porEmpresa, porTipo, porZona, porMes (listas), nPartes (las que caben a 400 ODT por parte), version 2,
+    //     porEmpresa, porTipo, porZona, porMes (listas), nPartes (las que caben a 400 ODT por parte), version 3,
     //     creadoPor {uid, nombre del perfil}, creadoEn (hora del servidor). Lo crea solo un admin con perfil, en UN
     //     lote con sus partes.
     //       /partes/{k} (k = '0'..'59'): {k, odts:[…]}; solo en el lote que CREA el corte (antes no existe; después,
@@ -2048,6 +2129,10 @@ service cloud.firestore {
     //     lleva además su AZT en sitio (`azt`) y su jefe de trabajo (`jefe`), textos de 0 a 200: 11 campos. Los cortes
     //     nuevos se crean SOLO con version == 2. Los de la versión 1 (ODT de 9 campos) ya guardados se siguen leyendo
     //     igual (get/list no miran la versión) y, como todos, nunca cambian.
+    //     VERSIÓN 3 (99 §236, 2026-11-26, cumplimiento del cierre a 20 días desde la ejecución): cada ODT lleva además su
+    //     fecha de ejecución (`ejecucion`, 'aaaa-mm-dd' o vacía) y su equipo (`equipo`, texto de 0 a 200): 13 campos.
+    //     Desde entonces los cortes nuevos se crean SOLO con version == 3 (uno nuevo de la 2 o de la 1 se niega); los de
+    //     la 1 y la 2 ya guardados se siguen leyendo.
     // PRESUPUESTO: Firestore evalúa como mucho 1000 expresiones por documento (en un lote, cada documento evalúa su
     // propia regla). Por eso los campos sueltos se revisan completos, pero DENTRO de las listas (porEmpresa, porTipo,
     // porZona, porMes y las ODT de cada parte) solo se revisa que sean listas, su tamaño máximo y la forma del PRIMER
@@ -2101,13 +2186,15 @@ service cloud.firestore {
         && l[0].keys().hasOnly(['mes', 'generadas', 'cerradas'])
         && l[0].mes.matches('^[0-9]{4}-(0[1-9]|1[0-2])$');
     }
-    // La PRIMERA ODT de una parte (versión 2): los 11 campos y nada más, con su N.º (1..40), su AZT en sitio y su
-    // jefe de trabajo como textos de 0 a 200 (un número, un nulo o un texto más largo niegan).
+    // La PRIMERA ODT de una parte (versión 3): los 13 campos y nada más, con su N.º (1..40), su AZT en sitio, su
+    // jefe de trabajo y su equipo como textos de 0 a 200 (un número, un nulo o un texto más largo niegan) y su fecha
+    // de ejecución 'aaaa-mm-dd' o vacía.
     function odtIndOdt(o) {
-      return o.size() == 11
-        && o.keys().hasOnly(['nro', 'empresa', 'tipo', 'zona', 'subestacion', 'prevista', 'cerrada', 'estado', 'principal', 'azt', 'jefe'])
+      return o.size() == 13
+        && o.keys().hasOnly(['nro', 'empresa', 'tipo', 'zona', 'subestacion', 'prevista', 'cerrada', 'estado', 'principal', 'azt', 'jefe', 'ejecucion', 'equipo'])
         && o.nro.matches('^.{1,40}$')
-        && o.azt.matches('^.{0,200}$') && o.jefe.matches('^.{0,200}$');
+        && o.azt.matches('^.{0,200}$') && o.jefe.matches('^.{0,200}$') && o.equipo.matches('^.{0,200}$')
+        && o.ejecucion.matches('^([0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01]))?$');
     }
     // ── Guardar un corte (lote: el corte + sus partes), solo un admin con perfil ──
     function odtIndCorte(id) {
@@ -2137,7 +2224,7 @@ service cloud.firestore {
         // nPartes coherente con las ODT, sin divisiones: (nPartes − 1) · 400 < odts ≤ nPartes · 400.
         && odtIndEntero(d.nPartes, 1, 60)
         && (d.nPartes - 1) * 400 < d.odts && d.odts <= d.nPartes * 400
-        && d.version == 2
+        && d.version == 3
         && d.creadoPor == {'uid': request.auth.uid, 'nombre': profile().get('nombre', '')}
         && d.creadoEn == request.time
         // La ÚLTIMA parte existe al terminar el MISMO lote (y, por la cadena, todas las de antes).

@@ -26,8 +26,9 @@ const ID = 'A'.repeat(20);
 const TS = { marca: 'ts' };
 const CAMPOS_CORTE = ['archivo', 'creadoEn', 'creadoPor', 'fechaDatos', 'filasArchivo', 'filasResponsable', 'nPartes', 'odts', 'odtsArchivo',
   'porEmpresa', 'porMes', 'porTipo', 'porZona', 'rango', 'responsable', 'totales', 'version'];
-// Versión 2 (2026-11-24): cada ODT guardada lleva además su AZT en sitio y su jefe de trabajo.
-const CAMPOS_ODT = ['azt', 'cerrada', 'empresa', 'estado', 'jefe', 'nro', 'prevista', 'principal', 'subestacion', 'tipo', 'zona'];
+// Versión 2 (2026-11-24): cada ODT guardada lleva además su AZT en sitio y su jefe de trabajo; versión 3 (2026-11-26,
+// 99 §236), su fecha de ejecución y su equipo.
+const CAMPOS_ODT = ['azt', 'cerrada', 'ejecucion', 'empresa', 'equipo', 'estado', 'jefe', 'nro', 'prevista', 'principal', 'subestacion', 'tipo', 'zona'];
 
 function base() {
   const lectura = leerCsv(archivoBase());
@@ -61,7 +62,7 @@ describe('plan del lote (puro)', () => {
     assert.deepEqual(c.porMes.map((m) => m.mes), ['2026-01', '2026-02', '2026-03', '2026-04'], 'meses sin huecos');
     // Lo que la regla exige con su PRIMER elemento: que cada lista tenga al menos uno.
     for (const l of [c.porEmpresa, c.porTipo, c.porZona, c.porMes]) assert.ok(l.length >= 1);
-    assert.equal(c.nPartes, 1); assert.equal(c.version, 2);
+    assert.equal(c.nPartes, 1); assert.equal(c.version, 3);   // 99 §236: versión 3 (con la fecha de ejecución)
     assert.deepEqual(c.creadoPor, { uid: ADMIN.uid, nombre: ADMIN.nombre });
     assert.equal(c.creadoEn, TS);
   });
@@ -71,7 +72,7 @@ describe('plan del lote (puro)', () => {
     assert.equal(p.corte.fechaDatos, '2026-04-06T23:59:59');
     assert.match(p.corte.fechaDatos, /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])T([01]\d|2[0-3]):[0-5]\d:[0-5]\d$/);
   });
-  test('las partes: {k, odts} con las 11 claves de cada ODT (versión 2); todo en UNA lista de operaciones (corte primero)', () => {
+  test('las partes: {k, odts} con las 13 claves de cada ODT (versión 3); todo en UNA lista de operaciones (corte primero)', () => {
     const { lectura, analisis } = base();
     const p = planCorte({ id: ID, archivo: ARCHIVO, lectura, analisis, por: ADMIN, ts: TS });
     assert.equal(p.operaciones.length, 2);

@@ -54,6 +54,14 @@
 //   · Los cortes guardados desde ese día son la VERSIÓN 2 (VERSION_CORTE): cada ODT guardada lleva además `azt` y
 //     `jefe` (11 campos). Los de la versión 1 (9 campos) se siguen leyendo, pero no traen con qué filtrar por ellos.
 //
+// FECHA DE EJECUCIÓN (99 §236, pedido del Ingeniero del 2026-11-26: toda ODT debe quedar CERRADA a más tardar 20 días
+// calendario después de su EJECUCIÓN): se lee de «FECHA Y HORA AZT - RECIBE ZT» (CAMPOS_OPCIONALES.ejecucion; solo la
+// fecha, 'aaaa-mm-dd'; '' si viene vacía o ilegible). No es de los encabezados mínimos: si el archivo no la trae, la
+// vista previa lo avisa (MSG_SIN_COLUMNA_EJECUCION). De las filas de una ODT se toma la de la PRIMERA que la traiga (si
+// otra trae otra, se avisa). Los cortes guardados desde ese día son la VERSIÓN 3: cada ODT guardada lleva además
+// `ejecucion` y su `equipo` («EQUIPO», el de su primera fila: la tabla de los avisos lo muestra): 13 campos. El
+// cumplimiento del plazo se calcula en domain/odt_afinia_cumplimiento.js.
+//
 // Sin Firebase, sin DOM, sin red. Archivo NUEVO a propósito (L-102): ninguna pieza vieja de la caché lo nombra.
 // ══════════════════════════════════════════════════════════════════════════════
 
@@ -62,10 +70,13 @@ export const COL_CORTES = Object.freeze({
   cortes: 'odt_afinia_cortes',    // odt_afinia_cortes/{id}  (id aleatorio de 20)
   partes: 'partes'                // odt_afinia_cortes/{id}/partes/{0..59}  {k, odts:[…]}
 });
-/** 1: los primeros cortes (ODT de 9 campos). 2: desde el 2026-11-24, cada ODT con su AZT y su jefe (11 campos). */
-export const VERSION_CORTE = 2;
+/**
+ * 1: los primeros cortes (ODT de 9 campos). 2: desde el 2026-11-24, cada ODT con su AZT y su jefe (11 campos).
+ * 3: desde el 2026-11-26 (99 §236), cada ODT con su fecha de ejecución y su equipo (13 campos).
+ */
+export const VERSION_CORTE = 3;
 export const TOPES_CORTE = Object.freeze({
-  porParte: 400,              // ODT por parte (≈ 110 KB: lejos del 1 MB de un documento)
+  porParte: 400,              // ODT por parte (≈ 150 KB con los 13 campos de la versión 3: lejos del 1 MB de un documento)
   partesMax: 60,              // 24.000 ODT por corte
   responsableMin: 3,
   responsableMax: 120,
@@ -119,7 +130,11 @@ export const ENCABEZADOS_MINIMOS = Object.freeze(Object.values(CAMPOS));
 export const CAMPOS_OPCIONALES = Object.freeze({
   azt: 'AZT EN SITIO',
   jefe: 'JEFE DE TRABAJO EN SITIO',
-  jefeRespaldo: 'JEFE DE TRABAJO'
+  jefeRespaldo: 'JEFE DE TRABAJO',
+  // La fecha de ejecución de la ODT (99 §236): el AZT recibe la zona de trabajo.
+  ejecucion: 'FECHA Y HORA AZT - RECIBE ZT',
+  // El equipo intervenido (99 §236): se muestra en la lista de abiertas y en la tabla de los correos de aviso.
+  equipo: 'EQUIPO'
 });
 /** Lo que muestran los filtros (y la lista) cuando una ODT no trae el AZT o el jefe de trabajo. */
 export const SIN_DATO = '(sin dato)';
@@ -450,7 +465,9 @@ export function crearLector(contenido) {
         cerrada: fechaIso(leer(indice.cerrada)),
         estado,
         azt: recortar(leer(indice.azt)),
-        jefe: recortar(leer(indice.jefe)) || recortar(leer(indice.jefeRespaldo))
+        jefe: recortar(leer(indice.jefe)) || recortar(leer(indice.jefeRespaldo)),
+        ejecucion: fechaIso(leer(indice.ejecucion)),
+        equipo: recortar(leer(indice.equipo))
       });
     }
     return i >= fin;
@@ -480,6 +497,8 @@ export function crearLector(contenido) {
       encabezados, columnas: n, faltan, distintosAfinia,
       // ¿Trae el archivo las columnas del AZT y del jefe de trabajo? (no son de los mínimos)
       traeAzt: indice.azt >= 0, traeJefe: indice.jefe >= 0 || indice.jefeRespaldo >= 0,
+      // ¿Trae la fecha de ejecución («FECHA Y HORA AZT - RECIBE ZT»)? (99 §236; tampoco es de los mínimos)
+      traeEjecucion: indice.ejecucion >= 0,
       registros, filas: registros.length, odtsArchivo: todos.size,
       responsables, estadosFila, raras, sinNro, vacias, compartidos
     };
@@ -523,6 +542,8 @@ export const MSG_OTRO_ARCHIVO = 'Este archivo no es el «Informe Seguimiento de 
 // El corte se guarda igual (versión 2) y su filtro queda con una sola opción, «(sin dato)», con todas sus ODT.
 export const MSG_SIN_COLUMNA_AZT = 'El archivo no trae la columna «AZT EN SITIO»: el corte se guarda sin el AZT y, en su filtro, todas las ODT saldrán como «' + SIN_DATO + '».';
 export const MSG_SIN_COLUMNA_JEFE = 'El archivo no trae las columnas «JEFE DE TRABAJO EN SITIO» ni «JEFE DE TRABAJO»: el corte se guarda sin el jefe de trabajo y, en su filtro, todas las ODT saldrán como «' + SIN_DATO + '».';
+// 99 §236: sin la fecha de ejecución, el cumplimiento del cierre (20 días desde la ejecución) no se puede calcular.
+export const MSG_SIN_COLUMNA_EJECUCION = 'El archivo no trae la columna «FECHA Y HORA AZT - RECIBE ZT» (la fecha de ejecución): el corte se guarda sin ella y el cumplimiento del cierre (20 días desde la ejecución) dejará todas sus ODT como «fecha por revisar».';
 
 // ── Responsable, deduplicación y agregados ─────────────────────────────────────
 /** La entrada de la lista de responsables que corresponde a `nombre` (comparado normalizado), o null. */
@@ -538,13 +559,16 @@ export function filtrarPorResponsable(registros, nombre) {
   return (registros || []).filter((r) => (r.rc ?? normalizarNombre(r.responsable)) === c);
 }
 
-/** La ODT que se guarda (versión 2: 11 campos, con su AZT en sitio y su jefe de trabajo), desde su primera fila. */
+/**
+ * La ODT que se guarda (versión 3: 13 campos, con su AZT en sitio, su jefe de trabajo, su fecha de ejecución y su
+ * equipo), desde su primera fila.
+ */
 export function odtDeFila(r) {
   return {
     nro: recortar(r.nro, TOPES_CORTE.nroMax), empresa: recortar(r.empresa), tipo: recortar(r.tipo), zona: recortar(r.zona),
     subestacion: recortar(r.subestacion), prevista: esIso(r.prevista) ? r.prevista : '', cerrada: esIso(r.cerrada) ? r.cerrada : '',
     estado: recortar(normalizarTexto(r.estado)), principal: r.principal === true,
-    azt: recortar(r.azt), jefe: recortar(r.jefe)
+    azt: recortar(r.azt), jefe: recortar(r.jefe), ejecucion: esIso(r.ejecucion) ? r.ejecucion : '', equipo: recortar(r.equipo)
   };
 }
 
@@ -567,6 +591,11 @@ export function deduplicar(filas) {
     if (esIso(r.prevista)) {
       previo.previstas.add(r.prevista);
       if (!previo.odt.prevista || r.prevista < previo.odt.prevista) previo.odt.prevista = r.prevista;
+    }
+    // La fecha de ejecución (99 §236): la de la primera fila que la traiga; otra distinta se avisa.
+    if (esIso(r.ejecucion)) {
+      if (!previo.odt.ejecucion) previo.odt.ejecucion = r.ejecucion;
+      else if (r.ejecucion !== previo.odt.ejecucion) conflictos.push({ nro: r.nro, campo: 'ejecucion', primero: previo.odt.ejecucion, otro: r.ejecucion, linea: r.linea });
     }
     const est = recortar(normalizarTexto(r.estado));
     if (est !== previo.odt.estado) conflictos.push({ nro: r.nro, campo: 'estado', primero: previo.odt.estado, otro: est, linea: r.linea });
@@ -727,6 +756,7 @@ export function avisosDeLectura(lectura, analisis) {
   // Sin las columnas del AZT o del jefe de trabajo (no son de las mínimas): el corte se guarda igual, sin ellas.
   if (lectura.ok && lectura.traeAzt === false) out.push(MSG_SIN_COLUMNA_AZT);
   if (lectura.ok && lectura.traeJefe === false) out.push(MSG_SIN_COLUMNA_JEFE);
+  if (lectura.ok && lectura.traeEjecucion === false) out.push(MSG_SIN_COLUMNA_EJECUCION);
   if (lectura.distintosAfinia && lectura.ok) out.push('Los encabezados no son exactamente los 48 del informe de Afinia (' + lectura.columnas + ' columnas): se leyeron por su nombre. Revise que sea el «Informe Seguimiento de Órdenes de Trabajo».');
   const raras = lectura.raras || [];
   const por = (t) => raras.filter((r) => r.tipo === t);
@@ -756,6 +786,8 @@ export function avisosDeLectura(lectura, analisis) {
   if (azt.length) out.push(frase(azt.length + ' ODT vienen con AZT en sitio distintos en sus filas; se tomó el de la primera: ' + primeros(azt, 6, (c) => c.nro)));
   const jefe = analisis.conflictos.filter((c) => c.campo === 'jefe');
   if (jefe.length) out.push(frase(jefe.length + ' ODT vienen con jefes de trabajo distintos en sus filas; se tomó el de la primera: ' + primeros(jefe, 6, (c) => c.nro)));
+  const ejec = analisis.conflictos.filter((c) => c.campo === 'ejecucion');
+  if (ejec.length) out.push(frase(ejec.length + ' ODT vienen con fechas de ejecución distintas en sus filas; se tomó la de la primera fila que la trae: ' + primeros(ejec, 6, (c) => c.nro)));
   if (lectura.traeAzt !== false && analisis.sinAzt) out.push(analisis.sinAzt + ' ODT no traen AZT en sitio: en su filtro salen como «' + SIN_DATO + '».');
   if (lectura.traeJefe !== false && analisis.sinJefe) out.push(analisis.sinJefe + ' ODT no traen jefe de trabajo (ni en sitio ni asignado): en su filtro salen como «' + SIN_DATO + '».');
   if (analisis.previstasDistintas) out.push(analisis.previstasDistintas + ' ODT traen fechas previstas distintas en sus filas: se tomó la más temprana.');
