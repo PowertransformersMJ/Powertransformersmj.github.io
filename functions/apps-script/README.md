@@ -21,8 +21,12 @@ remitente** igual a la cuenta donde va a instalar el script.
    - Pulse **Guardar** (el icono del disquete).
 5. Arriba, en la lista de funciones, elija **`instalar`** y pulse **Ejecutar**.
 6. Google pide permiso: **Revisar permisos** → elija la cuenta remitente → si dice «Google no verificó esta app»,
-   pulse **Configuración avanzada** → **Ir a SGM avisos de cumplimiento** → **Permitir**. (Es su propio script:
-   envía correos desde esa cuenta, crea su disparador cada 10 minutos y habla solo con la plataforma de SGM.)
+   pulse **Configuración avanzada** → **Ir a SGM avisos de cumplimiento** → marque **TODAS las casillas** («Seleccionar
+   todo») → **Continuar**. (Es su propio script: envía correos desde esa cuenta, crea su disparador cada 10 minutos y
+   habla solo con la plataforma de SGM.) Una casilla sin marcar es un permiso que no se da: `instalar` y
+   `probarConexion` vuelven a mostrar la pantalla solo con lo que falte (99 §236.9).
+   - Si la ventana de permisos dice **«No se pudo abrir el archivo en este momento»**, es porque en ese Chrome hay
+     varias cuentas de Google abiertas: haga todo en una **ventana de incógnito** donde solo esté la cuenta remitente.
 7. En el **Registro de ejecución** debe salir «Listo: … se creó uno que corre enviarPendientes cada 10 minutos»,
    «La plataforma respondió 403: Este script todavía no está aprobado en SGM…» y «Identificador de este script: …».
    Eso es lo esperado. Deje esa ventana abierta: el identificador sirve en el paso siguiente.
