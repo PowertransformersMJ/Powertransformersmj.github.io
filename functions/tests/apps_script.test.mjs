@@ -29,8 +29,9 @@ const CODIGO = readFileSync(new URL('../apps-script/avisos-cumplimiento.gs', imp
  *   dormir: lo que hace Utilities.sleep (puede lanzar: así se corta la ejecución) · ocupado: el candado lo tiene otra
  *   ejecución · reloj: Date.now() del script
  */
-function cargar({ cupo = 100, servidor = () => ({ codigo: 200, datos: { ok: true, correos: [] } }), enviar = () => {}, disparadores = [], dormir = () => {}, ocupado = false, reloj = () => 0 } = {}) {
+function cargar({ cupo = 100, servidor = () => ({ codigo: 200, datos: { ok: true, correos: [] } }), enviar = () => {}, disparadores = [], dormir = () => {}, ocupado = false, reloj = () => 0, faltanPermisos = false } = {}) {
   const llamadas = []; const enviados = []; const registro = []; const props = new Map(); const borrados = []; const creados = []; const esperas = [];
+  const permisosPedidos = [];
   const candado = { tomado: 0, soltado: 0 };
   let quedan = cupo;
   const ctx = {
@@ -48,6 +49,9 @@ function cargar({ cupo = 100, servidor = () => ({ codigo: 200, datos: { ok: true
       sendEmail: (o) => { enviar(o); enviados.push(o); quedan -= o.to.split(',').length + (o.cc ? o.cc.split(',').length : 0); }
     },
     ScriptApp: {
+      AuthMode: { FULL: 'FULL' },
+      // Como Google: con algún permiso sin conceder, corta la ejecución (y el editor muestra la pantalla de permisos).
+      requireAllScopes: (modo) => { permisosPedidos.push(modo); if (faltanPermisos) throw new Error('Authorization is required to perform that action.'); },
       getIdentityToken: () => 'token.de.prueba',
       getProjectTriggers: () => disparadores.map((h) => ({ getHandlerFunction: () => h })),
       deleteTrigger: (t) => { borrados.push(t.getHandlerFunction()); },
@@ -74,7 +78,7 @@ function cargar({ cupo = 100, servidor = () => ({ codigo: 200, datos: { ok: true
   };
   vm.createContext(ctx);
   vm.runInContext(CODIGO, ctx, { filename: 'avisos-cumplimiento.gs' });
-  return { ctx, llamadas, enviados, registro, props, borrados, creados, esperas, candado, cupo: () => quedan };
+  return { ctx, llamadas, enviados, registro, props, borrados, creados, esperas, candado, permisosPedidos, cupo: () => quedan };
 }
 const C = (k, extra = {}) => ({ id: 'Cumplim000000000000' + k + '_10', para: ['destino.uno@prueba.test', 'destino.dos@prueba.test'], cc: ['copia.uno@prueba.test'], asunto: 'SGM · asunto ' + k, texto: 'texto ' + k, html: '<p>html ' + k + '</p>', prestamo: 'prestamo' + String(k).padStart(16, '0'), ...extra });
 /** Un servidor de mentira: entrega `correos` al pedir pendientes y responde 200 a lo demás. */
@@ -228,5 +232,21 @@ describe('instalar y probarConexion', () => {
     const sinRed = cargar({ servidor: () => new Error('timeout de prueba') });
     assert.doesNotThrow(() => sinRed.ctx.probarConexion());
     assert.match(sinRed.registro[0], /respondió 0: Sin conexión con la plataforma: timeout de prueba/);
+  });
+  test('99 §236.9: instalar y probarConexion piden ANTES todos los permisos; si falta alguno, no hacen nada más', () => {
+    const completo = cargar({ servidor: () => ({ codigo: 403, datos: { ok: false, error: 'sin_aprobar' } }) });
+    completo.ctx.instalar();
+    assert.deepEqual(completo.permisosPedidos, ['FULL', 'FULL'], 'instalar y el probarConexion que llama');
+    completo.ctx.probarConexion();
+    assert.equal(completo.permisosPedidos.length, 3);
+    const incompleto = cargar({ faltanPermisos: true, disparadores: ['enviarPendientes'] });
+    assert.throws(() => incompleto.ctx.instalar(), /Authorization is required/);
+    assert.deepEqual([incompleto.borrados.length, incompleto.creados.length, incompleto.llamadas.length], [0, 0, 0], 'ni toca disparadores ni llama');
+    assert.throws(() => incompleto.ctx.probarConexion(), /Authorization is required/);
+    assert.equal(incompleto.llamadas.length, 0);
+    // El disparador no pide permisos: ahí no hay nadie que pueda aceptarlos.
+    const disparador = cargar({ faltanPermisos: true, servidor: servidorCon([C(1)]) });
+    assert.doesNotThrow(() => disparador.ctx.enviarPendientes());
+    assert.deepEqual(disparador.permisosPedidos, []);
   });
 });

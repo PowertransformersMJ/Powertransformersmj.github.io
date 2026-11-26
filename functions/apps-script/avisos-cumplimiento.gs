@@ -30,6 +30,7 @@ const TIEMPO_MAX_TURNO_MS = 4 * 60 * 1000;
 
 /** Se corre UNA vez, a mano: borra los disparadores propios de enviarPendientes y crea uno cada 10 minutos. */
 function instalar() {
+  pedirPermisosQueFalten_();
   const disparadores = ScriptApp.getProjectTriggers();
   let borrados = 0;
   for (let i = 0; i < disparadores.length; i++) {
@@ -90,6 +91,7 @@ function enviarPendientes() {
  * SGM muestra al pedir permiso: deben ser el mismo antes de aprobarlo).
  */
 function probarConexion() {
+  pedirPermisosQueFalten_();
   const r = llamar_({ accion: 'probar' });
   Logger.log('La plataforma respondió ' + r.codigo + ': ' + r.mensaje);
   const aud = r.datos && typeof r.datos.audiencia === 'string' ? r.datos.audiencia : '';
@@ -98,6 +100,16 @@ function probarConexion() {
 }
 
 // ── Lo de adentro ─────────────────────────────────────────────
+/**
+ * La pantalla de permisos de Google trae una casilla por permiso: la que quede sin marcar no se concede, y el editor
+ * ya no vuelve a mostrar la pantalla (lo vivido al instalarlo, 99 §236.9). requireAllScopes corta la ejecución y vuelve
+ * a pedir SOLO lo que falte; con todo concedido no hace nada. Solo en las funciones que se corren a mano (instalar y
+ * probarConexion): en el disparador no hay nadie que pueda aceptar.
+ */
+function pedirPermisosQueFalten_() {
+  ScriptApp.requireAllScopes(ScriptApp.AuthMode.FULL);
+}
+
 function opcionesCorreo_(c) {
   const o = { to: (c.para || []).join(','), subject: String(c.asunto || ''), body: String(c.texto || ''), name: NOMBRE_REMITENTE };
   if (c.cc && c.cc.length) o.cc = c.cc.join(',');
