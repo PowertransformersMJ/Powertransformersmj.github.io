@@ -1,0 +1,137 @@
+/* ══════════════════════════════════════════════════════════════
+   SGM · TRANSPOWER — «Dónde se instaló» cada accesorio (tablero de Suministros, 99 §238)
+   Lo pinta assets/js/ui/suministros-instalaciones.js. Solo variables de la página (AQUA).
+   El detalle vive en una fila de «Stock por ítem»; esa tabla se desliza de lado en celular, así
+   que el panel se queda pegado a la izquierda y mide lo que se ve de la caja (100cqi), nunca
+   lo que mide la tabla: la página no se desplaza de lado. Las fichas se activan por el ancho de
+   esa caja (consulta de contenedor), no de la pantalla: en un portátil el marco del tablero puede
+   ser angosto aunque la pantalla no lo sea.
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Pista sobre la tabla y botón del código en cada fila ── */
+.inst-pista { margin: 0 0 8px; font-size: 12.5px; color: var(--ink-3); }
+.inst-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 32px; margin: -4px -6px; padding: 4px 6px;
+  background: none; border: 0; border-radius: var(--r-xs);
+  font: inherit; color: inherit; cursor: pointer; text-align: left;
+}
+.data-table .inst-btn code { color: var(--brand-deep); }   /* contraste AA (el azul claro heredado no llega a 4,5:1) */
+.inst-btn:hover code { background: rgba(0,122,255,.16); }
+.inst-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.inst-chev {
+  flex: none; width: 7px; height: 7px; margin-left: 2px;
+  border-right: 2px solid var(--brand); border-bottom: 2px solid var(--brand);
+  transform: rotate(-45deg); transition: transform var(--dur-fast) var(--ease-out);
+}
+.inst-btn[aria-expanded="true"] .inst-chev { transform: rotate(45deg); }
+.inst-activo tr[data-codigo] { cursor: pointer; }
+.data-table tbody tr.inst-sel > td { background: rgba(0,122,255,.07); }
+.data-table tbody tr.inst-sel > td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
+
+/* ── Fila del detalle ── */
+.inst-contenedor { container-type: inline-size; }
+.data-table tbody tr.inst-fila > td.inst-celda { padding: 0; cursor: default; }
+.inst-panel {
+  position: sticky; left: 0;
+  box-sizing: border-box; width: 100%; width: 100cqi;
+  padding: 14px 18px 18px;
+  background: rgba(255,255,255,.82);
+  border-top: 2px solid var(--brand);
+  color: var(--ink-2); text-align: left; white-space: normal;
+}
+.inst-cabeza { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.inst-titulo { margin: 0; font-size: 15px; font-weight: 700; line-height: 1.35; color: var(--ink-1); }
+.inst-titulo code { font-size: 13px; color: var(--brand-deep); } /* contraste AA (el <code> global es azul claro) */
+.inst-panel button.btn.inst-cerrar { flex: none; height: auto; padding: 5px 14px; font-size: 12.5px; }
+.inst-resumen { margin: 0 0 10px; font-size: 13.5px; line-height: 1.55; color: var(--ink-2); }
+.inst-resumen b { color: var(--ink-1); }
+.inst-vacio { padding: 10px 12px; background: var(--surface-sunken); border-radius: var(--r-sm); }
+.inst-nota { margin: 0 0 10px; font-size: 12.5px; color: var(--ink-3); }
+.inst-alerta {
+  margin: 0 0 10px; padding: 8px 12px; border-left: 3px solid var(--danger); border-radius: var(--r-xs);
+  background: rgba(255,59,48,.08); color: #8a1c14; font-size: 13px;
+}
+.inst-ingresos { margin: 10px 0 0; font-size: 12.5px; color: var(--ink-3); }
+.inst-pie { margin-top: 10px; text-align: right; }
+.inst-sub { font-size: 11.5px; color: var(--ink-3); font-weight: 400; }
+.inst-aviso { margin-top: 4px; font-size: 11.5px; color: #9a3412; }
+.inst-estado {
+  display: inline-block; padding: 2px 8px; border-radius: var(--r-pill);
+  font-size: 11.5px; font-weight: 600; white-space: nowrap;
+}
+.inst-estado--reg { background: rgba(22,163,74,.14); color: #166534; }
+.inst-estado--pend { background: rgba(245,158,11,.16); color: #92400e; }
+
+/* ── Tabla por transformador (dentro de la tabla de stock: se ganan sus reglas heredadas) ── */
+.inst-caja {
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+  background: #fff; border: 1px solid var(--edge-muted); border-radius: var(--r-sm);
+}
+.inst-tabla { width: 100%; border-collapse: collapse; font-size: 13px; }
+.data-table .inst-panel .inst-tabla th,
+.data-table .inst-panel .inst-tabla td { padding: 8px; vertical-align: top; text-align: left; line-height: 1.4; }
+.data-table .inst-panel .inst-tabla thead th { position: static; white-space: normal; vertical-align: bottom; }
+body.aqua .data-table .inst-panel .inst-tabla thead th { color: var(--ink-3) !important; }   /* contraste AA */
+.inst-th-sub { font-weight: 400; text-transform: none; letter-spacing: normal; }
+.data-table .inst-panel .inst-tabla tbody th,
+.data-table .inst-panel .inst-tabla tfoot th {
+  position: static; background: transparent; font: inherit; font-weight: 600;
+  letter-spacing: normal; text-transform: none; color: var(--ink-1);
+}
+.data-table .inst-panel .inst-tabla tfoot th,
+.data-table .inst-panel .inst-tabla tfoot td { border-top: 1px solid var(--edge-muted); background: var(--surface-sunken); }
+.data-table .inst-panel .inst-tabla .inst-num { text-align: right; font-family: var(--font-mono); white-space: nowrap; }
+.data-table .inst-panel .inst-tabla code { font-size: 12px; white-space: nowrap; color: var(--brand-deep); }
+.inst-linea + .inst-linea { margin-top: 3px; }
+/* Una línea por entrega: fecha · orden · movimiento · cantidad · estado juntos (se parte si no cabe). */
+.inst-entregas { margin: 0; padding: 0; list-style: none; }
+.inst-entrega + .inst-entrega { margin-top: 5px; padding-top: 5px; border-top: 1px dashed var(--edge-muted); }
+.inst-fecha { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.data-table .inst-panel .inst-tabla td.inst-col-entregas { min-width: 15em; }
+
+.inst-sr {
+  position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0;
+}
+
+/* ── Caja angosta (celular, o el marco del tablero en un portátil): cada transformador es una ficha ──
+   Las etiquetas salen de data-etiqueta; los roles ARIA del HTML mantienen la tabla para los lectores. */
+@container (max-width: 760px) {
+  .inst-panel { padding: 12px 12px 14px; }
+  .inst-cabeza { flex-wrap: wrap; }
+  .inst-caja { overflow: visible; background: transparent; border: 0; }
+  .inst-tabla, .inst-tabla tbody, .inst-tabla tfoot, .inst-tabla tr { display: block; width: 100%; }
+  .inst-tabla thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); }
+  .inst-tabla tbody tr {
+    margin: 0 0 8px; padding: 8px 10px;
+    background: #fff; border: 1px solid var(--edge-muted); border-radius: var(--r-sm);
+  }
+  .data-table .inst-panel .inst-tabla tbody th,
+  .data-table .inst-panel .inst-tabla tbody td {
+    display: grid; grid-template-columns: 7.2em minmax(0, 1fr); gap: 8px;
+    padding: 3px 0; border: 0 !important; text-align: left; white-space: normal; overflow-wrap: anywhere;
+  }
+  .data-table .inst-panel .inst-tabla tbody .inst-num { text-align: left; }
+  /* Las entregas, a todo el ancho de la ficha (etiqueta encima): menos renglones partidos, ficha más baja. */
+  .data-table .inst-panel .inst-tabla td.inst-col-entregas { min-width: 0; grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .data-table .inst-panel .inst-tabla tbody th::before,
+  .data-table .inst-panel .inst-tabla tbody td::before {
+    /* Texto alternativo vacío: el lector ya dice el encabezado de la columna (no se oye dos veces). La primera
+       línea queda para los navegadores que no entienden «/ ""». */
+    content: attr(data-etiqueta);
+    content: attr(data-etiqueta) / "";
+    font-family: var(--font-sans); font-size: 11.5px; font-weight: 400; color: var(--ink-3);
+  }
+  .data-table .inst-panel .inst-tabla tfoot tr {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px;
+    padding: 8px 10px; background: var(--surface-sunken); border-radius: var(--r-sm);
+  }
+  .data-table .inst-panel .inst-tabla tfoot th,
+  .data-table .inst-panel .inst-tabla tfoot td { display: block; padding: 0; border: 0 !important; background: transparent; }
+  .data-table .inst-panel .inst-tabla tfoot td:empty { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inst-chev { transition: none; }
+}

@@ -95,6 +95,7 @@ let huellaEnlazados = null;     // huella de los movimientos enlazados del últi
 let unsubStock = null;
 let unsubAccionesBrig = null;
 let charts = {};
+let instalaciones = null;     // 99 §238: detalle «Dónde se instaló» (null hasta que cargue su módulo)
 
 // Helpers
 function showInfo(msg, kind) {
@@ -242,8 +243,9 @@ function renderTabla() {
     const marcas = (r.marcas_disponibles && r.marcas_disponibles.length)
       ? r.marcas_disponibles.map((m) => `<span class="marca-chip">${escHtml(m)}</span>`).join(' ')
       : '—';
+    // 99 §238: `data-codigo` deja seleccionar la fila para ver dónde se instaló (ui/suministros-instalaciones.js).
     return `
-    <tr>
+    <tr data-codigo="${escHtml(r.codigo)}">
       <td><code>${escHtml(r.codigo)}</code></td>
       <td>${escHtml(r.nombre)}</td>
       <td>${marcas}</td>
@@ -259,6 +261,8 @@ function renderTabla() {
     </tr>`;
   }).join('');
   window.sgmRefreshIcons?.();
+  // 99 §238: botones de cada ítem y, si hay uno abierto, su detalle «Dónde se instaló» con los datos nuevos.
+  if (instalaciones) try { instalaciones.alPintarTabla(); } catch (err) { console.warn('[instalaciones]', err); }
 }
 
 // ── Charts ──
@@ -697,6 +701,20 @@ function cargarRelectura() {
     pintarLecturaOrdenes();
   }, (err) => console.warn('[nexo] relectura de órdenes no disponible:', err));
 }
+/* ─── «Dónde se instaló» cada accesorio (99 §238) ─── */
+// Al seleccionar una fila de «Stock por ítem» se abre, debajo, dónde y cuánto se instaló de ese ítem (movimientos
+// EGRESO + lo por registrar de las órdenes), cuadrado con −Egresos. Módulo nuevo cargado perezoso (`30 L-102`): si
+// falta o falla, la tabla sigue como antes. Solo lee lo que el tablero ya tiene en memoria.
+function cargarInstalaciones() {
+  import('./ui/suministros-instalaciones.js').then((m) => {
+    if (typeof m.crearDetalleInstalaciones !== 'function') return;
+    instalaciones = m.crearDetalleInstalaciones({ tbody, columnas: 11, datos: () => ({ catalogo: cacheStockGlobal,
+      movimientos: cacheMovs, nexo, parque: parqueNexo, ordenes: ordenesNexo, contratoId: getContratoActivo(),
+      parqueEstado: parqueFallo ? 'fallo' : (parqueNexo === null ? 'leyendo' : 'leido') }) });
+    if (stockLlego) renderTabla();
+  }, (err) => console.warn('[instalaciones] detalle no disponible:', err));
+}
+
 /** (b) Al volver a la pestaña, si la última lectura tiene más de un minuto. */
 function alVolverALaPestana() {
   if (!REL || !relector) return;
@@ -771,6 +789,7 @@ $('btnActualizarOrdenes')?.addEventListener('click', () => { if (relector) relec
 document.addEventListener('visibilitychange', alVolverALaPestana);
 
 arrancar();
+cargarInstalaciones();   // 99 §238
 // Si los datos llegan antes que la sesión, el registro automático espera a que la sesión esté lista.
 window.addEventListener('sgm:session-ready', () => autoRegistrar(), { once: true });
 document.addEventListener('sgm:session-ready', () => autoRegistrar(), { once: true });
